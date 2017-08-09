@@ -1,0 +1,17 @@
+zip =
+  \n.Tr_((2*n)*(n-1))
+  (((((id^(n-x))*(sym(1,1)^x))*(id^(n-x)))^(x<--n))&
+   sym((2*n)*(n-1),2*n));
+
+unzip =
+  \n.Tr_((2*n)*(n - 1))
+  (((((id^(x+1))*(sym(1,1)^((n-x)-1)))*(id^(x+1)))^(x<--n))&
+   sym((2*n)*(n-1),2*n));
+
+sequencer =
+  \n.(((dupl^n)&unzip(n:I)) *
+    Tr_n(sym(n-1,1)&((fifofull&dupl)*((fifo & dupl)^(n-1)))&
+         unzip(n:I)))&
+    ((id^n)*((zip(n:I)) & (drain^n)));
+
+(writer^3) & sequencer 3 & (reader^3)

@@ -1,0 +1,6 @@
+exrouter =
+  dupl & (dupl*id) &
+  (((lossy*lossy) & (dupl*dupl) & (id*swap*id) & (id*id*merger))*id) &
+  (id*id*drain);
+
+writer! & exrouter & reader!
