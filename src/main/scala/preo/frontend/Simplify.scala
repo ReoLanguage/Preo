@@ -351,71 +351,74 @@ object Simplify {
     * @param con connector to be simplified
     * @return simplified connector
     */
-  def apply(con:Connector): Connector = con match {
-    case Seq(c1,c2) => (apply(c1),apply(c2)) match {
+  def apply(con:Connector): Connector  = simplifyWithTypeChk(con,DSL.typeCheck)
+  def unsafe(con:Connector): Connector = simplifyWithTypeChk(con,DSL.unsafeTypeCheck)
+
+  private def simplifyWithTypeChk(con:Connector,tcheck: Connector=>Boolean): Connector = con match {
+    case Seq(c1,c2) => (simplifyWithTypeChk(c1,tcheck),simplifyWithTypeChk(c2,tcheck)) match {
       case (Id(_), cc2) if !DSL.isFamily(cc2) => cc2
       case (cc1, Id(_)) if !DSL.isFamily(cc1) => cc1
       case (cc1,cc2) => Seq(cc1,cc2)
     }
-    case Par(c1,c2) => (apply(c1),apply(c2)) match {
-      case (Par(c1a,c2a),cc2) => apply(Par(c1a,Par(c2a,cc2))) // group on the right
+    case Par(c1,c2) => (simplifyWithTypeChk(c1,tcheck),simplifyWithTypeChk(c2,tcheck)) match {
+      case (Par(c1a,c2a),cc2) => simplifyWithTypeChk(Par(c1a,Par(c2a,cc2)),tcheck) // group on the right
       case (Id(Port(IVal(0))), cc2) => cc2 // drop id_0
       case (cc1, Id(Port(IVal(0)))) => cc1
       case (Id(Port(IVal(n1))), Id(Port(IVal(n2)))) => Id(Port(IVal(n1+n2))) // merge id*id
-      case (Id(Port(IVal(n1))), Par(Id(Port(IVal(n2))),cc2)) => apply(Par(Id(Port(IVal(n1+n2))),cc2))
+      case (Id(Port(IVal(n1))), Par(Id(Port(IVal(n2))),cc2)) => simplifyWithTypeChk(Par(Id(Port(IVal(n1+n2))),cc2),tcheck)
       case (cc1,cc2) => Par(cc1,cc2)
     }
-    case Id(i) => con
+    case Id(_) => con
     case Symmetry(i,j) => (apply(i),apply(j)) match {
       case (Port(IVal(0)),j2) => Id(j2)
       case (i2,Port(IVal(0))) => Id(i2)
       case (i2,j2) => Symmetry(i2,j2)
     }
     case Trace(i,c) => apply(i) match {
-      case Port(IVal(0)) => apply(c)
-      case i2 => Trace(i2,apply(c))
+      case Port(IVal(0)) => simplifyWithTypeChk(c,tcheck)
+      case i2 => Trace(i2,simplifyWithTypeChk(c,tcheck))
     }
     case Prim(n,a,b,e) => Prim(n,apply(a),apply(b),e)
     case Exp(a, c) => Eval(a) match {
       case IVal(v) if v<1  => Id(Port(IVal(v)))
-      case IVal(v) => apply(Par(c,Exp(IVal(v-1),c)))
-      case n => Exp(n,apply(c))
+      case IVal(v) => simplifyWithTypeChk(Par(c,Exp(IVal(v-1),c)),tcheck)
+      case n => Exp(n,simplifyWithTypeChk(c,tcheck))
     }
     case ExpX(x, a, c) => Eval(a) match {
       case IVal(v) if v<1 => Id(Port(IVal(0)))
-      case IVal(v) => apply(Par(ExpX(x,IVal(v-1),c),Substitution(x,IVal(v-1))(c)))
-      case n => ExpX(x,n,apply(c))
+      case IVal(v) => simplifyWithTypeChk(Par(ExpX(x,IVal(v-1),c),Substitution(x,IVal(v-1))(c)),tcheck)
+      case n => ExpX(x,n,simplifyWithTypeChk(c,tcheck))
     }
     case Choice(b, c1, c2) => Eval(b) match {
-      case BVal(true) => apply(c1)
-      case BVal(false) => apply(c2)
-      case b2 => Choice(b,apply(c1),apply(c2))
+      case BVal(true) => simplifyWithTypeChk(c1,tcheck)
+      case BVal(false) => simplifyWithTypeChk(c2,tcheck)
+      case b2 => Choice(b,simplifyWithTypeChk(c1,tcheck),simplifyWithTypeChk(c2,tcheck))
     }
-    case IAbs(x, c) => IAbs(x,apply(c))
-    case BAbs(x, c) => BAbs(x,apply(c))
-    case IApp(c,a) => (apply(c),apply(a)) match {
-      case (IAbs(x,c2),a2) => apply(Substitution(x,a2)(c2))
+    case IAbs(x, c) => IAbs(x,simplifyWithTypeChk(c,tcheck))
+    case BAbs(x, c) => BAbs(x,simplifyWithTypeChk(c,tcheck))
+    case IApp(c,a) => (simplifyWithTypeChk(c,tcheck),apply(a)) match {
+      case (IAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
       case (Seq(c1,c2),a2) =>
-        if (DSL.typeCheck(IApp(c1,a2))) apply(Seq(IApp(c1,a2),c2))
-        else apply(Seq(c1,IApp(c2,a2)))
+        if (tcheck(IApp(c1,a2))) simplifyWithTypeChk(Seq(IApp(c1,a2),c2),tcheck)
+        else simplifyWithTypeChk(Seq(c1,IApp(c2,a2)),tcheck)
       case (Par(c1,c2),a2) =>
-        if (DSL.typeCheck(IApp(c1,a2))) apply(Par(IApp(c1,a2),c2))
-        else apply(Par(c1,IApp(c2,a2)))
+        if (tcheck(IApp(c1,a2))) simplifyWithTypeChk(Par(IApp(c1,a2),c2),tcheck)
+        else simplifyWithTypeChk(Par(c1,IApp(c2,a2)),tcheck)
       case (c2,a2) => IApp(c2,a2)
     }
-    case BApp(c,a) => (apply(c),apply(a)) match {
-      case (BAbs(x,c2),a2) => apply(Substitution(x,a2)(c2))
+    case BApp(c,a) => (simplifyWithTypeChk(c,tcheck),apply(a)) match {
+      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
       case (Seq(c1,c2),a2) =>
-        if (DSL.typeCheck(BApp(c1,a2))) apply(Seq(BApp(c1,a2),c2))
-        else apply(Seq(c1,BApp(c2,a2)))
+        if (tcheck(BApp(c1,a2))) simplifyWithTypeChk(Seq(BApp(c1,a2),c2),tcheck)
+        else simplifyWithTypeChk(Seq(c1,BApp(c2,a2)),tcheck)
       case (Par(c1,c2),a2) =>
-        if (DSL.typeCheck(BApp(c1,a2))) apply(Par(BApp(c1,a2),c2))
-        else apply(Par(c1,BApp(c2,a2)))
+        if (tcheck(BApp(c1,a2))) simplifyWithTypeChk(Par(BApp(c1,a2),c2),tcheck)
+        else simplifyWithTypeChk(Par(c1,BApp(c2,a2)),tcheck)
       case (c2,a2) => BApp(c2,a2)
-//      case (BAbs(x,c2),a2) => apply(Substitution(x,a2)(c2))
-//      case (c2,a2) => BApp(c2,a2)
+      //      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
+      //      case (c2,a2) => BApp(c2,a2)
     }
-    case Restr(c, phi) => (apply(c),Eval(phi)) match{
+    case Restr(c, phi) => (simplifyWithTypeChk(c,tcheck),Eval(phi)) match{
       case (c2,BVal(true)) => c2
       case (c2,phi2) => Restr(c,phi2)
     }

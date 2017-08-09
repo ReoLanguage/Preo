@@ -21,7 +21,7 @@ sealed abstract class Connector {
 
   // hides the details to the developer/user
   override def toString = try {
-    Show(this) + "\n   : "+Show(DSL.typeOf(this))
+    Show(this) + "\n   : "+Show(DSL.unsafeTypeOf(this)) // note: using lightweight version in toString
   } catch {
     case e: TypeCheckException => Show(this)+ "\n   ! Type error: "+e.getMessage
   }

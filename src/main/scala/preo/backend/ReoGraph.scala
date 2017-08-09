@@ -103,6 +103,16 @@ object ReoGraph {
       val pair = out->in
       val (es2,m2) = redGraphAux(tl,m,ins)
       (es2,pair::m2)
+    //    case Edge(CPrim("merger",_,_,_),List(in1,in2),List(out))::tl if !(ins(in1) || ins(in2))=>
+    //      val pair1 = out->in1
+    //      val pair2 = out->in2
+    //      val (es2,m2) = redGraphAux(tl,m,ins)
+    //      (es2,pair1::pair2::m2)
+    case Edge(CPrim("dupl",_,_,_),List(in),List(out1,out2))::tl => // if !ins(in) =>
+      val pair1 = out1->in
+      val pair2 = out2->in
+      val (es2,m2) = redGraphAux(tl,m,ins)
+      (es2,pair1::pair2::m2)
     case edge::tl =>
       val (es2,m2) = redGraphAux(tl,m,ins)
       (edge::es2,m2)

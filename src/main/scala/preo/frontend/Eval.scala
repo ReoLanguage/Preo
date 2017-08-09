@@ -239,7 +239,7 @@ object Eval {
     * @param c connector to be reduced
     * @return reduced connector
     */
-  def reduce(c: Connector): CoreConnector = conn2CoreConn(Simplify(instantiate(c)))
+  def reduce(c: Connector): CoreConnector = conn2CoreConn(Simplify(instantiate(c)),reduce)
 
   /**
     * Unsafe version of [[reduce()]] - without using constraint solver, and selecting
@@ -249,16 +249,16 @@ object Eval {
     * @return reduced connector
     */
   def unsafeReduce(c: Connector): CoreConnector = unsafeInstantiate(c) match {
-    case Some(c2) => conn2CoreConn(Simplify(c2))
+    case Some(c2) => conn2CoreConn(Simplify.unsafe(c2),unsafeReduce)
     case None => throw new TypeCheckException("Failed to reduce connector (with unsafe operator): " + Show(c))
   }
 
-  private def conn2CoreConn(c:Connector): CoreConnector = c match {
-    case Seq(c1, c2) => CSeq(reduce(c1), reduce(c2))
-    case Par(c1, c2) => CPar(reduce(c1), reduce(c2))
+  private def conn2CoreConn(c:Connector,red:Connector=>CoreConnector): CoreConnector = c match {
+    case Seq(c1, c2) => CSeq(red(c1), red(c2))
+    case Par(c1, c2) => CPar(red(c1), red(c2))
     case Id(i) => CId(reduce(i))
     case Symmetry(i, j) => CSymmetry(reduce(i), reduce(j))
-    case Trace(i, c) => CTrace(reduce(i), reduce(c))
+    case Trace(i, c) => CTrace(reduce(i), red(c))
     case Prim(name, i, j, extra) => CPrim(name, reduce(i), reduce(j), extra)
     case c2 => throw new TypeCheckException("Failed to reduce connector " + Show(c2))
   }
@@ -318,7 +318,7 @@ object Eval {
         }
       }
     }
-    val reduced = Simplify(subst(res))
+    val reduced = Simplify.unsafe(subst(res))
 
     def noFalseRestr(c: Connector): Boolean = c match {
       case Seq(c1, c2) => noFalseRestr(c1) && noFalseRestr(c2)
