@@ -389,6 +389,9 @@ object Simplify {
       case IVal(v) => simplifyWithTypeChk(Par(ExpX(x,IVal(v-1),c),Substitution(x,IVal(v-1))(c)),tcheck)
       case n => ExpX(x,n,simplifyWithTypeChk(c,tcheck))
     }
+
+    case SubConnector(name, c) => SubConnector(name, simplifyWithTypeChk(c, tcheck))
+
     case Choice(b, c1, c2) => Eval(b) match {
       case BVal(true) => simplifyWithTypeChk(c1,tcheck)
       case BVal(false) => simplifyWithTypeChk(c2,tcheck)

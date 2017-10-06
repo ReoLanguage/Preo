@@ -133,6 +133,10 @@ object TypeCheck {
       // Type(args, Port(newi), Port(newj), EQ(newi,ci) & EQ(newj,cj) & /*nonNeg(newi,newj)*/ nonNeg(a) & phi2,isG)
       Type(args, Port(ci), Port(cj), /*nonNeg(newi,newj)*/ nonNeg(a) & phi2,isG)
     // END OF TRICKY CASE
+
+    case SubConnector(_, c) => check (gamma, c)
+
+
     case Choice(b, c1, c2) =>
       val Type(args1,i1,j1,phi1,isG1) = check(gamma,c1)
       val Type(args2,i2,j2,phi2,isG2) = check(gamma,c2)
