@@ -167,6 +167,7 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
     case Trace(i, c) => Trace(subst(it,i),subst(it,c))
     case Prim(name, i, j,e) => Prim(name,subst(it,i),subst(it,j),e)
     case Exp(a, c) =>  Exp(subst(it,a),subst(it,c))
+    case SubConnector(name, sub) => SubConnector(name, subst(it, sub))
     case ExpX(x, a, c) => it match {
       case IItem(`x`, e) => ExpX(x,subst(it,a),c)
       case _ => ExpX(x,subst(it,a),subst(it,c))
@@ -183,6 +184,7 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
     case IApp(c, a) => IApp(subst(it,c),subst(it,a))
     case BApp(c, b) => BApp(subst(it,c),subst(it,b))
     case Restr(c, phi) => Restr(subst(it,c),subst(it,phi))
+
   }
 
   /**

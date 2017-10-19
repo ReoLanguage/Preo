@@ -3,7 +3,7 @@ name := "PReo"
 version := "1.1"
 
 scalaVersion := "2.11.8"
-  
+
 // more warnings
 scalacOptions ++= Seq("-unchecked", "-deprecation","-feature")
 
