@@ -59,15 +59,15 @@ object Parser extends RegexParsers {
 
   // Connector Literals:
   def lit: Parser[Connector] =
-    "Tr_"~iexpr~conn                ^^ {case _~e~c     => Trace(Port(e),c)}        |
-      "sym"~"("~iexpr~","~iexpr~")"   ^^ {case _~_~e1~_~e2~_ => Symmetry(Port(e1),Port(e2))} |
-      bexpr ~ "?" ~ conn ~ "+" ~ conn ^^ {case b~_~c1~_~c2 => Choice(b,c1,c2)}       |
-      "\\" ~ identifier ~ lambdaCont  ^^ {case _~ s ~ cont => cont(str2IVar(s))} |
-      "(" ~ conn ~ ")"                ^^ {case _ ~ c ~ _ => c}                       |
-      "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => IAbs(IVar("n"),c^IVar("n"))} |
-      identifier~"!"                  ^^ {case s~_ => IAbs(IVar("n"),inferPrim(s)^IVar("n"))} |
-      identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,c1)} |
-      identifier                      ^^ { inferPrim }
+    "Tr_"~iexpr~conn                ^^ {case _~e~c     => Trace(Port(e),c)}                 |
+    "sym"~"("~iexpr~","~iexpr~")"   ^^ {case _~_~e1~_~e2~_ => Symmetry(Port(e1),Port(e2))}  |
+    bexpr ~ "?" ~ conn ~ "+" ~ conn ^^ {case b~_~c1~_~c2 => Choice(b,c1,c2)}                |
+    "\\" ~ identifier ~ lambdaCont  ^^ {case _~ s ~ cont => cont(str2IVar(s))}              |
+    "(" ~ conn ~ ")"                ^^ {case _ ~ c ~ _ => c}                                |
+    "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => IAbs(IVar("n"),c^IVar("n"))}        |
+    identifier~"!"                  ^^ {case s~_ => IAbs(IVar("n"),inferPrim(s)^IVar("n"))} |
+    identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,c1)} |
+    identifier                      ^^ { inferPrim }
 
   def lambdaCont: Parser[Var=>Connector] =
     "." ~ conn                   ^^ {case _~ c   => lam(_:Var,c)}                   |

@@ -69,6 +69,12 @@ object Repository {
 
 //  val ndupl = lam(n, Trace( NN, ((dupl * (id^x))^(x<--(n-1))) & sym(NN,n) ))
 //  val dupl4 = lam(n, Trace( 5 , ((dupl * (id^x))^(x<--3))     & sym(5,4) ))
-  val ndupl = lam(n, Tr( ((n+1)*(n-2))/2, ((dupl * (id^x))^(x<--(n-1))) & sym( ((n+1)*(n-2))/2 ,n) ))
+//  val ndupl = lam(n, Tr( ((n+1)*(n-2))/2, ((dupl * (id^x))^(x<--(n-1))) & sym( ((n+1)*(n-2))/2 ,n) ))
+
+  val dupls = lam (n, Tr(n-1,(id * (dupl^(n-1))) & sym(1,(n-1)*2)))
+
+  val mergers = lam (n, Tr(n-1,sym((n-1)*2,1) & (id * (merger^(n-1)))))
+
+  val node = mergers & dupls
 
 }

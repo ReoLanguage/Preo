@@ -1,0 +1,9 @@
+dupls = \d . Tr_(d-1)
+  ((id * (dupl^(d-1))) & sym(1,(d-1)*2));
+
+mergers = \n . Tr_(n-1)
+  (sym((n-1)*2,1) & (id * (merger^(n-1))));
+
+node = mergers & dupls;
+
+(writer^3) & node & (reader^4)
