@@ -15,23 +15,23 @@ object Show {
     case Trace(i, c)    => s"Tr_${showP(i)}{${apply(c)}}"
     case Prim(name,_,_,_) => name
     case Exp(a, c)  => s"${showP(c)}^${showP(a)}"
-    case ExpX(x, a, c)  => s"${showP(c)}^{${apply(x)}<--${apply(a)}}"
+    case ExpX(x, a, c)  => s"${showP(c)}^{${apply(x:IExpr)}<--${apply(a)}}"
     case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1)} ⊕ ${showP(c2)}"
                              //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
-    case IAbs(x, c)     => s"\\${apply(x)}${showAP(c)}"
-    case BAbs(x, c)     => s"\\${apply(x)}${showAP(c)}"
-    case IApp(c, a)     => s"${showP(c)}(${apply(a)})"
-    case BApp(c, b)     => s"${showP(c)}(${apply(b)})"
+    case Abs(x, c)     => s"\\${apply(x)}${showAP(c)}"
+//    case BAbs(x, c)     => s"\\${apply(x)}${showAP(c)}"
+    case App(c, a)     => s"${showP(c)}(${apply(a)})"
+//    case BApp(c, b)     => s"${showP(c)}(${apply(b)})"
     case Restr(c,b)     => s"${showP(c)} | ${showP(b)}"
   }
   private def showP(con:Connector): String = con match {
-    case Seq(_,_) | Par(_,_) | Choice(_,_,_) | IAbs(_,_) | BAbs(_,_) |
+    case Seq(_,_) | Par(_,_) | Choice(_,_,_) | Abs(_,_) |
          Exp(_,_) | ExpX(_,_,_) | Restr(_,_) => s"(${apply(con)})"
     case _ => apply(con)
   }
   private def showAP(con:Connector): String = con match {
-    case IAbs(x,c) => s" ${apply(x)}${showAP(c)}"
-    case BAbs(x,c) => s" ${apply(x)}${showAP(c)}"
+    case Abs(x,c) => s" ${apply(x)}${showAP(c)}"
+//    case BAbs(x,c) => s" ${apply(x)}${showAP(c)}"
     case _ => s".${showP(con)}"
   }
 
@@ -45,6 +45,14 @@ object Show {
   private def showP(itf:Interface):String = itf match {
     case Port(a) => showP(a)
     case _ => s"(${apply(itf)})"
+  }
+
+  def apply(v:Var): String = v.x
+
+  def apply(exp: Expr): String = exp match {
+    case SomeVar(x) => x
+    case e: IExpr => apply(e)
+    case e: BExpr => apply(e)
   }
 
   def apply(exp: IExpr): String = exp match {
@@ -85,6 +93,7 @@ object Show {
   }
 
   def showVar(v:Var) = v match {
+    case SomeVar(x) => x+":?"
     case IVar(x) => x+":I"
     case BVar(x) => x+":B"
   }
@@ -113,14 +122,14 @@ object Show {
     case ExpX(x, a, c)  => s"(${showSP(c)}^(${showP(x)}<--${showP(a)}))"
     case Choice(b, c1, c2) => s"${showP(b)} ? ${showSP(c1)} + ${showSP(c2)}"
     //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
-    case IAbs(x, c)     => s"lam(${apply(x)},${source(c)})"
-    case BAbs(x, c)     => s"lam(${apply(x)}${source(c)})"
-    case IApp(c, a)     => s"${showSP(c)}(${apply(a)})"
-    case BApp(c, b)     => s"${showSP(c)}(${apply(b)})"
+    case Abs(x, c)     => s"lam(${apply(x)},${source(c)})"
+//    case BAbs(x, c)     => s"lam(${apply(x)}${source(c)})"
+    case App(c, a)     => s"${showSP(c)}(${apply(a)})"
+//    case BApp(c, b)     => s"${showSP(c)}(${apply(b)})"
     case Restr(c,b)     => s"${showSP(c)} | ${showP(b)}"
   }
   private def showSP(con:Connector): String = con match {
-    case Seq(_,_) | Par(_,_) | Choice(_,_,_) | IAbs(_,_) | BAbs(_,_) |
+    case Seq(_,_) | Par(_,_) | Choice(_,_,_) | Abs(_,_) |
          Exp(_,_) | ExpX(_,_,_) | Restr(_,_) => s"(${source(con)})"
     case _ => source(con)
   }

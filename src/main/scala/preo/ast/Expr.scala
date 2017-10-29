@@ -5,6 +5,8 @@ sealed trait Var {
   def unary_! = LamWrap(List(this)) // helper to DSL (lambdas: !x -> conn)
 }
 
+case class SomeVar(x:String) extends Expr with Var // can have any type
+
 sealed abstract class Expr
 
 /**

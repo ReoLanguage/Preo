@@ -29,9 +29,10 @@ object DSL {
   def lam(v:Var,c:Connector): Connector= v match {
     case v2:IVar => lam(v2,c)
     case v2:BVar => lam(v2,c)
+    case SomeVar(x) => lam(IVar(x),c) // by default - Int
   }
-  def lam(x:I,c:Connector) = IAbs(x,c)
-  def lam(x:B,c:Connector) = BAbs(x,c)
+  def lam(x:I,c:Connector) = Abs(x,c)
+  def lam(x:B,c:Connector) = Abs(x,c)
   def not(b:BExpr) = Not(b)
 
   val sym  = Symmetry

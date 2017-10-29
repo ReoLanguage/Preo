@@ -14,10 +14,10 @@ sealed abstract class Connector {
   def :^(that:IExpr) = Exp(that,this)           // experimenting with precedence
   def :^(x:IVar,that:IExpr) = ExpX(x,that,this) // experimenting with precedence
   def :^(ew:ExpWrap) = ExpX(ew.x,ew.to,this)    // experimenting with precedence
-  def apply(that:IExpr): Connector = IApp(this,that)
-  def apply(that:BExpr): Connector = BApp(this,that)
+  def apply(that:Expr): Connector = App(this,that)
+//  def apply(that:BExpr): Connector = BApp(this,that)
   def |(phi:BExpr): Connector = Restr(this,phi)
-  def |+|(that:Connector) = BAbs(BVar("$"),Choice(BVar("$"),this,that))
+  def |+|(that:Connector) = Abs(BVar("$"),Choice(BVar("$"),this,that))
 
   // hides the details to the developer/user
   override def toString = try {
@@ -47,9 +47,11 @@ case class Prim(name:String,i:Interface,j:Interface,extra:Option[Any]=None) exte
 case class Exp(a:IExpr, c:Connector) extends Connector
 case class ExpX(x:IVar, a:IExpr, c:Connector) extends Connector
 case class Choice(b:BExpr, c1:Connector, c2:Connector) extends Connector
-case class IAbs(x:IVar, c:Connector) extends Connector
-case class BAbs(x:BVar, c:Connector) extends Connector
-case class IApp(c:Connector, a:IExpr) extends Connector
-case class BApp(c:Connector, b:BExpr) extends Connector
+case class Abs(x:Var, c:Connector) extends Connector
+//case class IAbs(x:IVar, c:Connector) extends Connector
+//case class BAbs(x:BVar, c:Connector) extends Connector
+case class App(c:Connector, a:Expr) extends Connector
+//case class IApp(c:Connector, a:IExpr) extends Connector
+//case class BApp(c:Connector, b:BExpr) extends Connector
 
 case class Restr(c:Connector,phi:BExpr) extends Connector

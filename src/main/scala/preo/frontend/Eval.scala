@@ -23,6 +23,18 @@ object Eval {
     * @param e expression being evaluated
     * @return
     */
+  def apply(e: Expr): Expr = e match {
+    case SomeVar(x) => e
+    case ex: IExpr => apply(ex)
+    case ex: BExpr => apply(ex)
+  }
+
+  /**
+    * Evaluates an expression by performing operations over known values
+    *
+    * @param e expression being evaluated
+    * @return
+    */
   def apply(e: IExpr): IExpr = e match {
     case IVal(_) => e
     case IVar(_) => e
@@ -186,6 +198,7 @@ object Eval {
           if (subst(x) == x) subst += (x, IVal(1))
         case x@BVar(_) =>
           if (subst(x) == x) subst += (x, BVal(true))
+        case SomeVar(x) => throw new TypeCheckException(s"expanding variable $x with unknown type")
       }
     }
     subst
@@ -219,15 +232,16 @@ object Eval {
 
     var res = c
     for (a <- type4.args.vars) {
-      var (expr, subst_) = subst.pop(a)
+      var (expr, isInt, subst_) = subst.pop(a)
       subst = subst_
       expr match {
-        case Some(e: IExpr) => res = res.apply(e)
-        case Some(e: BExpr) => res = res.apply(e)
-        case None => a match {
-          case _: IVar => res = res.apply(IVal(1))
-          case _: BVar => res = res.apply(BVal(true))
-        }
+        case Some(e: Expr) => res = res.apply(e)
+//        case Some(e: BExpr) => res = res.apply(e)
+        case None => res = if (isInt) res.apply(IVal(1)) else res.apply(BVal(true))
+//          a match {
+//          case _: IVar => res = res.apply(IVal(1))
+//          case _: BVar => res = res.apply(BVal(true))
+//        }
       }
     }
     subst(res)
@@ -301,21 +315,23 @@ object Eval {
 
     var res = c
     for (a <- type4.args.vars) {
-      var (expr, subst_) = subst.pop(a) // a -> expr, and rest is subst_
+      var (expr,isInt, subst_) = subst.pop(a) // a -> expr, and rest is subst_
       subst = subst_
       expr match {
-        case Some(e: IExpr) => // if e has free variables, give them default values, and update the substitution
-          val e2 = Eval(addDefaultsI(e))
+        case Some(e: Expr) => // if e has free variables, give them default values, and update the substitution
+          val e2 = Eval(addDefaults(e,isInt))
           subst = subst.update(a, e2)
           res = res.apply(e2)
-        case Some(e: BExpr) =>
-          val e2 = Eval(addDefaultsB(e))
-          subst = subst.update(a, e2)
-          res = res.apply(e2)
-        case None => a match {
-          case x: IVar => res = res.apply(IVal(1)) // default values
-          case x: BVar => res = res.apply(BVal(true)) // default values
-        }
+//        case Some(e: BExpr) =>
+//          val e2 = Eval(addDefaultsB(e))
+//          subst = subst.update(a, e2)
+//          res = res.apply(e2)
+        case None => res = if (isInt) res.apply(IVal(1)) else res.apply(BVal(true))
+//          a match {
+//          case x: IVar => res = res.apply(IVal(1)) // default values
+//          case x: BVar => res = res.apply(BVal(true)) // default values
+//
+//        }
       }
     }
     val reduced = Simplify.unsafe(subst(res))
@@ -328,6 +344,12 @@ object Eval {
 
     Some(reduced) filter noFalseRestr
 
+  }
+
+  private def addDefaults(expr: Expr,isInt:Boolean): Expr = expr match {
+    case SomeVar(x) => if (isInt) addDefaults(IVar(x),isInt) else addDefaults(BVar(x),isInt)
+    case i: IExpr => addDefaultsI(i)
+    case b: BExpr => addDefaultsB(b)
   }
 
   private def addDefaultsI(e:IExpr, except:Set[Var] = Set()): IExpr = e match {

@@ -3,7 +3,7 @@ package preo
 import org.junit.Test
 import org.junit.Assert._
 import DSL._
-import preo.ast.{Connector, IAbs, Trace}
+import preo.ast.{Connector, Abs, Trace}
 import preo.frontend.Show
 
 class TestShow {
@@ -27,7 +27,7 @@ class TestShow {
               "id^3")
     testPrint(Trace(2,"fifo" & id),
               "Tr_2{fifo ; id}")
-    testPrint(IAbs("x","fifo"^"x"),
+    testPrint(Abs("x":I,"fifo"^"x"),
               "\\x.(fifo^x)")
     testPrint(Trace(2,("fifo"^3) & (id * (id^3))),
               "Tr_2{(fifo^3) ; (id ⊗ (id^3))}")

@@ -42,13 +42,13 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
   def ++(that:Substitution): Substitution = {
     new Substitution(items ::: that.items,isGeneral && that.isGeneral)
   }
-  def pop(x:Var): (Option[Expr],Substitution) = items match {
-    case Nil => (None,this)
-    case IItem(`x`,e)::tl => (Some(e),new Substitution(tl))
-    case BItem(`x`,e)::tl => (Some(e),new Substitution(tl))
+  def pop(x:Var): (Option[Expr],Boolean,Substitution) = items match { // booleans: is an integer?
+    case Nil => (None,true,this)
+    case IItem(`x`,e)::tl => (Some(e),true,new Substitution(tl))
+    case BItem(`x`,e)::tl => (Some(e),false,new Substitution(tl))
     case hd::tl =>
-      val (e,sub) = new Substitution(tl).pop(x)
-      (e,new Substitution(hd::sub.items))
+      val (e,b,sub) = new Substitution(tl).pop(x)
+      (e,b,new Substitution(hd::sub.items))
   }
 
   /** update all variables "x" inside the expressions by "e" */
@@ -113,6 +113,12 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
     Type(Arguments(vars),i,j,const,isGeneral = isGeneral && genType)
   }
 
+  /** substitution in expressions */
+  private def subst(i:Item,exp:Expr): Expr = exp match {
+    case e: IExpr => subst(i,e)
+    case e: BExpr => subst(i,e)
+  }
+
   /** substitution in boolean expressions */
   private def subst(i:Item,exp:BExpr): BExpr = exp match {
     case x@BVar(_) => i match {
@@ -172,16 +178,16 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
       case _ => ExpX(x,subst(it,a),subst(it,c))
     }
     case Choice(b, c1, c2) => Choice(subst(it,b),subst(it,c1),subst(it,c2))
-    case IAbs(x, c) => it match {
+    case Abs(x, c) => it match {
       case IItem(`x`, e) => con
-      case _ => IAbs(x,subst(it,c))
+      case _ => Abs(x,subst(it,c))
     }
-    case BAbs(x, c) => it match {
-      case BItem(`x`, e) => con
-      case _ => BAbs(x,subst(it,c))
-    }
-    case IApp(c, a) => IApp(subst(it,c),subst(it,a))
-    case BApp(c, b) => BApp(subst(it,c),subst(it,b))
+//    case BAbs(x, c) => it match {
+//      case BItem(`x`, e) => con
+//      case _ => BAbs(x,subst(it,c))
+//    }
+    case App(c, a) => App(subst(it,c),subst(it,a))
+//    case BApp(c, b) => BApp(subst(it,c),subst(it,b))
     case Restr(c, phi) => Restr(subst(it,c),subst(it,phi))
   }
 
@@ -255,10 +261,10 @@ object Substitution {
     case Trace(i, c)   => Trace(i,replacePrim(s,c,by))
     case Exp(a, c)     => Exp(a,replacePrim(s,c,by))
     case ExpX(x, a, c) => ExpX(x,a,replacePrim(s,c,by))
-    case IAbs(x, c)    => IAbs(x,replacePrim(s,c,by))
-    case BAbs(x, c)    => BAbs(x,replacePrim(s,c,by))
-    case IApp(c, a)    => IApp(replacePrim(s,c,by),a)
-    case BApp(c, b)    => BApp(replacePrim(s,c,by),b)
+    case Abs(x, c)    => Abs(x,replacePrim(s,c,by))
+//    case BAbs(x, c)    => BAbs(x,replacePrim(s,c,by))
+    case App(c, a)    => App(replacePrim(s,c,by),a)
+//    case BApp(c, b)    => BApp(replacePrim(s,c,by),b)
     case Restr(c, phi) => Restr(replacePrim(s,c,by),phi)
     case Choice(b, c1, c2) => Choice(b,replacePrim(s,c1,by),replacePrim(s,c2,by))
     case _ => c

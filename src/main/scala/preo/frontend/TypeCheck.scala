@@ -49,6 +49,7 @@ object TypeCheck {
     def addVar(v:Var): Context = v match {
       case x@IVar(_) => addInt(v.x)
       case x@BVar(_) => addBool(v.x)
+      case SomeVar(x) => throw new TypeCheckException(s"Cannot add variable $x to the context - unkown type.")
     }
 
     /** Number of variables. */
@@ -138,33 +139,48 @@ object TypeCheck {
       val Type(args2,i2,j2,phi2,isG2) = check(gamma,c2)
       check(gamma,b)
       Type(args1++args2, Cond(b,i1,i2), Cond(b,j1,j2), phi1 & phi2,isG1 && isG2)
-    case IAbs(x, c) =>
+    case Abs(x, c) =>
       val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,c) //check(gamma.addVar(x),c)
       Type(args + newx ,i,j,phi,isG)
-    case BAbs(x, c) =>
-      val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,c) //check(gamma.addVar(x),c)
-      Type(args + newx ,i,j,phi,isG)
-    case IApp(c, a) =>
+//    case BAbs(x, c) =>
+//      val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,c) //check(gamma.addVar(x),c)
+//      Type(args + newx ,i,j,phi,isG)
+//    case IApp(c, a) =>
+//      val Type(args,i,j,phi,isG) = check(gamma,c)
+//      args.vars match {
+//        case Nil =>
+//          throw new TypeCheckException(s"application: ${Show(c)} is applied to ${Show(a)} but it does not expect arguments")
+//        case (x@IVar(_))::xs =>
+//          val s = Substitution(x, a)
+//          Type(Arguments(xs),s(i),s(j),s(phi),isG)
+//        case e =>
+//          throw new TypeCheckException(s"application: expected 'int', found ${e.getClass}.")
+//      }
+//    case BApp(c, b) =>
+//      val Type(args,i,j,phi,isG) = check(gamma,c)
+//      if (args.vars.isEmpty)
+//        throw new TypeCheckException(s"application: ${Show(c)} is applied to ${Show(b)} but it does not expect arguments")
+//      args.vars.head match {
+//        case x@BVar(_) =>
+//          val s = Substitution(x, b)
+//          Type(Arguments(args.vars.tail),s(i),s(j),s(phi),isG)
+//        case x =>
+//          throw new TypeCheckException(s"application: expected 'bool', found ${x.getClass}.")
+//      }
+    case App(c, a) =>
       val Type(args,i,j,phi,isG) = check(gamma,c)
+      val isInt = isIExpr(gamma,a)
       args.vars match {
         case Nil =>
           throw new TypeCheckException(s"application: ${Show(c)} is applied to ${Show(a)} but it does not expect arguments")
-        case (x@IVar(_))::xs =>
+        case (x@IVar(_))::xs if isInt =>
+          val s = Substitution(x, a)
+          Type(Arguments(xs),s(i),s(j),s(phi),isG)
+        case (x@BVar(_))::xs if !isInt =>
           val s = Substitution(x, a)
           Type(Arguments(xs),s(i),s(j),s(phi),isG)
         case e =>
-          throw new TypeCheckException(s"application: expected 'int', found ${e.getClass}.")
-      }
-    case BApp(c, b) =>
-      val Type(args,i,j,phi,isG) = check(gamma,c)
-      if (args.vars.isEmpty)
-        throw new TypeCheckException(s"application: ${Show(c)} is applied to ${Show(b)} but it does not expect arguments")
-      args.vars.head match {
-        case x@BVar(_) =>
-          val s = Substitution(x, b)
-          Type(Arguments(args.vars.tail),s(i),s(j),s(phi),isG)
-        case x =>
-          throw new TypeCheckException(s"application: expected 'bool', found ${x.getClass}.")
+          throw new TypeCheckException(s"application: expected '${if (isInt) "Int" else "Bool"}', found ${e.getClass}.")
       }
     case Restr(c,phi) =>
       check(gamma,phi)
@@ -172,6 +188,11 @@ object TypeCheck {
       Type(args,i,j,psi & phi,isG)
   }
 
+  def isIExpr(gamma:Context,a:Expr): Boolean = a match {
+    case SomeVar(x) => gamma(IVar(x))
+    case ie: IExpr => true
+    case be: BExpr => false
+  }
 
   def check(gamma:Context,a:IExpr): Unit = a match {
     case IVal(_)     =>
@@ -201,6 +222,7 @@ object TypeCheck {
   }
 
 
+  // TODO: allow rename of unknown-typed variables
   private def alphaEquiv(t1:Type,t2:Type): Type = {
     val rep = t1.args.vars intersect t2.args.vars
     var sub = Substitution()
@@ -218,6 +240,7 @@ object TypeCheck {
       x match {
         case v@IVar(_) => (check(gamma.addVar(IVar(y)),Substitution(v,IVar(y))(c)),IVar(y))
         case v@BVar(_) => (check(gamma.addVar(BVar(y)),Substitution(v,BVar(y))(c)),BVar(y))
+          // TODO: replace with "somevar" as well.
       }
     }
     else
@@ -232,9 +255,11 @@ object TypeCheck {
         case _ =>
       }
     }
-    else e match {
+    else
+    e match {
       case e2: IExpr => check(gamma.addVar(x), e2)
       case e2: BExpr => check(gamma.addVar(x), e2)
+      case SomeVar(x) => {}
     }
 
   }

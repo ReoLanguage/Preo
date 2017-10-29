@@ -64,8 +64,8 @@ object Parser extends RegexParsers {
     bexpr ~ "?" ~ conn ~ "+" ~ conn ^^ {case b~_~c1~_~c2 => Choice(b,c1,c2)}                |
     "\\" ~ identifier ~ lambdaCont  ^^ {case _~ s ~ cont => cont(str2IVar(s))}              |
     "(" ~ conn ~ ")"                ^^ {case _ ~ c ~ _ => c}                                |
-    "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => IAbs(IVar("n"),c^IVar("n"))}        |
-    identifier~"!"                  ^^ {case s~_ => IAbs(IVar("n"),inferPrim(s)^IVar("n"))} |
+    "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => Abs(IVar("n"),c^IVar("n"))}        |
+    identifier~"!"                  ^^ {case s~_ => Abs(IVar("n"),inferPrim(s)^IVar("n"))} |
     identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,c1)} |
     identifier                      ^^ { inferPrim }
 
@@ -119,4 +119,18 @@ object Parser extends RegexParsers {
     "*"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 * e2 } |
     "/"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 / e2 }
 
+
+  /*
+  conn       := lit combinator
+  combinator :=  "&" ~ conn   ^^ {case _~ c => (_:Connector) & c} |
+      "*" ~ conn   ^^ {case _~ c => (_:Connector) * c} |
+      "!"          ^^ {_ => (c:Connector) =>  lam("n":I,c^"n") } | //  IAbs(IVar("n"),c^IVar("n"))} |
+      "^" ~ "("~identifier ~ "<--" ~ iexpr ~")" ^^
+        {case _~_~x~_~a~_=>(_:Connector)^(x<--a)}|
+      "^" ~ iexpr  ^^ {case _~ i => (_:Connector) ^ i} |
+      "|" ~ bexpr  ^^ {case _~ b => (_:Connector) | b} |
+      bexpr        ^^ {b => (_: Connector)(b)}         |
+      iexpr        ^^ {e => (_: Connector)(e)}         |
+      ""           ^^
+   */
 }
