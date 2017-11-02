@@ -24,7 +24,7 @@ object Repository {
   val fifos = dupl & fifo*fifo
 
   /** n-ary sequence of a connector. */
-  def seq(i:Interface, c:Connector, x:preo.DSL.Var, n:IExpr) =
+  def seq(i:Interface, c:Connector, x:preo.DSL.TypedVar, n:IExpr) =
     Trace(Repl(i,n-1), (c^(x<--n)) & sym(Repl(i,n-1),i) ) | n>0
   /** n-ary sequence of a connector. */
   def seq(i:Interface, c:Connector, n:IExpr) =

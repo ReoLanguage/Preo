@@ -9,22 +9,12 @@ import scala.collection.immutable.Nil
   * Created by jose on 25/05/15.
  */
 
-//private sealed abstract class Item {
-//  def getVar: Var = this match {
-//    case IItem(v, e) => v
-//    case BItem(v, e) => v
-//  }
-//}
-//private case class IItem(v:IVar,e:IExpr) extends Item {
-//  override def toString = s"${v.x}:I -> ${Show.apply(e)}"
-//}
-//private case class BItem(v:BVar,e:BExpr) extends Item {
-//  override def toString = s"${v.x}:B -> ${Show.apply(e)}"
-//}
-//private case class GItem(v:Var,e:Exp) extends Item {
-//  override def toString = s"${v.x} -> ${Show.apply(e)}"
-//}
-case class Item(v:Var,e:Expr) {
+/**
+  * Stores a single replacement: a variable by an expression
+  * @param v variable
+  * @param e expression
+  */
+private case class Item(v:Var,e:Expr) {
   override def toString = s"${v.x} -> ${Show.apply(e)}"
 }
 
@@ -34,28 +24,18 @@ case class Item(v:Var,e:Expr) {
   *
   * @param items pairs of (variable -> expression) to be replaced
  */
-class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
+class Substitution(private val items:List[Item], private val isGeneral:Boolean = true) {
 
-//  protected val isGeneral: Boolean = true
   def mkConcrete: Substitution = new Substitution(items,false)
 
-  //  def +(i:Item) = new Substitution(i::items)
   def +(x:Var,e:Expr): Substitution =
     new Substitution(Item(x,e)::items,isGeneral)
-//  def +(x:BVar,e:BExpr): Substitution = {
-//    new Substitution(BItem(x,e)::items,isGeneral)
-//  }
-//  def +(x:IVar,e:IExpr): Substitution = {
-//    new Substitution(IItem(x,e)::items,isGeneral)
-//  }
   def ++(that:Substitution): Substitution = {
     new Substitution(items ::: that.items,isGeneral && that.isGeneral)
   }
   def pop(x:Var): (Option[Expr],Substitution) = items match { // booleans: is an integer?
     case Nil => (None,this)
     case Item(`x`,e)::tl => (Some(e),new Substitution(tl))
-//    case IItem(`x`,e)::tl => (Some(e),true,new Substitution(tl))
-//    case BItem(`x`,e)::tl => (Some(e),false,new Substitution(tl))
     case hd::tl =>
       val (e,sub) = new Substitution(tl).pop(x)
       (e,new Substitution(hd::sub.items))
@@ -65,8 +45,6 @@ class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
   def update(x:Var,e:Expr): Substitution = items match {
     case Nil => this
     case Item(x2,e2)::tl => new Substitution(tl).update(x,e) + (x2,Substitution(x,e)(e2))
-//    case IItem(x2,e2)::tl => new Substitution(tl).update(x,e) + (x2,Substitution(x,e)(e2))
-//    case BItem(x2,e2)::tl => new Substitution(tl).update(x,e) + (x2,Substitution(x,e)(e2))
   }
 
   def apply(exp:Expr): Expr = exp match {
@@ -77,11 +55,7 @@ class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
     items.foldLeft(exp)((e:IExpr,i:Item) => substI(i,e))
   def apply(exp:BExpr): BExpr =
     items.foldLeft(exp)((e:BExpr,i:Item) => substB(i,e))
-//    var prev = exp
-//    for (i <- items)
-//      prev = substI(i,prev)
-//    prev
-//  }
+
   def apply(itf:Interface): Interface = {
     var prev = itf
     for (i <- items)
@@ -115,8 +89,6 @@ class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
     for (it <- items) {
       it match {
         case Item(v, x:Var) => vars = vars.map{case (`v`,typ) => (x,typ) case y => y}
-//        case IItem(v, x@IVar(_)) => vars = vars.map{case `v` => x case y => y}
-//        case BItem(v, x@BVar(_)) => vars = vars.map{case `v` => x case y => y}
         case _ =>
       }
       i = subst(it, i)
@@ -139,11 +111,7 @@ class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
       case Item(`x`, e:BExpr) => e
       case _                  => x
     }
-//    match {
-//      case be:BExpr => be
-//    }
     case BVal(_)     => exp
-    //      case IEQ(e1, e2) => IEQ(subst(i,e1),subst(i,e2))
     case EQ(e1, e2)  => EQ(substI(i,e1),substI(i,e2))
     case GT(e1, e2)  => GT(substI(i,e1),substI(i,e2))
     case LT(e1, e2)  => LT(substI(i,e1),substI(i,e2))
@@ -201,12 +169,7 @@ class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
       case Item(`x`, e) => con
       case _            => Abs(x,et,subst(it,c))
     }
-//    case BAbs(x, c) => it match {
-//      case BItem(`x`, e) => con
-//      case _ => BAbs(x,subst(it,c))
-//    }
     case App(c, a)     => App(subst(it,c),subst(it,a))
-//    case BApp(c, b) => BApp(subst(it,c),subst(it,b))
     case Restr(c, phi) => Restr(subst(it,c),substB(it,phi))
   }
 
@@ -218,16 +181,8 @@ class Substitution(val items:List[Item], private val isGeneral:Boolean = true) {
    */
   def getConstBoundedVars(typ:Type): BExpr = {
     var newvars = typ.args.vars.map(_._1).toSet
-//    var newVars = relevant
     var history = Set[Var]()
     var round = Set[Var]()
-//    // note: only relevant if there are unbounded variables in the interfaces
-//    var hasFreeVars = false
-//    for (v <- Utils.freeVars(typ.i * typ.j)) {
-//      if (!(bounded contains v)) hasFreeVars = true
-//    }
-//    if (!hasFreeVars)
-//      return BVal(true)
 
     var newrest:Set[BExpr] = Set()
     while (newvars.nonEmpty) {
@@ -260,16 +215,6 @@ object Substitution {
   def apply() = new Substitution(List())
   def apply(x:Var,e:Expr) =
     new Substitution(List(Item(Var(x.x),e)))
-//  e match {
-//    case e2:IExpr =>  new Substitution(List(IItem(IVar(x.x),e2)))
-//    case e2:BExpr =>  new Substitution(List(BItem(BVar(x.x),e2)))
-//  }
-  //    def apply(i:Item) = new Substitution(List(i))
-//  def apply(x:IVar,e:IExpr) = new Substitution(List(IItem(x,e)))
-//  def apply(x:BVar,e:BExpr) = new Substitution(List(BItem(x,e)))
-
-//  def apply(p:(IVar,IExpr)) = new Substitution(List(IItem(p._1,p._2)))
-//  def apply(p:(BVar,BExpr)) = new Substitution(List(BItem(p._1,p._2)))
 
   def replacePrim(s:String,con:Connector,by:Connector): Connector = con match {
     case Prim(name,_,_,_) if name == s => by
@@ -279,9 +224,7 @@ object Substitution {
     case Exp(a, c)     => Exp(a,replacePrim(s,c,by))
     case ExpX(x, a, c) => ExpX(x,a,replacePrim(s,c,by))
     case Abs(x,et,c)   => Abs(x,et,replacePrim(s,c,by))
-//    case BAbs(x, c)    => BAbs(x,replacePrim(s,c,by))
     case App(c, a)    => App(replacePrim(s,c,by),a)
-//    case BApp(c, b)    => BApp(replacePrim(s,c,by),b)
     case Restr(c, phi) => Restr(replacePrim(s,c,by),phi)
     case Choice(b, c1, c2) => Choice(b,replacePrim(s,c1,by),replacePrim(s,c2,by))
     case _ => con

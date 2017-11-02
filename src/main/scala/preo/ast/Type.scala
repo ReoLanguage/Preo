@@ -37,12 +37,8 @@ case class Arguments(vars:List[(Var,ExprType)]) {
   }
 
   override def toString: String = vars.map(x=>x._1.x+":"+x._2).mkString(",")
-//    vars.map {
-////      case BVar(x) => x + ":B"
-////      case IVar(x) => x + ":I"
-//      case x => throw new RuntimeException(s"Unknown variable $x : ${x.getClass}.")
-//    }.mkString(",")
 }
+
 // empty constructure for arguments
 object Arguments{
   def apply():Arguments = Arguments(List())

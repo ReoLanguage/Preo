@@ -91,8 +91,6 @@ object Simplify {
   def lits2IExpr(l:OptLits): IExpr = {
     var res:IExpr = IVal(0)
     for ((vars,coef) <- l.lits.map) {
-//      var prod:IExpr = IVal(coef)
-//      for (v <- vars) prod = Mul(prod,IVar(v))
       var prod:IExpr = IVal(1)
       for (v <- vars) prod = Mul(Var(v),prod)
       res = res + Mul(IVal(coef),prod)
@@ -151,12 +149,6 @@ object Simplify {
     case EQ(e1, e2) => //EQ(apply(Sub(e1,e2)),IVal(0))
       val eq = iexpr2lits(Eval(Sub(e1,e2)))
       optimiseEq(eq)
-//      if (eq.lits.map contains Bag())
-//        // place the coefficient with no variable on the right of "=="
-//        EQ( lits2IExpr(OptLits(Lits(eq.lits.map - Bag()),eq.rest)) , IVal(eq.lits.map(Bag())) )
-//      else
-//      // place a "0" on the right of "=="
-//        EQ( lits2IExpr(OptLits(Lits(eq.lits.map        ),eq.rest)) , IVal(0) )
     case GT(e1, e2) => optimiseIneq(e1,e2,GT) //GT(apply(e1),apply(e2))
     case LT(e1, e2) => optimiseIneq(e1,e2,LT) //LT(apply(e1),apply(e2))
     case GE(e1, e2) => optimiseIneq(e1,e2,GE) //GE(apply(e1),apply(e2))
@@ -400,10 +392,8 @@ object Simplify {
       case b2 => Choice(b,simplifyWithTypeChk(c1,tcheck),simplifyWithTypeChk(c2,tcheck))
     }
     case Abs(x,et,c) => Abs(x,et,simplifyWithTypeChk(c,tcheck))
-//    case BAbs(x, c) => BAbs(x,simplifyWithTypeChk(c,tcheck))
     case App(c,a) => (simplifyWithTypeChk(c,tcheck),apply(a)) match {
       case (Abs(x,et,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
-//      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
       case (Seq(c1,c2),a2) =>
         if (tcheck(App(c1,a2))) simplifyWithTypeChk(Seq(App(c1,a2),c2),tcheck)
         else simplifyWithTypeChk(Seq(c1,App(c2,a2)),tcheck)
@@ -412,18 +402,6 @@ object Simplify {
         else simplifyWithTypeChk(Par(c1,App(c2,a2)),tcheck)
       case (c2,a2) => App(c2,a2)
     }
-//    case BApp(c,a) => (simplifyWithTypeChk(c,tcheck),apply(a)) match {
-//      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
-//      case (Seq(c1,c2),a2) =>
-//        if (tcheck(BApp(c1,a2))) simplifyWithTypeChk(Seq(BApp(c1,a2),c2),tcheck)
-//        else simplifyWithTypeChk(Seq(c1,BApp(c2,a2)),tcheck)
-//      case (Par(c1,c2),a2) =>
-//        if (tcheck(BApp(c1,a2))) simplifyWithTypeChk(Par(BApp(c1,a2),c2),tcheck)
-//        else simplifyWithTypeChk(Par(c1,BApp(c2,a2)),tcheck)
-//      case (c2,a2) => BApp(c2,a2)
-//      //      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
-//      //      case (c2,a2) => BApp(c2,a2)
-//    }
     case Restr(c, phi) => (simplifyWithTypeChk(c,tcheck),Eval(phi)) match{
       case (c2,BVal(true)) => c2
       case (c2,phi2) => Restr(c,phi2)

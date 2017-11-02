@@ -28,37 +28,32 @@ object DSL {
   implicit def i2IExpr(i:I):IExpr = Var(i.x)
   implicit def i2Interface(i:I):Interface = Port(ast.Var(i.x))
 
-  sealed abstract class Var {
+  sealed abstract class TypedVar {
     def getName:String
     def unary_! = LamWrap(List(this)) // helper to DSL (lambdas: !x -> conn)
     def <--(to:IExpr) = ExpWrap(this,to) // helper to DSL
     def =<(to:IExpr)  = ExpWrap(this,to) // helper to DSL
   }
-  case class I(x:String) extends Var {def getName: String = x}
-  case class B(x:String) extends Var {def getName: String = x}
+  case class I(x:String) extends TypedVar {def getName: String = x}
+  case class B(x:String) extends TypedVar {def getName: String = x}
 
   // helper for DSL
-  case class ExpWrap(x:Var,to:IExpr)
-  case class LamWrap(vs:List[Var]) { // !x - y -> conn
+  case class ExpWrap(x:TypedVar, to:IExpr)
+  case class LamWrap(vs:List[TypedVar]) { // !x - y -> conn
     def ->(c:Connector): Connector = vs match {
       case Nil => c
       case (I(v)::t) => DSL.lam(v,IntType,LamWrap(t)->c)
       case (B(v)::t) => DSL.lam(v,BoolType,LamWrap(t)->c)
     }
-    def -(v2:Var): LamWrap =  LamWrap(vs:::List(v2))
-    def -(v2c:(Var,Connector)): Connector = LamWrap(vs:::List(v2c._1)) -> v2c._2
+    def -(v2:TypedVar): LamWrap =  LamWrap(vs:::List(v2))
+    def -(v2c:(TypedVar,Connector)): Connector = LamWrap(vs:::List(v2c._1)) -> v2c._2
   }
 
-
-
-//  val int = IntType
-//  val bool = BoolType
   type Itf = Interface
   def lam(v:String,et:ExprType,c:Connector): Connector =  Abs(Var(v),et,c)
-//  def lam(vet:(String,ExprType),c:Connector): Connector =  Abs(Var(vet._1),vet._2,c)
-  def lam(v:Var,c:Connector): Connector = v match {
-    case I(x) => Abs(Var(x),IntType,c)
-    case B(x) => Abs(Var(x),BoolType,c)
+  def lam(v:TypedVar, c:Connector): Connector = v match {
+    case I(name) => Abs(Var(name),IntType,c)
+    case B(name) => Abs(Var(name),BoolType,c)
   }
   def not(b:BExpr) = Not(b)
 
@@ -79,7 +74,7 @@ object DSL {
   val drain = Prim("drain",2,0)
 
   // included for the demo at FACS'15
-  val x="x":I; val y="y":I; val z="z":I; val n="n":I; val b="b":B; val c="c":B;
+  val x:I="x"; val y:I="y"; val z:I="z"; val n:I="n"; val b:B="b"; val c:B="c"
 
   // methods to (instantiate and) simplify a connector //
   /**

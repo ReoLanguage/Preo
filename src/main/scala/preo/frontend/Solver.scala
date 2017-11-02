@@ -130,8 +130,6 @@ object Solver {
   private def solveAux(bExpr: Expr): Option[CSolver] = {
 
     seed = 0
-//    boolVars.clear()
-//    intVars.clear()
     boolVars = scala.collection.mutable.Map[String,BoolVar]()
     intVars  = scala.collection.mutable.Map[String,IntVar]()
     solver = new CSolver()
@@ -278,18 +276,6 @@ object Solver {
     case LT(e1,e2) => comp(e1,e2,"<",">",_<_)
     case GE(e1,e2) => comp(e1,e2,">=","<=",_>=_)
     case LE(e1,e2) => comp(e1,e2,"<=",">=",_<=_)
-//    case EQ(IVal(i1), IVal(i2)) => if (i1==i2) TRUE(solver) else FALSE(solver)
-//    case EQ(IVar(x), IVal(i)) => arithm(getIVar(x),"=",i)
-//    case EQ(IVal(i), exp) => arithm(getIVar(exp),"=",i)
-//    case EQ(exp1, exp2) => arithm(getIVar(exp1),"=",getIVar(exp2))
-//    case GT(IVal(i1), IVal(i2)) => if (i1>i2) TRUE(solver) else FALSE(solver)
-//    case GT(IVar(x), IVal(i)) => arithm(getIVar(x),">",i)
-//    case GT(IVal(i), exp) => arithm(getIVar(exp),"<",i)
-//    case GT(exp1, exp2) => arithm(getIVar(exp1),">",getIVar(exp2))
-//    case LT(IVal(i1), IVal(i2)) => if (i1<i2) TRUE(solver) else FALSE(solver)
-//    case LT(IVar(x), IVal(i)) => arithm(getIVar(x),"<",i)
-//    case LT(IVal(i), exp) => arithm(getIVar(exp),">",i)
-//    case LT(exp1, exp2) => arithm(getIVar(exp1),"<",getIVar(exp2))
     case AndN(_, f, t, _) =>
       throw new UnhandledOperException(s"Case not handled - neither ${Show(f)} nor ${Show(t)} can have variables, in:\n  "+Show.apply(bExpr))
     case _ =>

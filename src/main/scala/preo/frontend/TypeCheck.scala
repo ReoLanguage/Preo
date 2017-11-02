@@ -42,8 +42,6 @@ object TypeCheck {
       build(ints, bools + v, conns)
     }
 
-//    def addVar(v:IVar): Context = addInt(v.x)
-//    def addVar(v:BVar): Context = addBool(v.x)
     def addVar(v:Var,et: ExprType): Context = et match {
       case IntType  => addInt(v.x)
       case BoolType => addBool(v.x)
@@ -126,9 +124,6 @@ object TypeCheck {
       val phi2 = AndN(newx,IVal(0),a,phi)
       val ci = Sum(newx,IVal(0),a,interfaceSem(Eval(i))) // 0<=x<a
       val cj = Sum(newx,IVal(0),a,interfaceSem(Eval(j)))
-      // val newi = IVar(fresh()) // gen unique name
-      // val newj = IVar(fresh()) // gen unique name
-      // Type(args, Port(newi), Port(newj), EQ(newi,ci) & EQ(newj,cj) & /*nonNeg(newi,newj)*/ nonNeg(a) & phi2,isG)
       Type(args, Port(ci), Port(cj), /*nonNeg(newi,newj)*/ nonNeg(a) & phi2,isG)
     // END OF TRICKY CASE
     case Choice(b, c1, c2) =>
@@ -139,31 +134,6 @@ object TypeCheck {
     case Abs(x,et, c) =>
       val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,et,c) //check(gamma.addVar(x),c)
       Type(args + (newx,et) ,i,j,phi,isG)
-//    case BAbs(x, c) =>
-//      val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,c) //check(gamma.addVar(x),c)
-//      Type(args + newx ,i,j,phi,isG)
-//    case IApp(c, a) =>
-//      val Type(args,i,j,phi,isG) = check(gamma,c)
-//      args.vars match {
-//        case Nil =>
-//          throw new TypeCheckException(s"application: ${Show(c)} is applied to ${Show(a)} but it does not expect arguments")
-//        case (x@IVar(_))::xs =>
-//          val s = Substitution(x, a)
-//          Type(Arguments(xs),s(i),s(j),s(phi),isG)
-//        case e =>
-//          throw new TypeCheckException(s"application: expected 'int', found ${e.getClass}.")
-//      }
-//    case BApp(c, b) =>
-//      val Type(args,i,j,phi,isG) = check(gamma,c)
-//      if (args.vars.isEmpty)
-//        throw new TypeCheckException(s"application: ${Show(c)} is applied to ${Show(b)} but it does not expect arguments")
-//      args.vars.head match {
-//        case x@BVar(_) =>
-//          val s = Substitution(x, b)
-//          Type(Arguments(args.vars.tail),s(i),s(j),s(phi),isG)
-//        case x =>
-//          throw new TypeCheckException(s"application: expected 'bool', found ${x.getClass}.")
-//      }
     case App(c, a) =>
       val Type(args,i,j,phi,isG) = check(gamma,c)
       val isInt = isIExpr(gamma,a)
@@ -192,21 +162,18 @@ object TypeCheck {
   }
 
   def check(gamma:Context,a:Expr):Unit = a match {
-//  def check(gamma:Context,a:IExpr): Unit = a match {
-    case IVal(_)     =>
+
     case v@Var(x)   => if (!gamma(v)) throw new TypeCheckException(s"$x not in the context ($gamma)")
+
+    case IVal(_)     =>
     case Add(e1, e2) => check(gamma,e1); check(gamma,e2)
     case Sub(e1, e2) => check(gamma,e1); check(gamma,e2)
     case Mul(e1, e2) => check(gamma,e1); check(gamma,e2)
     case Div(e1, e2) => check(gamma,e1); check(gamma,e2)
     case Sum(x,from,to,e) => check(gamma,from) ; check(gamma,to) ; checkAndAddVar(gamma,x,IntType,e) //check(gamma.addVar(x),e)
     case ITE(b,ift,iff)   => check(gamma,b) ; check(gamma,ift) ; check(gamma,iff)
-//  }
-//
-//  def check(gamma:Context,b:BExpr): Unit = b match {
+
     case BVal(_)     =>
-//    case v@Var(x)   => if (!gamma(v)) throw new TypeCheckException(s"$x:Bool not in the context ($gamma)")
-//    case IEQ(e1, e2) => check(gamma,e1); check(gamma,e2)
     case EQ(e1, e2)  => check(gamma,e1); check(gamma,e2)
     case GT(e1, e2)  => check(gamma,e1); check(gamma,e2)
     case LT(e1, e2)  => check(gamma,e1); check(gamma,e2)
@@ -249,11 +216,5 @@ object TypeCheck {
     }
     else
     check(gamma.addVar(x,et), e)
-//    e match {
-//      case e2: IExpr => check(gamma.addVar(x), e2)
-//      case e2: BExpr => check(gamma.addVar(x), e2)
-//      case SomeVar(x) => {}
-//    }
-
   }
 }

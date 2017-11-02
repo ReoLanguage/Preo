@@ -7,10 +7,17 @@ import preo.ast._
  */
 object Utils {
 
-  def isFree(x:Var,e:IExpr): Boolean = e match {
+  /**
+    * Checks if a variable occurs freely in an expression.
+    * @param x variable
+    * @param e expression
+    * @return True if x occurs freely in e
+    */
+  def isFree(x:Var,e:Expr): Boolean = e match {
     case `x` => false
-    case IVal(_) => true
     case Var(_) => true
+
+    case IVal(_) => true
     case Add(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case Sub(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case Mul(e1, e2) => isFree(x,e1) && isFree(x,e2)
@@ -18,12 +25,8 @@ object Utils {
     case Sum(`x`, from, to, _) => isFree(x,from) && isFree(x,to)
     case Sum(_, from, to, e2) => isFree(x,from) && isFree(x,to) && isFree(x,e2)
     case ITE(b, ifTrue, ifFalse) => isFree(x,b) && isFree(x,ifTrue) && isFree(x,ifFalse)
-  }
 
-  def isFree(x:Var,e:BExpr): Boolean = e match {
     case BVal(_) => true
-    case Var(_) => true
-    //    case IEQ(e1, e2) => free(x,e1) && free(x,e2)
     case EQ(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case GT(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case LT(e1, e2) => isFree(x,e1) && isFree(x,e2)
@@ -37,30 +40,23 @@ object Utils {
     case AndN(_, from, to, e2) => isFree(x,from) && isFree(x,to) && isFree(x,e2)
   }
 
-  //  def free(x:IVar,itf:Interface): Boolean = itf match {
-  //    case Tensor(i, j) => free(x,i) && free(x,j)
-  //    case Port(a) => free(x,a)
-  //    case Repl(i, a) => free(x,i) && free(x,a)
-  //    case Cond(b, i1, i2) => free(x,b) && free(x,i1) && free(x,i2)
-  //  }
-
-
+  /**
+    * Collects all free variables in an expression
+    * @param e Expression
+    * @return the collected set of variables
+    */
   def freeVars(e:Expr):Set[Var] = e match {
     case x:Var => Set(x)
 
-//  def freeVars(e:IExpr):Set[Var] = e match {
     case IVal(n) => Set()
-//    case x@IVar(_) => Set(x)
     case Add(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Sub(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Mul(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Div(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Sum(x, from, to, e1) => (freeVars(e1)-x) ++ freeVars(from) ++ freeVars(to)
     case ITE(b, ifTrue, ifFalse) => freeVars(b) ++ freeVars(ifTrue) ++ freeVars(ifFalse)
-//  }
-//  def freeVars(e:BExpr): Set[Var] = e match {
+
     case BVal(b) => Set()
-//    case x@BVar(_) => Set(x)
     case EQ(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case GT(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case LT(e1, e2) => freeVars(e1) ++ freeVars(e2)
@@ -72,6 +68,12 @@ object Utils {
     case Not(e1) => freeVars(e1)
     case AndN(x,from,to,e1) => (freeVars(e1)-x) ++ freeVars(from) ++ freeVars(to)
   }
+
+  /**
+    * Collects all free variables in an interface
+    * @param i Interface
+    * @return the collected free variables
+    */
   def freeVars(i:Interface): Set[Var] = freeVars(interfaceSem(i))
 
 
@@ -97,6 +99,5 @@ object Utils {
    */
   def isAlphaEquivVar(x:String) =
     x.matches(".*![0-9]+$")
-  //{println(s"isTemp $x - ${x.matches("x[0-9]+")}") ; x.matches("x[0-9]+")}
 
 }

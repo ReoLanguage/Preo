@@ -19,9 +19,7 @@ object Show {
     case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1)} ⊕ ${showP(c2)}"
                              //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
     case Abs(x,et, c)  => s"\\${apply(x)}:${apply(et)}${showAP(c)}"
-//    case BAbs(x, c)     => s"\\${apply(x)}${showAP(c)}"
     case App(c, a)     => s"${showP(c)}(${apply(a)})"
-//    case BApp(c, b)     => s"${showP(c)}(${apply(b)})"
     case Restr(c,b)     => s"${showP(c)} | ${showP(b)}"
   }
   private def showP(con:Connector): String = con match {
@@ -31,7 +29,6 @@ object Show {
   }
   private def showAP(con:Connector): String = con match {
     case Abs(x,et,c) => s" ${apply(x)}:${apply(et)}${showAP(c)}"
-//    case BAbs(x,c) => s" ${apply(x)}${showAP(c)}"
     case _ => s".${showP(con)}"
   }
 
@@ -40,7 +37,6 @@ object Show {
     case Port(a)       => apply(a)
     case Repl(i, a)    => s"${showP(i)}^${showP(a)}"
     case Cond(b, i, j) => s"${showP(b)} ? ${showP(i)} ⊕ ${showP(j)}"
-                          //s"${showP(i)} +${showP(b)}+ ${showP(j)}"
   }
   private def showP(itf:Interface):String = itf match {
     case Port(a) => showP(a)
@@ -96,7 +92,7 @@ object Show {
   }
 
   def showVar(v:Var) = v match {
-    case Var(x) => x //+":I"
+    case Var(x) => x
   }
 
   def apply(typ:Type): String =

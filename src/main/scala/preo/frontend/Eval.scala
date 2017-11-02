@@ -24,7 +24,6 @@ object Eval {
     * @return
     */
   def apply(e: Expr): Expr = e match {
-//    case SomeVar(x) => e
     case ex: IExpr => apply(ex)
     case ex: BExpr => apply(ex)
   }
@@ -98,8 +97,6 @@ object Eval {
     case Var(_) => e
 
     case BVal(b) => e
-//    case BVar(x) => e
-    //    case IEQ(e1, e2) => eval(EQ(interfaceSem(e1),interfaceSem(e2)))
     case EQ(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(i1), IVal(i2)) => BVal(i1 == i2)
       case (a, b) if a == b => BVal(b = true)
@@ -238,13 +235,8 @@ object Eval {
       subst = subst_
       expr match {
         case Some(e: Expr) => res = res.apply(e)
-//        case Some(e: BExpr) => res = res.apply(e)
         case None => res = if (etype==IntType) res.apply(IVal(1))
                            else                res.apply(BVal(true))
-//          a match {
-//          case _: IVar => res = res.apply(IVal(1))
-//          case _: BVar => res = res.apply(BVal(true))
-//        }
       }
     }
     subst(res)
@@ -290,9 +282,10 @@ object Eval {
   /**
     * Simplified version of [[instantiate()]], skipping the constraint solving phase,
     * and performing only the simplifications.
+    * Used when the solver cannot be used, e.g., when producing JavaScript code.
     *
-    * @param c
-    * @return
+    * @param c connector
+    * @return instantiated connector
     */
   def unsafeInstantiate(c: Connector): Option[Connector] = {
     // 1 - build derivation tree
