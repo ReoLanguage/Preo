@@ -7,10 +7,10 @@ import preo.ast._
  */
 object Utils {
 
-  def isFree(x:IVar,e:IExpr): Boolean = e match {
+  def isFree(x:Var,e:IExpr): Boolean = e match {
     case `x` => false
     case IVal(_) => true
-    case IVar(_) => true
+    case Var(_) => true
     case Add(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case Sub(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case Mul(e1, e2) => isFree(x,e1) && isFree(x,e2)
@@ -20,9 +20,9 @@ object Utils {
     case ITE(b, ifTrue, ifFalse) => isFree(x,b) && isFree(x,ifTrue) && isFree(x,ifFalse)
   }
 
-  def isFree(x:IVar,e:BExpr): Boolean = e match {
+  def isFree(x:Var,e:BExpr): Boolean = e match {
     case BVal(_) => true
-    case BVar(_) => true
+    case Var(_) => true
     //    case IEQ(e1, e2) => free(x,e1) && free(x,e2)
     case EQ(e1, e2) => isFree(x,e1) && isFree(x,e2)
     case GT(e1, e2) => isFree(x,e1) && isFree(x,e2)
@@ -45,20 +45,22 @@ object Utils {
   //  }
 
 
+  def freeVars(e:Expr):Set[Var] = e match {
+    case x:Var => Set(x)
 
-  def freeVars(e:IExpr):Set[Var] = e match {
+//  def freeVars(e:IExpr):Set[Var] = e match {
     case IVal(n) => Set()
-    case x@IVar(_) => Set(x)
+//    case x@IVar(_) => Set(x)
     case Add(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Sub(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Mul(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Div(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case Sum(x, from, to, e1) => (freeVars(e1)-x) ++ freeVars(from) ++ freeVars(to)
     case ITE(b, ifTrue, ifFalse) => freeVars(b) ++ freeVars(ifTrue) ++ freeVars(ifFalse)
-  }
-  def freeVars(e:BExpr): Set[Var] = e match {
+//  }
+//  def freeVars(e:BExpr): Set[Var] = e match {
     case BVal(b) => Set()
-    case x@BVar(_) => Set(x)
+//    case x@BVar(_) => Set(x)
     case EQ(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case GT(e1, e2) => freeVars(e1) ++ freeVars(e2)
     case LT(e1, e2) => freeVars(e1) ++ freeVars(e2)

@@ -3,7 +3,7 @@ package preo
 import org.junit.Test
 import org.junit.Assert._
 import DSL._
-import preo.ast.{Connector, Abs, Trace}
+import preo.ast.{Abs, Connector, IntType, Trace}
 import preo.frontend.Show
 
 class TestShow {
@@ -27,17 +27,17 @@ class TestShow {
               "id^3")
     testPrint(Trace(2,"fifo" & id),
               "Tr_2{fifo ; id}")
-    testPrint(Abs("x":I,"fifo"^"x"),
-              "\\x.(fifo^x)")
+    testPrint(Abs("x",IntType,"fifo"^"x"),
+              "\\x:I.(fifo^x)")
     testPrint(Trace(2,("fifo"^3) & (id * (id^3))),
               "Tr_2{(fifo^3) ; (id ⊗ (id^3))}")
     testPrint(lam(x,lam("b":B,drain^x)),
-      "\\x b.(drain^x)")
+      "\\x:I b:B.(drain^x)")
   }
 
   @Test def checkLambdaDSL(): Unit = {
-    testPrint(!("x":I) -> (fifo^x)    , "\\x.(fifo^x)")
-    testPrint(!x - ("y":I) -> (fifo^x), "\\x y.(fifo^x)")
-    testPrint(!x-y-z-("b":B)->(fifo^x), "\\x y z b.(fifo^x)")
+    testPrint(!("x":I) -> (fifo^x)    , "\\x:I.(fifo^x)")
+    testPrint(!x - ("y":I) -> (fifo^x), "\\x:I y:I.(fifo^x)")
+    testPrint(!x-y-z-("b":B)->(fifo^x), "\\x:I y:I z:I b:B.(fifo^x)")
   }
 }

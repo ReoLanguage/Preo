@@ -48,9 +48,9 @@ object Parser extends RegexParsers {
   def combinator: Parser[Connector => Connector] =
     "&" ~ conn   ^^ {case _~ c => (_:Connector) & c} |
       "*" ~ conn   ^^ {case _~ c => (_:Connector) * c} |
-      "!"          ^^ {_ => (c:Connector) =>  lam("n":I,c^"n") } | //  IAbs(IVar("n"),c^IVar("n"))} |
+      "!"          ^^ {_ => (c:Connector) =>  lam("n":I,c^Var("n")) } | //  IAbs(IVar("n"),c^IVar("n"))} |
       "^" ~ "("~identifier ~ "<--" ~ iexpr ~")" ^^
-        {case _~_~x~_~a~_=>(_:Connector)^(x<--a)}|
+        {case _~_~x~_~a~_=>(_:Connector)^((x:I)<--a)}|
       "^" ~ iexpr  ^^ {case _~ i => (_:Connector) ^ i} |
       "|" ~ bexpr  ^^ {case _~ b => (_:Connector) | b} |
       bexpr        ^^ {b => (_: Connector)(b)}         |
@@ -62,18 +62,18 @@ object Parser extends RegexParsers {
     "Tr_"~iexpr~conn                ^^ {case _~e~c     => Trace(Port(e),c)}                 |
     "sym"~"("~iexpr~","~iexpr~")"   ^^ {case _~_~e1~_~e2~_ => Symmetry(Port(e1),Port(e2))}  |
     bexpr ~ "?" ~ conn ~ "+" ~ conn ^^ {case b~_~c1~_~c2 => Choice(b,c1,c2)}                |
-    "\\" ~ identifier ~ lambdaCont  ^^ {case _~ s ~ cont => cont(str2IVar(s))}              |
+    "\\" ~ identifier ~ lambdaCont  ^^ {case _~ s ~ cont => cont(s,IntType)}              |
     "(" ~ conn ~ ")"                ^^ {case _ ~ c ~ _ => c}                                |
-    "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => Abs(IVar("n"),c^IVar("n"))}        |
-    identifier~"!"                  ^^ {case s~_ => Abs(IVar("n"),inferPrim(s)^IVar("n"))} |
+    "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => Abs(Var("n"),IntType,c^Var("n"))}        |
+    identifier~"!"                  ^^ {case s~_ => Abs(Var("n"),IntType,inferPrim(s)^Var("n"))} |
     identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,c1)} |
     identifier                      ^^ { inferPrim }
 
-  def lambdaCont: Parser[Var=>Connector] =
-    "." ~ conn                   ^^ {case _~ c   => lam(_:Var,c)}                   |
-    identifier ~ lambdaCont      ^^ { case v ~ f => lam(_:Var,f(str2IVar(v))) } |
-    ":" ~ "I" ~ lambdaCont ^^ { case _~ _ ~ cont => (v:Var) => cont(v) } | // IVar is the default
-    ":" ~ "B" ~ lambdaCont ^^ { case _~ _ ~ cont => (v:Var) => cont(str2BVar(v.x)) } // IVar is the default
+  def lambdaCont: Parser[(String,ExprType)=>Connector] =
+    "." ~ conn                   ^^ {case _~ c   => lam(_:String,_:ExprType,c)}                   |
+    identifier ~ lambdaCont      ^^ { case v ~ f => lam(_:String,_:ExprType,f(v,IntType)) } |
+    ":" ~ "I" ~ lambdaCont ^^ { case _~ _ ~ cont => (v:String,et:ExprType) => cont(v,et) } | // IVar is the default
+    ":" ~ "B" ~ lambdaCont ^^ { case _~ _ ~ cont => (v:String,_:ExprType) => cont(v,BoolType) } // IVar is the default
 //    ":" ~ ("I"|"B") ~ lambdaCont ^^ {
 //      case _~ "I" ~ cont => (v:Var) => cont(v) // IVar is the default
 //      case _~ "B" ~ cont => (v:Var) => cont(str2BVar(v.x))
@@ -88,8 +88,8 @@ object Parser extends RegexParsers {
   def blit: Parser[BExpr] =
     "true"     ^^ {_=>BVal(true)}                |
     "false"    ^^ {_=>BVal(false)}               |
-    identifier~":"~"B" ^^ {case s~_~_=>BVar(s) } |
-    identifier ^^ BVar                           |
+    identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
+    identifier ^^ Var                           |
     "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
   def bbop: Parser[(BExpr,BExpr)=>BExpr] =
     "&"  ^^ {_ => (e1:BExpr,e2:BExpr) => e1 & e2 } |
@@ -108,8 +108,8 @@ object Parser extends RegexParsers {
     ilit
   def ilit: Parser[IExpr] =
     intVal                                       |
-    identifier~":"~"I" ^^ {case s~_~_=>IVar(s) } |
-    identifier ^^ IVar                           |
+    identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
+    identifier ^^ Var                           |
     "(" ~ iexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
   def intVal: Parser[IExpr] =
     """[0-9]+""".r ^^ { (s:String) => int2IExp(s.toInt) }

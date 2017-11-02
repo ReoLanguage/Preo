@@ -37,7 +37,7 @@ object Solver {
    * @return a substitution if a solution is found, or None otherwise.
    *         The substitution is marked as "concrete" if more than 1 solution exist.
    */
-  def solve(bExpr: BExpr): Option[Substitution] = {
+  def solve(bExpr: Expr): Option[Substitution] = {
     // optimisation
     if (bExpr == BVal(true))
       return Some(Substitution())
@@ -47,9 +47,9 @@ object Solver {
     if (sol.isDefined) {
       var res = Substitution()
       for ((x, v) <- intVars)
-        res +=(IVar(x), IVal(v.getValue))
+        res +=(Var(x), IVal(v.getValue))
       for ((x, v) <- boolVars)
-        res +=(BVar(x), BVal(v.getValue == 1))
+        res +=(Var(x), BVal(v.getValue == 1))
       // a substitution is concrete if the constraints have more than 1 solution (more common)
       if (sol.get.nextSolution())
         Some(res.mkConcrete)
@@ -90,9 +90,9 @@ object Solver {
 
       var res = Substitution()
       for ((x, v) <- intVars)
-        res +=(IVar(x), IVal(v.getValue))
+        res += (Var(x), IVal(v.getValue))
       for ((x, v) <- boolVars)
-        res +=(BVar(x), BVal(v.getValue == 1))
+        res += (Var(x), BVal(v.getValue == 1))
 
       if (!typ.isGeneral)
         return Some(res)
@@ -100,19 +100,17 @@ object Solver {
       // set concrete if negating the relevant vars yields more solutions
 //      var newExp = typ.const
       var toNeg = List[BExpr]()
-      val vars:Iterable[Var] = Utils.freeVars(Tensor(typ.i,typ.j)) ++ typ.args.vars //-- typ.args.vars
+      val vars:Iterable[Var] = Utils.freeVars(Tensor(typ.i,typ.j)) ++ typ.args.vars.map(_._1) //-- typ.args.vars
 //      println(s"#### got relevant vars: ${vars.map(Show.showVar)}")
       for (v <- vars) v match {
-        case IVar(x) =>
-          if (intVars contains x)
-            toNeg ::= EQ(IVar(x),IVal(intVars(x).getValue))
-        case BVar(x) =>
-          if (boolVars contains x) {
+        case Var(x) if intVars contains x =>
+            toNeg ::= EQ(Var(x),IVal(intVars(x).getValue))
+        case Var(x) if boolVars contains x =>
             if (boolVars(x).getValue == 1)
-              toNeg ::= BVar(x)
+              toNeg ::= Var(x)
             else
-              toNeg ::= Not(BVar(x))
-          }
+              toNeg ::= Not(Var(x))
+        case _ => {}
       }
       if (vars.nonEmpty) {
         val newExp = typ.const & Not(And(toNeg))
@@ -129,7 +127,7 @@ object Solver {
       None
   }
 
-  private def solveAux(bExpr: BExpr): Option[CSolver] = {
+  private def solveAux(bExpr: Expr): Option[CSolver] = {
 
     seed = 0
 //    boolVars.clear()
@@ -180,7 +178,7 @@ object Solver {
   }
   private def getIVar(exp:IExpr): IntVar = exp match {
     case IVal(n) => VariableFactory.fixed(n,solver)
-    case IVar(x) => getIVar(x)
+    case Var(x) => getIVar(x)
     case Add(e1, e2) => combineIExpr(e1,e2,"+")
     case Sub(e1, e2) => combineIExpr(e1,e2,"-")
     case Mul(e1, e2) => combineIExpr(e1,e2,"*")
@@ -223,7 +221,7 @@ object Solver {
       }
       solver.post(c)
       v
-    case (IVar(x),IVal(i)) => // x 'op' i
+    case (Var(x),IVal(i)) => // x 'op' i
       val v = genFreshIVar()
       op match {
         case "+" | "-" =>
@@ -234,7 +232,7 @@ object Solver {
           solver.post(eucl_div(getIVar(x),VariableFactory.fixed(i,solver),v))
       }
       v
-    case (IVal(i),IVar(x)) => // i 'op' x (3-x --> -x + 3)
+    case (IVal(i),Var(x)) => // i 'op' x (3-x --> -x + 3)
       val v = genFreshIVar()
       op match {
         case "+" =>
@@ -268,9 +266,9 @@ object Solver {
     }
   }
 
-  def bexpr2choco(bExpr: BExpr): Constraint = bExpr match {
+  def bexpr2choco(bExpr: Expr): Constraint = bExpr match {
     case BVal(b) => if (b) TRUE(solver) else FALSE(solver)
-    case BVar(x) => reification_reifiable(getBVar(x),TRUE(solver))
+    case Var(x) => reification_reifiable(getBVar(x),TRUE(solver))
     case And(Nil) => TRUE(solver)
     case And(e::es) => and(bexpr2choco(e),bexpr2choco(And(es)))
     case Or(e1, e2) => or(bexpr2choco(e1),bexpr2choco(e2))
@@ -294,13 +292,14 @@ object Solver {
 //    case LT(exp1, exp2) => arithm(getIVar(exp1),"<",getIVar(exp2))
     case AndN(_, f, t, _) =>
       throw new UnhandledOperException(s"Case not handled - neither ${Show(f)} nor ${Show(t)} can have variables, in:\n  "+Show.apply(bExpr))
-
+    case _ =>
+      throw new UnhandledOperException(s"Could not encode expression as a boolean expression (in Choco):\n  "+Show.apply(bExpr))
   }
 
   private def comp(e1:IExpr,e2:IExpr,op:String,revop:String,test:(Int,Int)=>Boolean): Constraint =
     (e1,e2) match {
       case (IVal(i1), IVal(i2)) => if (test(i1,i2)) TRUE(solver) else FALSE(solver)
-      case (IVar(x), IVal(i)) => arithm(getIVar(x),op,i)
+      case (Var(x), IVal(i)) => arithm(getIVar(x),op,i)
       case (IVal(i), exp) => arithm(getIVar(exp),revop,i)
       case (exp1, exp2) => arithm(getIVar(exp1),op,getIVar(exp2))
     }

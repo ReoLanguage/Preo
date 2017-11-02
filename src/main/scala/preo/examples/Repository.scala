@@ -24,7 +24,7 @@ object Repository {
   val fifos = dupl & fifo*fifo
 
   /** n-ary sequence of a connector. */
-  def seq(i:Interface, c:Connector, x:I, n:IExpr) =
+  def seq(i:Interface, c:Connector, x:preo.DSL.Var, n:IExpr) =
     Trace(Repl(i,n-1), (c^(x<--n)) & sym(Repl(i,n-1),i) ) | n>0
   /** n-ary sequence of a connector. */
   def seq(i:Interface, c:Connector, n:IExpr) =
@@ -37,15 +37,15 @@ object Repository {
 
   /** rearrange 2*n entries: from n+n to 2+2+...+2 (n times) */
   val zip = lam(n,
-    Tr( 2*n*(n-1),
+    Tr( 2 * (n:IExpr) * (n-1), //2*n*(n-1),
       (((id^(n-x)) * (swap^x) * (id^(n-x)))^x<--n) &
-        sym(2*n*(n-1),2*n)
+        sym(2*(n:IExpr)*(n-1),2*(n:IExpr))
     ))
   /** rearrange 2*n entries: from 2+2+...+2 (n times) to n+n */
   val unzip = lam(n,
-    Tr( 2*n*(n-1),
+    Tr( 2*(n:IExpr)*(n-1),
       (((id^(x+1)) * (swap^(n-x-1)) * (id^(x+1)))^(x,n)) &
-        sym(2*n*(n-1),2*n)
+        sym(2*(n:IExpr)*(n-1),2*(n:IExpr))
     ))
   /** alternate flow between n flows [[http://reo.project.cwi.nl/webreo/generated/sequencer/frameset.htm]] */
   val sequencer = lam(n, (((dupl^n) & unzip(n)) *

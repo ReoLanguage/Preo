@@ -2,7 +2,7 @@ package preo
 
 import java.io.File
 
-import ast._
+import ast.{Var, _}
 import frontend._
 import lang.Parser
 import common.TypeCheckException
@@ -16,26 +16,54 @@ import scala.util.control.NonFatal
 object DSL {
   // goal: e.g., to write "fifo" * id & id^2
   implicit def str2conn(s:String): Connector = Prim(s,1,1)
-  implicit def str2IVar(s:String): IVar = IVar(s)
-  implicit def str2BVar(s:String): BVar = BVar(s)
+  implicit def str2Var(s:String): ast.Var = ast.Var(s)
   implicit def bool2BExp(b:Boolean): BExpr= BVal(b)
   implicit def int2IExp(n:Int): IExpr= IVal(n)
   implicit def int2Interface(n:Int): Interface = Port(IVal(n))
   implicit def exp2Interface(e:IExpr): Interface= Port(e)
 
-  type I  = IVar
-  type B = BVar
-  type Itf = Interface
-  def lam(v:Var,c:Connector): Connector= v match {
-    case v2:IVar => lam(v2,c)
-    case v2:BVar => lam(v2,c)
-    case SomeVar(x) => lam(IVar(x),c) // by default - Int
+  implicit def str2B(s:String): B = B(s)
+  implicit def str2I(s:String): I = I(s)
+  implicit def b2BExpr(b:B):BExpr = Var(b.x)
+  implicit def i2IExpr(i:I):IExpr = Var(i.x)
+  implicit def i2Interface(i:I):Interface = Port(ast.Var(i.x))
+
+  sealed abstract class Var {
+    def getName:String
+    def unary_! = LamWrap(List(this)) // helper to DSL (lambdas: !x -> conn)
+    def <--(to:IExpr) = ExpWrap(this,to) // helper to DSL
+    def =<(to:IExpr)  = ExpWrap(this,to) // helper to DSL
   }
-  def lam(x:I,c:Connector) = Abs(x,c)
-  def lam(x:B,c:Connector) = Abs(x,c)
+  case class I(x:String) extends Var {def getName: String = x}
+  case class B(x:String) extends Var {def getName: String = x}
+
+  // helper for DSL
+  case class ExpWrap(x:Var,to:IExpr)
+  case class LamWrap(vs:List[Var]) { // !x - y -> conn
+    def ->(c:Connector): Connector = vs match {
+      case Nil => c
+      case (I(v)::t) => DSL.lam(v,IntType,LamWrap(t)->c)
+      case (B(v)::t) => DSL.lam(v,BoolType,LamWrap(t)->c)
+    }
+    def -(v2:Var): LamWrap =  LamWrap(vs:::List(v2))
+    def -(v2c:(Var,Connector)): Connector = LamWrap(vs:::List(v2c._1)) -> v2c._2
+  }
+
+
+
+//  val int = IntType
+//  val bool = BoolType
+  type Itf = Interface
+  def lam(v:String,et:ExprType,c:Connector): Connector =  Abs(Var(v),et,c)
+//  def lam(vet:(String,ExprType),c:Connector): Connector =  Abs(Var(vet._1),vet._2,c)
+  def lam(v:Var,c:Connector): Connector = v match {
+    case I(x) => Abs(Var(x),IntType,c)
+    case B(x) => Abs(Var(x),BoolType,c)
+  }
   def not(b:BExpr) = Not(b)
 
-  val sym  = Symmetry
+  def sym(i1: IExpr,i2: IExpr)  = Symmetry(i1,i2)
+  def sym(i1: Interface,i2: Interface)  = Symmetry(i1,i2)
   val Tr   = Trace
 //  val Prim = preo.ast.Prim
 
@@ -102,7 +130,7 @@ object DSL {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst1,rest1) = Unify.getUnification(type1.const,type1.args.vars)
+    val (subst1,rest1) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
     val type2b = Type(type1.args,subst1(type1.i),subst1(type1.j),rest2,type1.isGeneral)
@@ -137,7 +165,7 @@ object DSL {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst1,rest1) = Unify.getUnification(type1.const,type1.args.vars)
+    val (subst1,rest1) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
     val type2b = Type(type1.args,subst1(type1.i),subst1(type1.j),rest2,type1.isGeneral)
@@ -160,7 +188,7 @@ object DSL {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst1,rest1) = Unify.getUnification(type1.const,type1.args.vars)
+    val (subst1,rest1) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
     val type2b = Type(type1.args,subst1(type1.i),subst1(type1.j),rest2,type1.isGeneral)
@@ -188,7 +216,7 @@ object DSL {
     // 1 - build derivation tree
     val oldtyp = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst,rest) = Unify.getUnification(oldtyp.const,oldtyp.args.vars)
+    val (subst,rest) = Unify.getUnification(oldtyp.const)
     // 3 - apply substitution to the type
     val tmptyp = subst(oldtyp)
     val newrest = subst.getConstBoundedVars(oldtyp)
@@ -232,7 +260,7 @@ object DSL {
     // 1 - build derivation tree
     val oldtyp = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst,rest) = Unify.getUnification(oldtyp.const,oldtyp.args.vars)
+    val (subst,rest) = Unify.getUnification(oldtyp.const)
     // 3 - apply substitution to the type
     val tmptyp = subst(oldtyp)
     val newrest = subst.getConstBoundedVars(oldtyp)
@@ -254,7 +282,7 @@ object DSL {
       val type1 = TypeCheck.check(c)
       println(s" - type-rules:    $type1")
       // 2 - unify constraints and get a substitution
-      val (subst1,rest1) = Unify.getUnification(type1.const,type1.args.vars)
+      val (subst1,rest1) = Unify.getUnification(type1.const)
       println(s" - [ unification: $subst1 ]")
       println(s" - [ missing:     ${Show(rest1)} ]")
       // 3 - apply substitution to the type

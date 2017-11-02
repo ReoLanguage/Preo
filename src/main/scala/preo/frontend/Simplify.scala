@@ -35,7 +35,7 @@ object Simplify {
       //
     case IVal(n) =>
       OptLits(Lits(Map(Bag[String]() -> n)),Set())
-    case IVar(x) =>
+    case Var(x) =>
       OptLits(Lits(Map(Bag[String](x) -> 1)),Set())
     case Add(e1, e2) =>
       join(iexpr2lits(e1),iexpr2lits(e2))
@@ -94,7 +94,7 @@ object Simplify {
 //      var prod:IExpr = IVal(coef)
 //      for (v <- vars) prod = Mul(prod,IVar(v))
       var prod:IExpr = IVal(1)
-      for (v <- vars) prod = Mul(IVar(v),prod)
+      for (v <- vars) prod = Mul(Var(v),prod)
       res = res + Mul(IVal(coef),prod)
     }
     for (r <- l.rest)
@@ -138,7 +138,7 @@ object Simplify {
 
   private def simpAux(e:BExpr): BExpr = e match {
     case BVal(b) => e
-    case BVar(x) => e
+    case Var(_) => e
     case And(es) => And(es.map(simpAux))
     case Or(e1, e2) => Or(simpAux(e1),simpAux(e2))
     case Not(e1) => Not(simpAux(e1))
@@ -183,26 +183,26 @@ object Simplify {
       case (IVal(0),e3@Mul(_,_)) => const(IVal(0),reduceZ(e3))
       case (e3@Mul(_,_),IVal(0)) => const(reduceZ(e3),IVal(0))
         // move constant in a+x OP b
-      case (IVal(n1),Add(x@IVar(_),IVal(n2))) => const(IVal(n2-n1),x)
+      case (IVal(n1),Add(x@Var(_),IVal(n2))) => const(IVal(n2-n1),x)
 //      case (Add(IVal(n1),x@IVar(_)),IVal(n2)) => const(x,IVal(n2-n1))
-      case (Add(x@IVar(_),IVal(n1)),IVal(n2)) => const(x,IVal(n2-n1))
-      case (IVal(n1),Sub(x@IVar(_),IVal(n2))) => const(IVal(n1+n2),x)
-      case (Sub(x@IVar(_),IVal(n1)),IVal(n2)) => const(x,IVal(n1+n2))
+      case (Add(x@Var(_),IVal(n1)),IVal(n2)) => const(x,IVal(n2-n1))
+      case (IVal(n1),Sub(x@Var(_),IVal(n2))) => const(IVal(n1+n2),x)
+      case (Sub(x@Var(_),IVal(n1)),IVal(n2)) => const(x,IVal(n1+n2))
         // otherwise
       case (e3,e4) => const(e3,e4)
     }
   }
   private def reduceZ(e:IExpr): IExpr = e match {
     case Mul(IVal(i),e2) if i>0 => reduceZ(e2)
-    case Mul(IVar(v1),IVar(v2)) if v1 == v2 => IVar(v1)
-    case Mul(IVar(v1),e2@Mul(IVar(v2),e3)) =>
+    case Mul(Var(v1),Var(v2)) if v1 == v2 => Var(v1)
+    case Mul(Var(v1),e2@Mul(Var(v2),e3)) =>
       if (v1==v2) reduceZ(e2)
-      else Mul(IVar(v1),reduceZ(e2))
+      else Mul(Var(v1),reduceZ(e2))
     case _ => e
   }
 
   /** Checks if a given variable only occurrs liniearly in every side of all conjunctive (in)equations. */
-  private def isLinearIneq(x:IVar,bExpr:BExpr): Boolean = bExpr match {
+  private def isLinearIneq(x:Var,bExpr:BExpr): Boolean = bExpr match {
     case And(es) => es.map(isLinearIneq(x,_)).forall(identity)
     case EQ(e1, e2) => degree(x,e1)<=1 && degree(x,e2)<=1
     case GT(e1, e2) => degree(x,e1)<=1 && degree(x,e2)<=1
@@ -262,14 +262,14 @@ object Simplify {
     for ((v,c) <- optLits.lits.map) {
       // TODO: improve by checking if variable only appears once before moving
       if ((c/gcdc) == -1 && v.size == 1) {
-        val res = EQ(lits2IExpr(OptLits(Lits(optLits.lits.map.mapValues(_ / gcdc) - v), optLits.rest)), IVar(v.head))
+        val res = EQ(lits2IExpr(OptLits(Lits(optLits.lits.map.mapValues(_ / gcdc) - v), optLits.rest)), Var(v.head))
 //        println(s"#### checking if ${v.head} is a temp variable.")
         if (Utils.isGenVar(v.head))
           return res
         else todo = Some(res)
       }
       if ((c/gcdc) == 1 && v.size == 1) {
-        val res = EQ( IVar(v.head), lits2IExpr(OptLits(Lits((optLits.lits.map - v).mapValues(-_/gcdc)),optLits.rest.map(neg(_)))))
+        val res = EQ( Var(v.head), lits2IExpr(OptLits(Lits((optLits.lits.map - v).mapValues(-_/gcdc)),optLits.rest.map(neg(_)))))
 //        println(s"#### checking if ${v.head} is a temp variable.")
         if (Utils.isGenVar(v.head))
           return res
@@ -291,10 +291,10 @@ object Simplify {
   }
 
   private def dropArgs(args: Arguments,bExpr: BExpr): BExpr = bExpr match {
-    case GE(x@IVar(_),IVal(i)) if (i <= 0) && (args.vars contains x) => BVal(true)
-    case GT(x@IVar(_),IVal(i)) if (i <  0) && (args.vars contains x) => BVal(true)
-    case LE(IVal(i),x@IVar(_)) if (i <= 0) && (args.vars contains x) => BVal(true)
-    case LT(IVal(i),x@IVar(_)) if (i <  0) && (args.vars contains x) => BVal(true)
+    case GE(x@Var(_),IVal(i)) if (i <= 0) && (args.vars.map(_._1) contains x) => BVal(true)
+    case GT(x@Var(_),IVal(i)) if (i <  0) && (args.vars.map(_._1) contains x) => BVal(true)
+    case LE(IVal(i),x@Var(_)) if (i <= 0) && (args.vars.map(_._1) contains x) => BVal(true)
+    case LT(IVal(i),x@Var(_)) if (i <  0) && (args.vars.map(_._1) contains x) => BVal(true)
     case And(l) => And(l.map(dropArgs(args,_)).filterNot(_==BVal(true)))
     case Or(e1,e2) => Eval(Or(dropArgs(args,e1),dropArgs(args,e2)))
     case _ => bExpr
@@ -399,10 +399,10 @@ object Simplify {
       case BVal(false) => simplifyWithTypeChk(c2,tcheck)
       case b2 => Choice(b,simplifyWithTypeChk(c1,tcheck),simplifyWithTypeChk(c2,tcheck))
     }
-    case Abs(x, c) => Abs(x,simplifyWithTypeChk(c,tcheck))
+    case Abs(x,et,c) => Abs(x,et,simplifyWithTypeChk(c,tcheck))
 //    case BAbs(x, c) => BAbs(x,simplifyWithTypeChk(c,tcheck))
     case App(c,a) => (simplifyWithTypeChk(c,tcheck),apply(a)) match {
-      case (Abs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
+      case (Abs(x,et,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
 //      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
       case (Seq(c1,c2),a2) =>
         if (tcheck(App(c1,a2))) simplifyWithTypeChk(Seq(App(c1,a2),c2),tcheck)

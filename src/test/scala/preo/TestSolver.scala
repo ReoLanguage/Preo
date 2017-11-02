@@ -21,13 +21,13 @@ class TestSolver {
     val solved = Solver.solve(e)
     println(Show.apply(e)+" - sol: "+solved)
     assertEquals(solved.isDefined,true)
-    assertEquals(solved.get(IVar("x")),IVal(xValueExpected))
+    assertEquals(solved.get(Var("x"):IExpr),IVal(xValueExpected))
   }
 
-  val x = IVar("x")
-  val y = IVar("y")
-  val a = BVar("a")
-  val b = BVar("b")
+  val x = Var("x")
+  val y = Var("y")
+  val a = Var("a")
+  val b = Var("b")
 
   @Test def solveExamples() {
     // 1 + 2 = 3

@@ -178,7 +178,7 @@ class TestTypeCheck {
     // alternative for zip: \x . sequence ( for y <- 0..x-1, id^(2y+1) * sym(x-y-1) * id^(x-y-1) )
     // (based on a nice recursive suggestion from a reviewer for FACS.)
     val zipalt = lam(n,
-      seq(n*2, (id^(x*2+1)) * sym(n-x-1,1) * (id^(n-x-1)) , x, n)  )
+      seq((n:Interface)*2, (id^((x:IExpr)*2+1)) * sym(n-x-1,1) * (id^(n-x-1)) , x, n)  )
 
 
     // composing families and parameterised primitives
@@ -216,7 +216,7 @@ class TestTypeCheck {
     val type_1 = TypeCheck.check(c)
     println(s" - type-rules:    $type_1")
     // 2 - unify constraints and get a substitution
-    val (subst_1,rest_1) = Unify.getUnification(type_1.const,type_1.args.vars)
+    val (subst_1,rest_1) = Unify.getUnification(type_1.const)
     println(s" - [ unification: $subst_1 ]")
     println(s" - [ missing:     ${Show(rest_1)} ]")
     // 3 - apply substitution to the type
@@ -255,7 +255,7 @@ class TestTypeCheck {
   
   private def testTypeError(c:Connector) = try {
     val oldtyp = TypeCheck.check(c)
-    val (subst,rest) = Unify.getUnification(oldtyp.const,oldtyp.args.vars)
+    val (subst,_) = Unify.getUnification(oldtyp.const)
     val _ = Solver.solve(Simplify(subst(oldtyp)).const)
     throw new RuntimeException("Type error not found in " + Show(c) + " : " + oldtyp)
   }
