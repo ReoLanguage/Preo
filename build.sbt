@@ -16,7 +16,7 @@ scalacOptions ++= Seq("-unchecked", "-deprecation","-feature")
 libraryDependencies ++= Seq(
 //    "junit" % "junit" % "4.12"
 //  , "com.novocode" % "junit-interface" % "0.11" % "test" // to run junit tests from sbt
-  , "org.choco-solver" % "choco-solver" % "3.3.1-j7"
+    "org.choco-solver" % "choco-solver" % "3.3.1-j7"
 //  "org.slf4j" % "slf4j-simple" % "1.7.12"
   , "org.scala-lang" % "scala-compiler" % scalaVersion.value // needed for JIT
   , "org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.6"
