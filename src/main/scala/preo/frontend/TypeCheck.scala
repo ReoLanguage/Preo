@@ -22,7 +22,7 @@ object TypeCheck {
 
     /** checks if a variable is in the context. */
     def contains(variable:String) =
-      (ints contains variable) || (bools contains variable) || (conns.map(_.x) contains variable)
+      (ints contains variable) || (bools contains variable) || (conns contains variable)
     /** checks if a variable is in the context. */
     def apply(v:Var) = (ints contains v.x) || (bools contains v.x)
     /** Check if 2 contexts are disjoint */
