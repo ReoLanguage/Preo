@@ -107,9 +107,14 @@ object DSL {
     * @param s string representing a connector
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(s:String): Parser.ParseResult[Connector] = Parser.parse(s)
+  def parseWithError(s:String): Parser.ParseResult[Connector] = Parser.parse(s)
 
-  def parse2(s:String): Connector =  Parser.parse(s) match {
+  /**
+    * Parses a string into a connector.
+    * @param s string representing a connector
+    * @return parsed connector
+    */
+  def parse(s:String): Connector =  Parser.parse(s) match {
     case Parser.Success(result, next) => result
     case f: Parser.NoSuccess => throw new TypeCheckException("Parser failed: "+f)
   }
