@@ -64,6 +64,7 @@ object ReoGraph {
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j)),i,j)
+    case CSubConnector(name, sub) => toGraph(sub)
     case _ =>
       throw new TypeCheckException("Failed to compile a non-instantiated connector "+Show(prim))
   }

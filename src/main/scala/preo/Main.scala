@@ -1,6 +1,7 @@
 package preo
 
 import preo.DSL._
+import preo.backend.{ReoGraph, Springy}
 import preo.frontend.Eval
 
 object Main extends App {
@@ -14,6 +15,7 @@ object Main extends App {
       val conn = parse(scala.io.StdIn.readLine())
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
+      println(ReoGraph(Eval.reduce(conn)))
 
   }
 

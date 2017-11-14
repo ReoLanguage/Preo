@@ -66,7 +66,7 @@ object Parser extends RegexParsers {
     "(" ~ conn ~ ")"                ^^ {case _ ~ c ~ _ => c}                                |
     "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => Abs(Var("n"),IntType,c^Var("n"))}        |
     identifier~"!"                  ^^ {case s~_ => Abs(Var("n"),IntType,inferPrim(s)^Var("n"))} |
-    identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,c1)}   |
+    identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,SubConnector(s, c1))} |
     identifier                      ^^ { inferPrim }
 
   def lambdaCont: Parser[(String,ExprType)=>Connector] =

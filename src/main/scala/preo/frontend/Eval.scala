@@ -269,6 +269,7 @@ object Eval {
     case Symmetry(i, j) => CSymmetry(reduce(i), reduce(j))
     case Trace(i, c) => CTrace(reduce(i), red(c))
     case Prim(name, i, j, extra) => CPrim(name, reduce(i), reduce(j), extra)
+    case SubConnector(name, sub) => CSubConnector(name, red(sub))
     case c2 => throw new TypeCheckException("Failed to reduce connector " + Show(c2))
   }
 

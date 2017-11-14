@@ -160,6 +160,7 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
     case Trace(i, c) => Trace(subst(it,i),subst(it,c))
     case Prim(name, i, j,e) => Prim(name,subst(it,i),subst(it,j),e)
     case Exp(a, c) =>  Exp(substI(it,a),subst(it,c))
+    case SubConnector(name, sub) => SubConnector(name, subst(it, sub))
     case ExpX(x, a, c) => it match {
       case Item(`x`, e) => ExpX(x,substI(it,a),c)
       case _            => ExpX(x,substI(it,a),subst(it,c))
