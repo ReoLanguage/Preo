@@ -38,7 +38,7 @@ A set of examples in the embedded DSL can be found in [```preo.examples.Reposito
 For example, the exclusive router example ["exrouter.preo"](src/main/scala/preo/examples/exrouter.preo) produces the following 
 
 <img src="src/resources/exrouter.svg"
-     style="display: block;margin-left: auto;margin-right: auto">
+     style="display: block;margin-left: auto;margin-right: auto;">
 
 You can also try it by yourself online - using a snapshot of this project in http://jose.proenca.org/reolive.
 
