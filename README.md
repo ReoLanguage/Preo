@@ -37,8 +37,9 @@ The function ```preo.DSL.draw(c:Connector)``` produces a connector as a string i
 A set of examples in the embedded DSL can be found in [```preo.examples.Repository.scala```](src/main/scala/preo/examples/Repository.scala), and a other examples in the Preo language can be found in the [examples folder](src/main/scala/preo/examples).
 For example, the exclusive router example ["exrouter.preo"](src/main/scala/preo/examples/exrouter.preo) produces the following 
 
-<img src="src/resources/exrouter.svg"
-     style="display: block;margin-left: auto;margin-right: auto;">
+<p align="center">
+     <img src="src/resources/exrouter.svg">
+</p>
 
 You can also try it by yourself online - using a snapshot of this project in http://jose.proenca.org/reolive.
 
