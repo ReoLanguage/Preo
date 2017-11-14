@@ -34,7 +34,14 @@ Visualising a connector
 
 The function ```preo.DSL.draw(c:Connector)``` produces a connector as a string interpreted by Graphviz (visit, for example, the online tool [Viz.js](https://mdaines.github.io/viz.js/)).
 
-Alternatively, you can try the results online using a snapshot of this project in http://jose.proenca.org/reolive.
+A set of examples in the embedded DSL can be found in [```preo.examples.Repository.scala```](src/main/scala/preo/examples/Repository.scala), and a other examples in the Preo language can be found in the [examples folder](src/main/scala/preo/examples).
+For example, the exclusive router example ["exrouter.preo"](src/main/scala/preo/examples/exrouter.preo) produces the following 
+
+<img src="https://cdn.rawgit.com/joseproenca/preo/master/src/resources/exrouter.svg">
+
+<img src="src/resources/exrouter.svg">
+
+You can also try it by yourself online - using a snapshot of this project in http://jose.proenca.org/reolive.
 
 <!-- This version is used by the new under-development web-related project, which can be found in https://github.com/joseproenca/reotools. -->
 
