@@ -2,7 +2,7 @@
 
 Parameterised Reo - a concrete language for a calculus of variable connectors.
 
-This is a branch from a simplified version, based on https://github.com/joseproenca/parameterised-connectors, with a more clear focus on the language and static analysis.
+This is a branch from a simplified version, based on https://github.com/joseproenca/parameterised-connectors, with a more clear focus on the language and the static analysis of connector families.
 
 Primitive blocks are blocks with input and output ports.
 Composition of blocks can be sequential (outputs to inputs) or parallel (appending inputs and outputs), and is defined in a _pointfree_ style, i.e., without naming the ports. A type system guarantees that composition is correct.
@@ -41,8 +41,6 @@ For example, the exclusive router example ["exrouter.preo"](src/main/scala/preo/
      style="display: block;margin-left: auto;margin-right: auto;">
 
 You can also try it by yourself online - using a snapshot of this project in http://jose.proenca.org/reolive.
-
-<!-- This version is used by the new under-development web-related project, which can be found in https://github.com/joseproenca/reotools. -->
 
 <!-- ## Why a new project?
 The emphasise is in the core language, which we call Preo, it's parser, and its static analysis.
