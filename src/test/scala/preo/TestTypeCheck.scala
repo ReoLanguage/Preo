@@ -104,7 +104,7 @@ class TestTypeCheck extends FlatSpec {
     "∀a:B . a ? 1 ⊕ 1 -> a ? 1 ⊕ 2 | (1 >= 0) & (2 >= 0)" ,
     "∀a:B . 1 -> if a then 1 else 2" ,
     "© 1 -> 1")
-  testOK( lam("a":B, fifo^("a" ? 2 + 3)),
+  testOK( lam("a":B, fifo^("a" ? 2 + 3)), 
     "∀a:B . 1^(if a then 2 else 3) -> 1^(if a then 2 else 3) | ((if a then 2 else 3) >= 0) & (1 >= 0) & (1 >= 0)",
 //    "∀a:B . 1^(if a then 2 else 3) -> 1^(if a then 2 else 3) | (1 >= 0) & (1 >= 0)",
     "∀a:B . if a then 2 else 3 -> if a then 2 else 3 | (if a then 2 else 3) >= 0",
