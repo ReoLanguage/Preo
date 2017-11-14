@@ -7,11 +7,11 @@ object Main extends App {
 
   args.toList match {
     case file::_ =>
-      val conn = parse2(readFromFile(file))
+      val conn = parse(readFromFile(file))
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
     case _ =>
-      val conn = parse2(scala.io.StdIn.readLine())
+      val conn = parse(scala.io.StdIn.readLine())
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
 
