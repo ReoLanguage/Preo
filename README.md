@@ -1,4 +1,4 @@
-# Preo [![Build Status](https://travis-ci.org/joseproenca/preo.svg?branch=master)](https://travis-ci.org/joseproenca/preo)
+# Preo [![Build Status](https://travis-ci.org/ReoLanguage/preo.svg?branch=master)](https://travis-ci.org/ReoLanguage/preo)
 
 Parameterised Reo - a concrete language for a calculus of variable connectors.
 
