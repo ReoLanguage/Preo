@@ -12,7 +12,6 @@ import preo.frontend.{Show, Solver}
 class TestSolver extends FlatSpec {
 
   private def testConstr(e: BExpr, shouldHold:Boolean): Unit = {
-    Thread.sleep(100)
     val solved = Solver.solve(e)
     println(Show.apply(e)+" - sol: "+solved)
     s"Constraint $e" should (if (shouldHold) "hold" else "not hold") in {
@@ -21,7 +20,6 @@ class TestSolver extends FlatSpec {
   }
 
   private def testConstrX(e: BExpr, xValueExpected:Int): Unit = {
-    Thread.sleep(150)
     val solved = Solver.solve(e)
     println(Show.apply(e)+" - sol: "+solved)
     s"Constraint $e" should s"yield x = $xValueExpected" in {

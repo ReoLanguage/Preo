@@ -33,14 +33,12 @@ class TestReduce extends FlatSpec {
 
 
   private def testOK(con:Connector,str:String) = {
-    Thread.sleep(100)
     val c = Eval.reduce(con)
     s"Connector ${Show(con)}" should s"be reduced to $str" in
       assertResult(str)(Show(c))
   }
 
   private def testInstOK(con:Connector,str:String) = {
-    Thread.sleep(100)
     val c = Eval.instantiate(con)
     s"Connector ${Show(con)}" should s"instantiate to $str" in {
       assert(typeCheck(c))

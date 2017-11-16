@@ -208,7 +208,6 @@ class TestTypeCheck extends FlatSpec {
 
 
   private def testOK(c:Connector,typString:String,evalType:String,concType:String): Unit = {
-    Thread.sleep(100)
     println(Show(c))
     // 1 - build derivation tree
     val type_1 = TypeCheck.check(c)
