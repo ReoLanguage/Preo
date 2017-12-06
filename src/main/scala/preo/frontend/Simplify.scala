@@ -403,6 +403,7 @@ object Simplify {
       case (Par(c1,c2),a2) =>
         if (tcheck(App(c1,a2))) simplifyWithTypeChk(Par(App(c1,a2),c2),tcheck)
         else simplifyWithTypeChk(Par(c1,App(c2,a2)),tcheck)
+      case (SubConnector(name, c), a2) => simplifyWithTypeChk(SubConnector(name, App(c, a2)), tcheck)
       case (c2,a2) => App(c2,a2)
     }
     case Restr(c, phi) => (simplifyWithTypeChk(c,tcheck),Eval(phi)) match{
