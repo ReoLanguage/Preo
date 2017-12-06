@@ -142,7 +142,7 @@ object Mcrl2Program{
       channel_count += 1
       channel
     }
-    case CPrim("dupl",a,b, _) => {
+    case CPrim("dupl",_,_, _) => {
       //nodes
       val in_node = ins.head
       val out_node1 = outs.head
@@ -165,7 +165,7 @@ object Mcrl2Program{
       channel_count += 1
       channel
     }
-    case CPrim("drain",a,b, _) => {
+    case CPrim("drain",_,_, _) => {
       //nodes
       val in_node1 = ins.head
       val in_node2 = ins.last
@@ -183,7 +183,7 @@ object Mcrl2Program{
       channel_count += 1
       channel
     }
-    case CPrim(name, a, b, _) => {
+    case CPrim(_, _, _, _) => {
       val in_node = ins.head
       val out_node = outs.head
       in_node.setRight(var_count)
@@ -217,7 +217,7 @@ object Mcrl2Program{
 
   private def initsMaker: List[Mcrl2Init] =
     if(starterNodes.nonEmpty){
-      val inits = makeInits(starterNodes.head, null)
+      val inits = makeInitsNode(starterNodes.head, null)
       last_init = if(last_init == null) inits.last.getName else Seq(last_init, inits.last.getName)
       inits ++ initsMaker
     }
@@ -231,9 +231,10 @@ object Mcrl2Program{
     }
 
 
+
   private def check(element: Mcrl2Def): Unit = to_check.filter(x => x != element)
 
-  private def notMissing(action: Action): Unit = missingVars.filter(x => x!= action)
+  private def notMissing(action: Action): Unit = missingVars.filter(x=> x!= action)
 
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
     case Action(number, group) :: rest => {
@@ -245,27 +246,27 @@ object Mcrl2Program{
   }
 
   //we have to prepare this to the spout in case we had it
-  private def makeInits(current: Mcrl2Node, last: Mcrl2Def, backwards: Boolean = false): List[Mcrl2Init] = {
+  private def makeInitsNode(current: Mcrl2Node, last: Mcrl2Def, backwards: Boolean = false): List[Mcrl2Init] = {
     if(to_check.contains(current)) {
       //in this case we know the node doesn't have prev
       //we can also assure that in this case backwards = false
       check(current)
       if (last == null) {
-        makeInits(current.getNext, current, current)
+        makeInitsChannel(current.getNext, current, current)
       }
       else {
         if (!backwards) {
           notMissing(current.before)
           val init = Mcrl2Init(channel_count, current.before.get_number, current.getName, last.getName)
           channel_count += 1
-          val rest = makeInits(current.next, init, current)
+          val rest = makeInitsChannel(current.next, init, current)
           init :: rest
         }
         else{
           notMissing(current.getAfter)
           var init = Mcrl2Init(channel_count, current.after.get_number, current.getName, last.getName)
           channel_count +=1
-          val rest = makeInits(current.prev, init, current, true)
+          val rest = makeInitsChannel(current.prev, init, current, true)
           init::rest
         }
       }
@@ -275,12 +276,12 @@ object Mcrl2Program{
     }
   }
 
-  private def makeInits(current: Mcrl2Channel, last: Mcrl2Def, last_node: Mcrl2Node, backwards: Boolean = false): List[Mcrl2Init] = {
+  private def makeInitsChannel(current: Mcrl2Channel, last: Mcrl2Def, last_node: Mcrl2Node, backwards: Boolean = false): List[Mcrl2Init] = {
     if(to_check.contains(current)) {
       check(current)
       //this will never happen but oh well
       if (last == null) {
-        makeInits(current.getNext.head, current)
+        makeInitsNode(current.getNext.head, current)
       }
       else {
         if (!backwards) {
@@ -289,12 +290,12 @@ object Mcrl2Program{
           channel_count += 1
           for(n <- current.getNext){
             val last = inits.last
-            inits ++= makeInits(n, last)
+            inits ++= makeInitsNode(n, last)
           }
           for(n <- current.getPrev){
             if(n != last_node) {
               val last = inits.last
-              inits ++= makeInits(n, last, true)
+              inits ++= makeInitsNode(n, last, true)
             }
           }
           inits
@@ -305,12 +306,12 @@ object Mcrl2Program{
           channel_count += 1
           for(n <- current.getPrev){
             val last = inits.last
-            inits ++= makeInits(n, last, true)
+            inits ++= makeInitsNode(n, last, true)
           }
           for(n <- current.getNext){
             if(n != last_node) {
               val last = inits.last
-              inits ++= makeInits(n, last)
+              inits ++= makeInitsNode(n, last)
             }
           }
           inits

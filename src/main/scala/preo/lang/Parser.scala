@@ -25,7 +25,7 @@ object Parser extends RegexParsers {
 
   override def skipWhitespace = true
   override val whiteSpace: Regex = "[ \t\r\f\n]+".r
-  val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r //todo-talk: se calhar deviamos impedir que se colocassem aqui nomes como fifo, etc...
+  val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
 
   /** Parses basic primitives */
   def inferPrim(s:String): Connector = s match {
@@ -37,7 +37,7 @@ object Parser extends RegexParsers {
     case "lossy"    => lossy
     case "merger"   => merger
     case "swap"     => swap
-    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1))) //todo-talk: não deviam estes dois estar definidos no mesmo local dos restantes?
+    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)))
     case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)))
     case _          => str2conn(s)
   }
@@ -46,7 +46,6 @@ object Parser extends RegexParsers {
     lit ~ combinator ^^ {case l ~ f => f(l) }
 
   //todo-ruben: add priorities
-  //todo-ruben: queremos poder atribuir variaveis que representam connectores e junta-los todos no final. Talvez um "SubConnector"
   def combinator: Parser[Connector => Connector] =
     "&" ~ conn   ^^ {case _~ c => (_:Connector) & c} |
       "*" ~ conn   ^^ {case _~ c => (_:Connector) * c} |

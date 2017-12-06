@@ -1,7 +1,7 @@
 package preo
 
 import preo.DSL._
-import preo.backend.{ReoGraph, Springy}
+import preo.backend.{ReoGraph, Springy, Graph}
 import preo.frontend.Eval
 
 object Main extends App {
@@ -16,6 +16,7 @@ object Main extends App {
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
       println(ReoGraph(Eval.reduce(conn)))
+      println(Graph(reduce(conn)))
 
   }
 

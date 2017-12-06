@@ -407,6 +407,7 @@ object Simplify {
       case (Par(c1,c2),a2) =>
         if (tcheck(IApp(c1,a2))) simplifyWithTypeChk(Par(IApp(c1,a2),c2),tcheck)
         else simplifyWithTypeChk(Par(c1,IApp(c2,a2)),tcheck)
+      case (SubConnector(name, c), a2) => simplifyWithTypeChk(SubConnector(name, IApp(c, a2)), tcheck)
       case (c2,a2) => IApp(c2,a2)
     }
     case BApp(c,a) => (simplifyWithTypeChk(c,tcheck),apply(a)) match {
@@ -417,6 +418,7 @@ object Simplify {
       case (Par(c1,c2),a2) =>
         if (tcheck(BApp(c1,a2))) simplifyWithTypeChk(Par(BApp(c1,a2),c2),tcheck)
         else simplifyWithTypeChk(Par(c1,BApp(c2,a2)),tcheck)
+      case (SubConnector(name, c), a2) => simplifyWithTypeChk(SubConnector(name, BApp(c, a2)), tcheck)
       case (c2,a2) => BApp(c2,a2)
       //      case (BAbs(x,c2),a2) => simplifyWithTypeChk(Substitution(x,a2)(c2),tcheck)
       //      case (c2,a2) => BApp(c2,a2)

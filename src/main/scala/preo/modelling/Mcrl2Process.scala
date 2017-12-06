@@ -28,8 +28,6 @@ case class Action(number: Int, group: Int) extends Mcrl2Process{
 
   def get_number: Int = number
 
-  def change_group(new_group: Int): Action = Action(number, new_group)
-
   override def vars: List[Action] = List(this)
 }
 
@@ -55,11 +53,6 @@ case class MultiAction(actions: List[Action]) extends Mcrl2Process{
 
   override def vars: List[Action] = if(actions.isEmpty) List(Action(0, -1)) else actions
 
-  def ++(other: List[Action]): MultiAction = MultiAction(actions ++ other)
-
-  def ++(other: MultiAction): MultiAction = other match{
-    case MultiAction(other_actions) => MultiAction(actions ++ other_actions)
-  }
 }
 
 object MultiAction{
