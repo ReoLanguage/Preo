@@ -40,17 +40,21 @@ object Graph {
         nodes += ReoNode(o,None,Mixed,None)
       }
       // between all outputs if no input end
-      if (e.ins.isEmpty && e.outs.size>1)
-        for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i)<e.outs.indexOf(o)) {
-          edges ::= ReoChannel(i,o,ArrowOut,ArrowOut,e.prim.name,None)
-          nodes += ReoNode(i,None,Mixed,None)
+      if (e.ins.isEmpty && e.outs.size>1) {
+        for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i) < e.outs.indexOf(o)) {
+          edges ::= ReoChannel(i, o, ArrowOut, ArrowOut, e.prim.name, None)
+          nodes += ReoNode(i, None, Mixed, None)
         }
+        nodes += ReoNode(e.outs.last, None, Mixed, None) // last one also needs to be added
+      }
       // between all inputs if no output end
-      if (e.outs.isEmpty && e.ins.size>1)
-        for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i)<e.ins.indexOf(o)) {
-          edges ::= ReoChannel(i,o,ArrowIn,ArrowIn,e.prim.name,None)
-          nodes += ReoNode(i,None,Mixed,None)
+      if (e.outs.isEmpty && e.ins.size>1) {
+        for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
+          edges ::= ReoChannel(i, o, ArrowIn, ArrowIn, e.prim.name, None)
+          nodes += ReoNode(i, None, Mixed, None)
         }
+        nodes += ReoNode(e.ins.last,None,Mixed,None) // last one also needs to be added
+      }
       // Create a node/component if exactly one output and no intput
       if (e.ins.isEmpty && e.outs.size == 1) {
         seed += 1
