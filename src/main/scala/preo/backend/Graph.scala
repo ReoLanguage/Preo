@@ -67,8 +67,9 @@ object Graph {
       // Create a node/component if exactly one input and no output
       if (e.outs.isEmpty && e.ins.size==1) {
         seed += 1
-        edges ::= ReoChannel(e.ins.head,seed,ArrowOut,NoArrow,"",None) //  s"n${e.ins.head}, ${e.prim.name + "_" + e.ins.head}"
+        edges ::= ReoChannel(e.ins.head,seed,NoArrow,ArrowOut,"",None) //  s"n${e.ins.head}, ${e.prim.name + "_" + e.ins.head}"
         nodes += ReoNode(seed,Some(e.prim.name),Sink,Some("component"))
+        nodes += ReoNode(e.ins.head,None,Mixed,None)
 //        bounds += (e.prim.name + "_" + e.ins.head)
       }
     }
