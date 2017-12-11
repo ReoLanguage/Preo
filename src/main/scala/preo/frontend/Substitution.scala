@@ -228,6 +228,7 @@ object Substitution {
     case App(c, a)    => App(replacePrim(s,c,by),a)
     case Restr(c, phi) => Restr(replacePrim(s,c,by),phi)
     case Choice(b, c1, c2) => Choice(b,replacePrim(s,c1,by),replacePrim(s,c2,by))
+    case SubConnector(n, c) => SubConnector(n, replacePrim(s, c, by))
     case _ => con
   }
 }
