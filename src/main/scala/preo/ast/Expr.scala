@@ -1,16 +1,16 @@
 package preo.ast
 
-sealed trait Var {
-  def x:String
-  def unary_! = LamWrap(List(this)) // helper to DSL (lambdas: !x -> conn)
+case class Var(x:String) extends IExpr with BExpr {
 }
+
+//case class SomeVar(x:String) extends Expr with Var // can have any type
 
 sealed abstract class Expr
 
 /**
  * Integer expressions
  */
-sealed abstract class IExpr extends Expr {
+sealed trait IExpr extends Expr {
   // helpers to DSL
   def +(that:IExpr) = Add(this,that)
   def -(that:IExpr) = Sub(this,that)
@@ -25,23 +25,19 @@ sealed abstract class IExpr extends Expr {
 }
 
 case class IVal(n:Int) extends IExpr
-case class IVar(x:String) extends IExpr with Var {
-  def <--(to:IExpr) = ExpWrap(this,to) // helper to DSL
-  def =<(to:IExpr) = ExpWrap(this,to) // helper to DSL
-}
 case class Add(e1:IExpr,e2:IExpr) extends IExpr
 case class Sub(e1:IExpr,e2:IExpr) extends IExpr
 case class Mul(e1:IExpr,e2:IExpr) extends IExpr
 case class Div(e1:IExpr,e2:IExpr) extends IExpr
 // Sum(x,from,to,e) means Sum(from <= x < to)e
-case class Sum(x:IVar,from:IExpr,to:IExpr,e:IExpr) extends IExpr
+case class Sum(x:Var,from:IExpr,to:IExpr,e:IExpr) extends IExpr
 case class ITE(b:BExpr,ifTrue:IExpr,ifFalse:IExpr) extends IExpr
 
 
 /**
   * Boolean expressions
   */
-sealed abstract class BExpr extends Expr {
+sealed trait BExpr extends Expr {
   // helpers for the DSL
   def &(that:BExpr) = (this,that) match {
     case (BVal(true),_) => that
@@ -73,13 +69,12 @@ class IfWrapC(val ifthen:List[(BExpr,Connector)]) {
 }
 
 case class BVal(b:Boolean) extends BExpr
-case class BVar(x:String) extends BExpr with Var
-case class And(es:List[BExpr]) extends BExpr // special treatment for ands, because constraints in typechecking are a big conjunction
+case class And(es:List[BExpr])   extends BExpr // special treatment for ands, because constraints in typechecking are a big conjunction
 case class Or(e1:BExpr,e2:BExpr) extends BExpr
-case class Not(e:BExpr) extends BExpr
+case class Not(e:BExpr)          extends BExpr
 case class EQ(e1:IExpr,e2:IExpr) extends BExpr
 case class GT(e1:IExpr,e2:IExpr) extends BExpr
 case class LT(e1:IExpr,e2:IExpr) extends BExpr
 case class LE(e1:IExpr,e2:IExpr) extends BExpr
 case class GE(e1:IExpr,e2:IExpr) extends BExpr
-case class AndN(x:IVar,from:IExpr,to:IExpr,e:BExpr) extends BExpr // to is "excluding"
+case class AndN(x:Var,from:IExpr,to:IExpr,e:BExpr) extends BExpr // to is "excluding"

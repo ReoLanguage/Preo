@@ -27,25 +27,26 @@ case class Type(args:Arguments, i:Interface, j:Interface, const:BExpr, isGeneral
  *
  * @param vars pars of variables (name,type).
  */
-case class Arguments(vars:List[Var]) {
+case class Arguments(vars:List[(Var,ExprType)]) {
   def ++(that:Arguments): Arguments = Arguments(vars ::: that.vars)
-  def +(that:Var) = Arguments(that :: vars)
+  def +(that:Var,exprType: ExprType) = Arguments((that,exprType) :: vars)
   def disjoint(that:Arguments): Boolean = {
     for (v <- vars)
       if (that.vars.contains(v)) return false
     true
   }
 
-  override def toString = //vars.map(x=>x._1+":"+x._2).mkString(",")
-    vars.map {
-      case BVar(x) => x + ":B"
-      case IVar(x) => x + ":I"
-      case x => throw new RuntimeException(s"Unknown variable $x : ${x.getClass}.")
-    }.mkString(",")
+  override def toString: String = vars.map(x=>x._1.x+":"+x._2).mkString(",")
 }
+
 // empty constructure for arguments
 object Arguments{
   def apply():Arguments = Arguments(List())
 }
+
+
+sealed abstract class ExprType
+case object IntType  extends ExprType { override def toString = "I"}
+case object BoolType extends ExprType { override def toString = "B"}
 
 

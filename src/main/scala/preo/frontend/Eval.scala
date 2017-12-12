@@ -23,19 +23,31 @@ object Eval {
     * @param e expression being evaluated
     * @return
     */
+  def apply(e: Expr): Expr = e match {
+    case ex: IExpr => apply(ex)
+    case ex: BExpr => apply(ex)
+  }
+
+  /**
+    * Evaluates an expression by performing operations over known values
+    *
+    * @param e expression being evaluated
+    * @return
+    */
   def apply(e: IExpr): IExpr = e match {
+    case Var(_) => e
+
     case IVal(_) => e
-    case IVar(_) => e
     case Add(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(a), IVal(b)) => IVal(a + b)
       case (IVal(0), e3) => e3
       case (e3, IVal(0)) => e3
-      case (ev1, ev2) => Add(ev1, ev2)
+      case (ev1:IExpr, ev2:IExpr) => Add(ev1, ev2)
     }
     case Sub(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(a), IVal(b)) => IVal(a - b)
       case (e3, IVal(0)) => e3
-      case (ev1, ev2) => Sub(ev1, ev2)
+      case (ev1:IExpr, ev2:IExpr) => Sub(ev1, ev2)
     }
     case Mul(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(a), IVal(b)) => IVal(a * b)
@@ -43,7 +55,7 @@ object Eval {
       case (_, IVal(0)) => IVal(0)
       case (IVal(1), e3) => e3
       case (e3, IVal(1)) => e3
-      case (ev1, ev2) => Mul(ev1, ev2)
+      case (ev1:IExpr, ev2:IExpr) => Mul(ev1, ev2)
     }
     case Div(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(a), IVal(b)) => IVal(a / b) // integer/eucledian division
@@ -51,12 +63,11 @@ object Eval {
       case (_, IVal(0)) => throw new TypeCheckException("Invalid constraints: division by 0 - " + Show(Div(e1, e2)))
       case (IVal(1), _) => IVal(0) // eucledian division of 1 by an integer is always 0
       case (e3, IVal(1)) => e3
-      case (ev1, ev2) => Div(ev1, ev2)
+      case (ev1:IExpr, ev2:IExpr) => Div(ev1, ev2)
     }
-    case Sum(x, from, to, newe) => (apply(from), apply(to)) match {
-      case (IVal(a), IVal(b)) =>
+    case Sum(x, from, to, newe) => (apply(from), apply(to), apply(newe)) match {
+      case (IVal(a), IVal(b),ev:IExpr) =>
         var res: IExpr = IVal(0)
-        val ev = apply(newe)
         //        println(" ## eval of "+PrettyPrint.show(e))
         //        println(s" ## sum from $a to $b")
         if (b > a)
@@ -66,13 +77,13 @@ object Eval {
           for (y <- a until b by -1)
             res += Substitution(x, IVal(-y))(ev)
         apply(res) // e(a) + ... + e(b)
-      case (ev1, ev2) => Sum(x, apply(from), apply(to), apply(newe))
+      case (ev1:IExpr, ev2:IExpr,ev:IExpr) => Sum(x, ev1, ev2, ev)
     }
-    case ITE(b, ifTrue, ifFalse) => apply(b) match {
-      case BVal(bv) => if (bv) apply(ifTrue) else apply(ifFalse)
-      case other =>
-        if (ifTrue == ifFalse) apply(ifTrue)
-        else ITE(other, apply(ifTrue), apply(ifFalse))
+    case ITE(b, ifTrue, ifFalse) => (apply(b),apply(ifTrue), apply(ifFalse)) match {
+      case (BVal(bv),itr,ifa) => if (bv) itr else ifa
+      case (other:BExpr,itr:IExpr,ifa:IExpr) =>
+        if (ifTrue == ifFalse) itr
+        else ITE(other, itr, ifa)
     }
   }
 
@@ -83,33 +94,33 @@ object Eval {
     * @return
     */
   def apply(e: BExpr): BExpr = e match {
+    case Var(_) => e
+
     case BVal(b) => e
-    case BVar(x) => e
-    //    case IEQ(e1, e2) => eval(EQ(interfaceSem(e1),interfaceSem(e2)))
     case EQ(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(i1), IVal(i2)) => BVal(i1 == i2)
       case (a, b) if a == b => BVal(b = true)
-      case (a, b) => EQ(a, b)
+      case (a:IExpr, b:IExpr) => EQ(a, b)
     }
     case GT(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(i1), IVal(i2)) => BVal(i1 > i2)
       case (a, b) if a == b => BVal(b = false)
-      case (a, b) => GT(a, b)
+      case (a:IExpr, b:IExpr) => GT(a, b)
     }
     case LT(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(i1), IVal(i2)) => BVal(i1 < i2)
       case (a, b) if a == b => BVal(b = false)
-      case (a, b) => LT(a, b)
+      case (a:IExpr, b:IExpr) => LT(a, b)
     }
     case GE(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(i1), IVal(i2)) => BVal(i1 >= i2)
       case (a, b) if a == b => BVal(b = true)
-      case (a, b) => GE(a, b)
+      case (a:IExpr, b:IExpr) => GE(a, b)
     }
     case LE(e1, e2) => (apply(e1), apply(e2)) match {
       case (IVal(i1), IVal(i2)) => BVal(i1 <= i2)
       case (a, b) if a == b => BVal(b = true)
-      case (a, b) => LE(a, b)
+      case (a:IExpr, b:IExpr) => LE(a, b)
     }
     case And(Nil) => e
     case And(e1 :: es) => (apply(e1), apply(And(es))) match {
@@ -117,19 +128,19 @@ object Eval {
       case (BVal(false), ev) => BVal(b = false)
       case (ev, BVal(true)) => ev
       case (ev, BVal(false)) => BVal(b = false)
-      case (a, b) => a & b
+      case (a:BExpr, b:BExpr) => a & b
     }
     case Or(e1, e2) => (apply(e1), apply(e2)) match {
       case (BVal(true), ev) => BVal(b = true)
       case (BVal(false), ev) => ev
       case (ev, BVal(true)) => BVal(b = true)
       case (ev, BVal(false)) => ev
-      case (a, b) => Or(a, b)
+      case (a:BExpr, b:BExpr) => Or(a, b)
     }
     case Not(e2) => apply(e2) match {
       case BVal(b) => BVal(!b)
       case Not(e3) => e3
-      case e3 => Not(e3)
+      case e3:BExpr => Not(e3)
     }
     case AndN(x, f, t, e1) => (apply(f), apply(t), apply(e1)) match {
       case (IVal(a), IVal(b), e2) =>
@@ -141,7 +152,7 @@ object Eval {
           for (y <- a until b by -1)
             res &= Substitution(x, IVal(-y))(e2)
         apply(res) // e(a) + ... + e(b)
-      case (f2, t2, e2) => AndN(x, f2, t2, e2)
+      case (f2:IExpr, t2:IExpr, e2:BExpr) => AndN(x, f2, t2, e2)
     }
   }
 
@@ -151,8 +162,9 @@ object Eval {
     * @param t type being evaluated
     * @return type after evaluation
     */
-  def apply(t: Type): Type =
-    Type(t.args, apply(t.i), apply(t.j), apply(t.const), t.isGeneral)
+  def apply(t: Type): Type = apply(t.const) match {
+    case c2: BExpr => Type(t.args, apply(t.i), apply(t.j), c2, t.isGeneral)
+  }
 
   /**
     * Creates an instance of a type by using the constraint solver
@@ -180,12 +192,12 @@ object Eval {
     */
   def expandSubstitution(args: Arguments, s: Substitution): Substitution = {
     var subst = s
-    for (v <- args.vars) {
-      v match {
-        case x@IVar(_) =>
-          if (subst(x) == x) subst += (x, IVal(1))
-        case x@BVar(_) =>
-          if (subst(x) == x) subst += (x, BVal(true))
+    for (vt <- args.vars) {
+      vt match {
+        case (x:Var,IntType) =>
+          if (subst(x:Expr) == x) subst += (x, IVal(1))
+        case (x:Var,BoolType) =>
+          if (subst(x:Expr) == x) subst += (x, BVal(true))
       }
     }
     subst
@@ -202,7 +214,7 @@ object Eval {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst1, rest1) = Unify.getUnification(type1.const, type1.args.vars)
+    val (subst1, rest1) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
     val type2b = Type(type1.args, subst1(type1.i), subst1(type1.j), rest2, type1.isGeneral)
@@ -218,16 +230,13 @@ object Eval {
     if (rest3 != BVal(true)) subst = subst.mkConcrete
 
     var res = c
-    for (a <- type4.args.vars) {
+    for ((a,etype) <- type4.args.vars) {
       var (expr, subst_) = subst.pop(a)
       subst = subst_
       expr match {
-        case Some(e: IExpr) => res = res.apply(e)
-        case Some(e: BExpr) => res = res.apply(e)
-        case None => a match {
-          case _: IVar => res = res.apply(IVal(1))
-          case _: BVar => res = res.apply(BVal(true))
-        }
+        case Some(e: Expr) => res = res.apply(e)
+        case None => res = if (etype==IntType) res.apply(IVal(1))
+                           else                res.apply(BVal(true))
       }
     }
     subst(res)
@@ -274,15 +283,16 @@ object Eval {
   /**
     * Simplified version of [[instantiate()]], skipping the constraint solving phase,
     * and performing only the simplifications.
+    * Used when the solver cannot be used, e.g., when producing JavaScript code.
     *
-    * @param c
-    * @return
+    * @param c connector
+    * @return instantiated connector
     */
   def unsafeInstantiate(c: Connector): Option[Connector] = {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
-    val (subst1, rest1) = Unify.getUnification(type1.const, type1.args.vars)
+    val (subst1, rest1) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
     val type2b = Type(type1.args, subst1(type1.i), subst1(type1.j), rest2, type1.isGeneral)
@@ -301,22 +311,24 @@ object Eval {
     var subst = subst1
 
     var res = c
-    for (a <- type4.args.vars) {
+    for ((a,etype) <- type4.args.vars) {
       var (expr, subst_) = subst.pop(a) // a -> expr, and rest is subst_
       subst = subst_
       expr match {
-        case Some(e: IExpr) => // if e has free variables, give them default values, and update the substitution
-          val e2 = Eval(addDefaultsI(e))
+        case Some(e: Expr) => // if e has free variables, give them default values, and update the substitution
+          val e2 = Eval(addDefaults(e,etype))
           subst = subst.update(a, e2)
           res = res.apply(e2)
-        case Some(e: BExpr) =>
-          val e2 = Eval(addDefaultsB(e))
-          subst = subst.update(a, e2)
-          res = res.apply(e2)
-        case None => a match {
-          case x: IVar => res = res.apply(IVal(1)) // default values
-          case x: BVar => res = res.apply(BVal(true)) // default values
-        }
+//        case Some(e: BExpr) =>
+//          val e2 = Eval(addDefaultsB(e))
+//          subst = subst.update(a, e2)
+//          res = res.apply(e2)
+        case None => res = if (etype==IntType) res.apply(IVal(1)) else res.apply(BVal(true))
+//          a match {
+//          case x: IVar => res = res.apply(IVal(1)) // default values
+//          case x: BVar => res = res.apply(BVal(true)) // default values
+//
+//        }
       }
     }
     val reduced = Simplify.unsafe(subst(res))
@@ -331,8 +343,14 @@ object Eval {
 
   }
 
+  private def addDefaults(expr: Expr,etype:ExprType): Expr = expr match {
+    case Var(x) => if (etype==IntType) addDefaultsI(Var(x)) else addDefaultsB(Var(x))
+    case i: IExpr => addDefaultsI(i)
+    case b: BExpr => addDefaultsB(b)
+  }
+
   private def addDefaultsI(e:IExpr, except:Set[Var] = Set()): IExpr = e match {
-    case IVar(x) if !except(IVar(x)) => IVal(1)
+    case Var(x) if !except(Var(x)) => IVal(1)
     case Add(e1, e2) => Add(addDefaultsI(e1,except),addDefaultsI(e2,except))
     case Sub(e1, e2) => Sub(addDefaultsI(e1,except),addDefaultsI(e2,except))
     case Mul(e1, e2) => Mul(addDefaultsI(e1,except),addDefaultsI(e2,except))
@@ -342,7 +360,7 @@ object Eval {
     case _ => e
   }
   private def addDefaultsB(e:BExpr, except:Set[Var] = Set()): BExpr = e match {
-    case BVar(x) if !except(BVar(x))=> BVal(true)
+    case Var(x) if !except(Var(x))=> BVal(true)
     case And(es) => And(es map (addDefaultsB(_,except)))
     case Or(e1, e2) => Or(addDefaultsB(e1,except),addDefaultsB(e2,except))
     case Not(e2) => Not(addDefaultsB(e2,except))
