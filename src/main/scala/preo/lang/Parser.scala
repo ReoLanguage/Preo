@@ -39,6 +39,7 @@ object Parser extends RegexParsers {
     case "swap"     => swap
     case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)))
     case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)))
+    case "node"     => preo.examples.Repository.node
     case _          => str2conn(s)
   }
 
