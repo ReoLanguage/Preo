@@ -17,7 +17,7 @@ object Mcrl2Def{
   }
 }
 
-case class Mcrl2Node(number: Int, var before: Action = null, var after: Action = null,var prev: Mcrl2Channel = null,var next: Mcrl2Channel=null)
+case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev: Mcrl2Channel = null,var next: Mcrl2Channel=null)
   extends Mcrl2Def{
 
   override def toString: String = s"Node$number = (${before.toString} | ${after.toString}) . Node$number"
@@ -36,7 +36,7 @@ case class Mcrl2Node(number: Int, var before: Action = null, var after: Action =
 
   def getAfter: Action = after
 
-  def getVars: List[Action] = before.vars ++ after.vars
+  def getVars: List[Action] = List(before, after)
 
   def setRight(action: Int): Unit = this.setRight(Action(action, 2))
 
@@ -101,7 +101,10 @@ object Mcrl2Init{
     val action1 = Action(var_number, 3)
     val action2 = Action(var_number, 2)
     val action3 = Action(var_number, 1)
-    val operator = Hide(List(action1),Block(List(action2, action3), Comm((action2, action3, action1), Par(ProcessName(proc1.toString), ProcessName(proc2.toString)))))
+    val operator1 = Par(ProcessName(proc1.toString), ProcessName(proc2.toString))
+    val operator2 = Comm((action2, action3, action1), operator1)
+    val operator3 = Block(List(action2, action3), operator2)
+    val operator = Hide(List(action1), operator3)
     Mcrl2Init(number,action1, operator)
   }
 }

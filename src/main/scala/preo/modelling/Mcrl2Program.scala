@@ -201,7 +201,7 @@ object Mcrl2Program{
   }
 
   private def makeNodes(numbers: List[Int]): List[Mcrl2Node] = numbers match{
-    case n :: rest => Mcrl2Node(n) :: makeNodes(rest)
+    case n :: rest => Mcrl2Node(n, Action(0, 6), Action(0, 6)) :: makeNodes(rest)
     case Nil => Nil
   }
 
@@ -218,7 +218,8 @@ object Mcrl2Program{
   private def initsMaker: List[Mcrl2Init] =
     if(starterNodes.nonEmpty){
       val inits = makeInitsNode(starterNodes.head, null)
-      last_init = if(last_init == null) inits.last.getName else Seq(last_init, inits.last.getName)
+      starterNodes = starterNodes.tail
+      last_init = if(last_init == null) inits.last.getName else Par(last_init, inits.last.getName)
       inits ++ initsMaker
     }
     else if(missingVars.nonEmpty) {
@@ -231,15 +232,15 @@ object Mcrl2Program{
     }
 
 
+  private def check(element: Mcrl2Def): Unit = to_check = to_check.filter(x => x != element)
 
-  private def check(element: Mcrl2Def): Unit = to_check.filter(x => x != element)
-
-  private def notMissing(action: Action): Unit = missingVars.filter(x=> x!= action)
+  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number)
 
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
     case Action(number, group) :: rest => {
       val filtered_rest = rest.filter{case Action(n, g) => n != number}
-      val m = Mcrl2Init(channel_count, number, last_init)
+      val m = Mcrl2Init(channel_count, number, last)
+      channel_count += 1
       m :: makeblockers(filtered_rest, m.getName)
     }
     case Nil => Nil

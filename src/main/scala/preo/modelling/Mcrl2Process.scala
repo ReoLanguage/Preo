@@ -81,7 +81,7 @@ case class Par(left: Mcrl2Process, right:Mcrl2Process) extends Mcrl2Process{
 case class Comm(actions: (Action, Action, Action), in: Mcrl2Process) extends Mcrl2Process{
   override def toString: String = s"""comm({${toString(actions)}}, ${in.toString})"""
 
-  def toString(vars: (Action, Action, Action)): String = s"""${vars._1.toString}|${vars._2.toString} -> ${vars._2.toString}"""
+  def toString(vars: (Action, Action, Action)): String = s"""${vars._1.toString}|${vars._2.toString} -> ${vars._3.toString}"""
 
   override def vars: List[Action] = actions._1 :: in.vars
 }
