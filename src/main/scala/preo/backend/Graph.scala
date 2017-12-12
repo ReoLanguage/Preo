@@ -33,12 +33,14 @@ object Graph {
     val nodes  = scala.collection.mutable.Set[ReoNode]()
     var edges  = List[ReoChannel]()
     def addNode(id:Int,name:Option[String],nType:NodeType,style:Option[String]): Unit = {
-      if (nodes contains ReoNode(id,name,nType.dual,style)){
-        nodes -= ReoNode(id,name,nType.dual,style)
-        nodes += ReoNode(id,name,Mixed,style)
+      if (!(nodes contains ReoNode(id,name,Mixed,style))) {
+        if (nodes contains ReoNode(id, name, nType.dual, None)) {
+          nodes -= ReoNode(id, name, nType.dual, style)
+          nodes += ReoNode(id, name, Mixed, style)
+        }
+        else
+          nodes += ReoNode(id, name, nType, style)
       }
-      else
-        nodes += ReoNode(id,name,nType,style)
     }
 
     for (e <- g.edges) {
@@ -64,7 +66,7 @@ object Graph {
         }
         addNode(e.ins.last,None,Source,None) // last one also needs to be added
       }
-      // Create a node/component if exactly one output and no intput
+      // Create a writer component if exactly one output and no intput
       if (e.ins.isEmpty && e.outs.size == 1) {
         seed += 1
         edges ::= ReoChannel(seed,e.outs.head,NoArrow,ArrowOut,"",None)
@@ -73,7 +75,7 @@ object Graph {
 //        bounds += (e.prim.name + "_" + e.outs.head)
 //        nodes += "n"++e.outs.head.toString
       }
-      // Create a node/component if exactly one input and no output
+      // Create a reader component if exactly one input and no output
       if (e.outs.isEmpty && e.ins.size==1) {
         seed += 1
         edges ::= ReoChannel(e.ins.head,seed,NoArrow,ArrowOut,"",None) //  s"n${e.ins.head}, ${e.prim.name + "_" + e.ins.head}"
