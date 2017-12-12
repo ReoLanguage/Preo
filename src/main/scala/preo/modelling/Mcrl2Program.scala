@@ -31,7 +31,7 @@ object Mcrl2Program{
   var to_check: List[Mcrl2Def] = List[Mcrl2Def]()
   var missingVars: List[Action] = List[Action]()
 
-  def apply(con: CoreConnector): Mcrl2Program = graphToMcrl2(ReoGraph(con))
+  def apply(con: CoreConnector): Mcrl2Program = graphToMcrl2(ReoGraph.toGraph(con))
 
   def graphToMcrl2(graph: ReoGraph): Mcrl2Program = graph match{
     case ReoGraph(edges, ins, outs) => {
@@ -42,7 +42,13 @@ object Mcrl2Program{
       to_check = channels ++ nodes
       missingVars = getVars(channels++nodes).toList.filter{case Action(number, group) => group < 3}
       val inits = initsMaker
-      new Mcrl2Program(getVars(channels++nodes++inits) + Action(var_count, 6), channels ++ this.nodes ++ inits, last_init)
+      if(last_init == null){
+        last_init = nodes.head.getName
+        for( node <- nodes.tail){
+          last_init = Par(last_init, node.getName)
+        }
+      }
+      new Mcrl2Program(getVars(channels++nodes++inits), channels ++ this.nodes ++ inits, last_init)
     }
   }
 
@@ -57,7 +63,12 @@ object Mcrl2Program{
         nodes_out ++= List(getNode(out, nodes))
       }
       val channel = primToChannel(prim, nodes_in, nodes_out)
-      channel :: edgetoMcrl2(rest)
+      if(channel != null) {
+        channel :: edgetoMcrl2(rest)
+      }
+      else{
+        edgetoMcrl2(rest)
+      }
     }
     case Nil => Nil
   }
@@ -148,7 +159,7 @@ object Mcrl2Program{
       val out_node1 = outs.head
       val out_node2 = outs.last
       in_node.setRight(var_count)
-      out_node1.setRight(var_count+1)
+      out_node1.setLeft(var_count+1)
       out_node2.setLeft(var_count+2)
       //channel
       val firstAction = Action(var_count, 1)
@@ -183,6 +194,20 @@ object Mcrl2Program{
       channel_count += 1
       channel
     }
+    case CPrim("reader", _, _, _) => {
+      val in_node = ins.head
+      in_node.setRight(Action(var_count, 4))
+      var_count +=1
+      null
+    }
+    case CPrim("writer", _, _, _) => {
+      val out_node = outs.head
+      out_node.setLeft(Action(var_count, 5))
+      this.starterNodes = starterNodes ++ List(out_node)
+      var_count += 1
+      null
+    }
+
     case CPrim(_, _, _, _) => {
       val in_node = ins.head
       val out_node = outs.head
@@ -219,7 +244,9 @@ object Mcrl2Program{
     if(starterNodes.nonEmpty){
       val inits = makeInitsNode(starterNodes.head, null)
       starterNodes = starterNodes.tail
-      last_init = if(last_init == null) inits.last.getName else Par(last_init, inits.last.getName)
+      if(inits.nonEmpty) {
+        last_init = if (last_init == null) inits.last.getName else Par(last_init, inits.last.getName)
+      }
       inits ++ initsMaker
     }
     else if(missingVars.nonEmpty) {
