@@ -18,10 +18,10 @@ case object ArrowOut extends EndType
 case object NoArrow  extends EndType
 
 case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, style:Option[String])
-sealed abstract class NodeType
-case object Source extends NodeType
-case object Sink   extends NodeType
-case object Mixed  extends NodeType
+sealed abstract class NodeType     { def dual:NodeType}
+case object Source extends NodeType {def dual = Sink  }
+case object Sink   extends NodeType {def dual = Source}
+case object Mixed  extends NodeType {def dual = Mixed }
 
 
 object Graph {
@@ -32,44 +32,55 @@ object Graph {
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
     var edges  = List[ReoChannel]()
+    def addNode(id:Int,name:Option[String],nType:NodeType,style:Option[String]): Unit = {
+      if (!(nodes contains ReoNode(id,name,Mixed,style))) {
+        if (nodes contains ReoNode(id, name, nType.dual, None)) {
+          nodes -= ReoNode(id, name, nType.dual, style)
+          nodes += ReoNode(id, name, Mixed, style)
+        }
+        else
+          nodes += ReoNode(id, name, nType, style)
+      }
+    }
+
     for (e <- g.edges) {
       // from every input to every output
       for (i <- e.ins; o <- e.outs) {
         edges ::= ReoChannel(i,o,NoArrow,ArrowOut,e.prim.name,None)
-        nodes += ReoNode(i,None,Mixed,None)
-        nodes += ReoNode(o,None,Mixed,None)
+        addNode(i,None,Source,None)
+        addNode(o,None,Sink,None)
       }
       // between all outputs if no input end
       if (e.ins.isEmpty && e.outs.size>1) {
         for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i) < e.outs.indexOf(o)) {
           edges ::= ReoChannel(i, o, ArrowOut, ArrowOut, e.prim.name, None)
-          nodes += ReoNode(i, None, Mixed, None)
+          addNode(i, None, Sink, None)
         }
-        nodes += ReoNode(e.outs.last, None, Mixed, None) // last one also needs to be added
+        addNode(e.outs.last, None, Sink, None) // last one also needs to be added
       }
       // between all inputs if no output end
       if (e.outs.isEmpty && e.ins.size>1) {
         for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
           edges ::= ReoChannel(i, o, ArrowIn, ArrowIn, e.prim.name, None)
-          nodes += ReoNode(i, None, Mixed, None)
+          addNode(i, None, Source, None)
         }
-        nodes += ReoNode(e.ins.last,None,Mixed,None) // last one also needs to be added
+        addNode(e.ins.last,None,Source,None) // last one also needs to be added
       }
-      // Create a node/component if exactly one output and no intput
+      // Create a writer component if exactly one output and no intput
       if (e.ins.isEmpty && e.outs.size == 1) {
         seed += 1
         edges ::= ReoChannel(seed,e.outs.head,NoArrow,ArrowOut,"",None)
-        nodes += ReoNode(seed,Some(e.prim.name),Source,Some("component"))
-        nodes += ReoNode(e.outs.head,None,Mixed,None)
+        addNode(seed,Some(e.prim.name),Source,Some("component"))
+        addNode(e.outs.head,None,Sink,None)
 //        bounds += (e.prim.name + "_" + e.outs.head)
 //        nodes += "n"++e.outs.head.toString
       }
-      // Create a node/component if exactly one input and no output
+      // Create a reader component if exactly one input and no output
       if (e.outs.isEmpty && e.ins.size==1) {
         seed += 1
         edges ::= ReoChannel(e.ins.head,seed,NoArrow,ArrowOut,"",None) //  s"n${e.ins.head}, ${e.prim.name + "_" + e.ins.head}"
-        nodes += ReoNode(seed,Some(e.prim.name),Sink,Some("component"))
-        nodes += ReoNode(e.ins.head,None,Mixed,None)
+        addNode(seed,Some(e.prim.name),Sink,Some("component"))
+        addNode(e.ins.head,None,Source,None)
 //        bounds += (e.prim.name + "_" + e.ins.head)
       }
     }
