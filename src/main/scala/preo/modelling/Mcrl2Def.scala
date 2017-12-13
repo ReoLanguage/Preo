@@ -20,6 +20,13 @@ object Mcrl2Def{
 case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev: Mcrl2Channel = null,var next: Mcrl2Channel=null)
   extends Mcrl2Def{
 
+  if(before == null){
+      before = Action(-1, 6)
+  }
+  if(after == null){
+      after = Action(-1, 6)
+  }
+
   override def toString: String = s"Node$number = (${before.toString} | ${after.toString}) . Node$number"
 
   def getName: ProcessName = ProcessName(s"Node$number")
@@ -36,7 +43,7 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
 
   def getAfter: Action = after
 
-  def getVars: List[Action] = List(before, after)
+  def getVars: List[Action] = Set(before, after).toList
 
   def setRight(action: Int): Unit = this.setRight(Action(action, 2))
 
@@ -50,6 +57,11 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
 case class Mcrl2Channel(name:String = "Channel", number: Int,var before: List[Action],var after: List[Action],
                         operator: Mcrl2Process,var prev: List[Mcrl2Node] = Nil,var next: List[Mcrl2Node]= Nil)
   extends Mcrl2Def{
+
+  if(operator == null){
+    throw new NullPointerException("null Operator Invalid")
+  }
+
 
   override def toString: String = s"$name$number = (${operator.toString}) . $name$number"
 

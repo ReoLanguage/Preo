@@ -18,7 +18,6 @@ object Main extends App {
       println("reduced: "+Eval.reduce(conn))
       println(ReoGraph(Eval.reduce(conn)))
       println(Mcrl2Program(Eval.reduce(conn)))
-
   }
 
 
