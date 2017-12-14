@@ -28,9 +28,12 @@ class Mcrl2Program(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
     s"""
        |act <br>
        |  $acts;<br>
+       |  <br>
        |proc<br>
+       |<br>
        |  $procs<br>
        |init<br>
+       |<br>
        |  $initProc;<br>
       """.stripMargin
   }
@@ -74,7 +77,15 @@ object Mcrl2Program{
           last_init = Par(last_init, node.getName)
         }
       }
-      new Mcrl2Program(getVars(channels++nodes++inits), channels ++ this.nodes ++ inits, last_init)
+      val program = new Mcrl2Program(getVars(channels++nodes++inits), channels ++ this.nodes ++ inits, last_init)
+      var_count = 0
+      channel_count = 0
+      nodes= List[Mcrl2Node]()
+      last_init = null
+      starterNodes = List[Mcrl2Node]()
+      missingVars = List[Action]()
+      to_check = List[Mcrl2Def]()
+      program
     }
   }
 

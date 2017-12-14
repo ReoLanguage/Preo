@@ -24,7 +24,8 @@ class TestProgram {
     val reoGraph8 = ReoGraph.toGraph(Eval.reduce(parse("(fifo * fifofull) * merger")));;
     val reoGraph9 = ReoGraph.toGraph(Eval.reduce(parse("writer & fifo & reader")));
     val reoGraph10 = ReoGraph.toGraph(Eval.reduce(parse("(writer & fifo & reader) * (writer & fifo & reader)")));
-    val graphs = List(reoGraph1,reoGraph2,reoGraph3,reoGraph4,reoGraph5,reoGraph6,reoGraph7,reoGraph8,reoGraph9,reoGraph10)
+    val reoGraph11 = ReoGraph.toGraph(Eval.reduce(parse("zip =\n  \\n.Tr_((2*n)*(n-1))\n  (((((id^(n-x))*(sym(1,1)^x))*(id^(n-x)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nunzip =\n  \\n.Tr_((2*n)*(n - 1))\n  (((((id^(x+1))*(sym(1,1)^((n-x)-1)))*(id^(x+1)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nsequencer =\n  \\n.(((dupl^n)&unzip(n:I)) *\n    Tr_n(sym(n-1,1)&((fifofull&dupl)*((fifo & dupl)^(n-1)))&\n         unzip(n:I)))&\n    ((id^n)*((zip(n:I)) & (drain^n)));\n\n(writer^3) & sequencer 3 & (reader^3)")))
+    val graphs = List(reoGraph1,reoGraph2,reoGraph3,reoGraph4,reoGraph5,reoGraph6,reoGraph7,reoGraph8,reoGraph9,reoGraph10, reoGraph11)
 
     //model getting
     val model1 = Mcrl2Program(reoGraph1)
@@ -37,7 +38,8 @@ class TestProgram {
     val model8 = Mcrl2Program(reoGraph8)
     val model9 = Mcrl2Program(reoGraph9)
     val model10 = Mcrl2Program(reoGraph10)
-    val models = List(model1, model2, model3, model4, model5, model6, model7, model8, model9, model10)
+    val model11 = Mcrl2Program(reoGraph11)
+    val models = List(model1, model2, model3, model4, model5, model6, model7, model8, model9, model10, model11)
 
     standardTests(graphs, models)
 
