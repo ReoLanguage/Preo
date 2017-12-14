@@ -20,7 +20,20 @@ class Mcrl2Program(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
       """.stripMargin
   }
 
-  //todo: web to string with paragrafs so I can put it in the browser
+  def webString: String = {
+    val acts = Mcrl2Def.toString(act.toList)
+    var procs = ""
+    for(p <- proc) procs += s"${p.toString};<br>\n"
+    val initProc = init.toString
+    s"""
+       |act <br>
+       |  $acts;<br>
+       |proc<br>
+       |  $procs<br>
+       |init<br>
+       |  $initProc;<br>
+      """.stripMargin
+  }
 
   //testing usefull stuff
   def getNodes: List[Mcrl2Node] = proc.filter(p => p.isInstanceOf[Mcrl2Node]).asInstanceOf[List[Mcrl2Node]]
