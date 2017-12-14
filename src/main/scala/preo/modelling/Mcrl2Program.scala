@@ -19,6 +19,17 @@ class Mcrl2Program(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
        |  $initProc;
       """.stripMargin
   }
+
+  //todo: web to string with paragrafs so I can put it in the browser
+
+  //testing usefull stuff
+  def getNodes: List[Mcrl2Node] = proc.filter(p => p.isInstanceOf[Mcrl2Node]).asInstanceOf[List[Mcrl2Node]]
+
+  def getChannels: List[Mcrl2Channel] = proc.filter(p => p.isInstanceOf[Mcrl2Channel]).asInstanceOf[List[Mcrl2Channel]]
+
+  def getInits: List[Mcrl2Init] = proc.filter(p => p.isInstanceOf[Mcrl2Init]).asInstanceOf[List[Mcrl2Init]]
+
+  def getActions: Set[Action] = act
 }
 
 object Mcrl2Program{
@@ -33,14 +44,16 @@ object Mcrl2Program{
 
   def apply(con: CoreConnector): Mcrl2Program = graphToMcrl2(ReoGraph.toGraph(con))
 
+  def apply(reoGraph: ReoGraph): Mcrl2Program = graphToMcrl2(reoGraph)
+
   def graphToMcrl2(graph: ReoGraph): Mcrl2Program = graph match{
     case ReoGraph(edges, ins, outs) => {
-      val starterNodes = makeNodes(ins)
+      this.starterNodes = makeNodes(ins)
       nodes = nodes ++ starterNodes ++ makeNodes(outs)
-      this.starterNodes = starterNodes
       val channels = edgetoMcrl2(edges)
       to_check = channels ++ nodes
       missingVars = getVars(channels++nodes).toList.filter{case Action(number, group) => group < 3}
+      if(starterNodes.isEmpty) starterNodes = nodes.head :: starterNodes
       val inits = initsMaker
       if(last_init == null){
         last_init = nodes.head.getName
@@ -73,7 +86,6 @@ object Mcrl2Program{
     case Nil => Nil
   }
 
-  //todo: missing writer and reader
   //We must have confidence that at this point, the number of ins and outs will coincide
   private def primToChannel(prim: CPrim, ins: List[Mcrl2Node], outs: List[Mcrl2Node]): Mcrl2Channel = prim match{
     case CPrim("fifo", _, _, _) => {
@@ -212,7 +224,7 @@ object Mcrl2Program{
       val in_node = ins.head
       val out_node = outs.head
       in_node.setRight(var_count)
-      out_node.setRight(var_count+1)
+      out_node.setLeft(var_count+1)
       val firstAction = Action(var_count, 1)
       val secondAction = Action(var_count+1, 1)
       val channel = Mcrl2Channel(number = channel_count, before= List(firstAction), after= List(secondAction),
