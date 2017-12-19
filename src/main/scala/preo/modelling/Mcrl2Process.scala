@@ -93,13 +93,13 @@ case class Allow(actions: List[Action], in: Mcrl2Process) extends Mcrl2Process{
 }
 
 case class Block(actions: List[Action], in: Mcrl2Process) extends Mcrl2Process{
-  override def toString: String = s"""block({${Mcrl2Def.toString(actions)}, ${in.toString})"""
+  override def toString: String = s"""block({${Mcrl2Def.toString(actions)}}, ${in.toString})"""
 
   override def vars: List[Action] = in.vars
 }
 
 case class Hide(actions: List[Action], in: Mcrl2Process) extends Mcrl2Process{
-  override def toString: String = s"""hide({${Mcrl2Def.toString(actions)}, ${in.toString})"""
+  override def toString: String = s"""hide({${Mcrl2Def.toString(actions)}}, ${in.toString})"""
 
   override def vars: List[Action] = in.vars
 }
