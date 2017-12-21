@@ -35,7 +35,7 @@ object ReoGraph {
     * @param prim connector to be converted to a graph
     * @return graph representation
     */
-  private def toGraph(prim:CoreConnector): ReoGraph = prim match {
+  def toGraph(prim:CoreConnector): ReoGraph = prim match {
     case CSeq(c1, c2) =>
       val (g1,g2) = (toGraph(c1),toGraph(c2))
       val g2b = subst(g2, g2.ins.zip(g1.outs).toMap )

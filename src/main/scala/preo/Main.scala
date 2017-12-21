@@ -1,8 +1,9 @@
 package preo
 
 import preo.DSL._
-import preo.backend.{ReoGraph, Springy}
+import preo.backend.{Graph, ReoGraph, Springy}
 import preo.frontend.Eval
+import preo.modelling.Mcrl2Program
 
 object Main extends App {
 
@@ -16,7 +17,7 @@ object Main extends App {
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
       println(ReoGraph(Eval.reduce(conn)))
-
+      println(Mcrl2Program(Eval.reduce(conn)).webString)
   }
 
 

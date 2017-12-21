@@ -46,6 +46,8 @@ object Parser extends RegexParsers {
   def conn: Parser[Connector] =
     lit ~ combinator ^^ {case l ~ f => f(l) }
 
+
+  //todo-ruben: add priorities
   def combinator: Parser[Connector => Connector] =
     "&" ~ conn   ^^ {case _~ c => (_:Connector) & c} |
       "*" ~ conn   ^^ {case _~ c => (_:Connector) * c} |
