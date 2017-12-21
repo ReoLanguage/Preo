@@ -175,6 +175,8 @@ object DSL {
     // 4.1 - evaluate and simplify type
     val type4 = Simplify(type3)
     // return the final type, without solving the missing constraints
+    // 5-heuristics for intervals
+    Solver.guessSol(type4.const) // will throw an error if inconsistent
     type4
   }
 
@@ -296,6 +298,11 @@ object DSL {
       // 4 - evaluate and simplify type
       val type4 = Simplify(type3)
       println(s" - simplified:    $type4")
+      // 5-alpha
+      val (interval,rest23) = Solver.varIntIntervals(type2b.const)
+      println(s" - got interval (pre-extension): ${interval.mkString("/")} - ${Show(rest23)}")
+      val (subst12,rest22) = Solver.guessSol(type2b.const)
+      println(s" - guessing solution: $subst12 - ${Show(rest22)}")
       // 5 - solve constraints
       val subst2 = Solver.solve(type4)
       val subst3 =
@@ -325,7 +332,69 @@ object DSL {
     }
   }
 
+  /**
+    * Parses a connector, and produces several intermediate steps when type checking and instantiating
+    * @param c connector to be parsed and analysed
+    */
+  def debug(c:String): Unit = debug(parse(c))
 
+  def unsafeDebug(c:String): Unit = unsafeDebug(parse(c))
+
+  def unsafeDebug(c:Connector): Unit = try {
+    println(Show(c))
+    // 1 - build derivation tree
+    val type1 = TypeCheck.check(c)
+    println(s" - type-rules:    $type1")
+    // 2 - unify constraints and get a substitution
+    val (subst2a,rest2a) = Unify.getUnification(type1.const)
+    println(s" - [ unification: $subst2a ]")
+    println(s" - [ missing:     ${Show(rest2a)} ]")
+    // 3 - apply substitution to the type
+    val rest3a = subst2a(rest2a)
+    val type3a = Type(type1.args,subst2a(type1.i),subst2a(type1.j),rest3a,type1.isGeneral)
+    println(s" - substituted:   $type3a")
+
+    // 4 - try to get intervals - if success, update substitution
+    val (interval,rest4a) = Solver.varIntIntervals(type3a.const)
+    println(s" - got interval (pre-extension): ${interval.mkString("/")} - ${Show(rest4a)}")
+    val (subst4a,rest4b) = Solver.guessSol(type3a.const)
+    println(s" - guessing solution: $subst4a - ${Show(rest4b)}")
+    // update subst and type if succeeded
+    val (subst4c,rest4c,type4c) = if (rest4b==BVal(true) || rest4b==And(List()))
+                                       (subst2a.compose(subst4a),rest4b,subst4a(type3a))
+                                  else (subst2a,rest3a,type3a)
+    println(s" - combined subst: $subst4c")
+    println(s" - combined type: $type4c")
+
+    // 5 - extend with lost constraints over argument-variables
+    val rest5a = subst4c.getConstBoundedVars(type4c)
+    val type5a = Type(type4c.args,type4c.i,type4c.j,rest4c & rest5a,type4c.isGeneral)
+    println(s" - extended with: $rest5a")
+    // 6 - evaluate and simplify type
+    val type6a = Simplify(type5a)
+    println(s" - simplified:    $type6a")
+
+    // 7 - apply subst3 if solver is an abstract solution
+    val type7a = subst4c(type6a)
+    if (type7a.isGeneral) {
+      val rest7a = subst4c.getConstBoundedVars(type7a)
+      println(s" - extended with: $rest7a")
+      val type7b = Eval(Type(type7a.args, type7a.i, type7a.j, type7a.const & rest7a, type7a.isGeneral))
+      println(s" - post-solver:   $type7b")
+    }
+    else println(s" - solution yields a concrete instance only.")
+    // 8 - apply the new substitution to the previous type and eval
+    val type8a = Eval.instantiate(subst4c(type7a))
+    println(s" - instantiation: $type8a")
+    // 9 - show final type
+    println(" - real type : "+Show(typeOf(c)))
+  }
+  catch {
+    case e:TypeCheckException => println(s" ! type checking error: ${e.getMessage}")
+    case NonFatal(e) => throw e
+    //      case x : Throwable => throw x
+
+  }
   /**
     * Checks if a connector type checks, using typeOf
     *

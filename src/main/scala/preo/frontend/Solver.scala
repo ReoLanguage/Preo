@@ -8,7 +8,9 @@ import org.chocosolver.solver.search.strategy.IntStrategyFactory
 import org.chocosolver.solver.variables.{BoolVar, IntVar, VariableFactory}
 import org.chocosolver.solver.{Solver => CSolver}
 import preo.ast._
-import preo.common.Utils
+import preo.common.{TypeCheckException, Utils}
+
+import scala.collection.immutable
 
 
 /**
@@ -290,6 +292,112 @@ object Solver {
       case (exp1, exp2) => arithm(getIVar(exp1),op,getIVar(exp2))
     }
 
+  /// Guessing simple intervals
+  sealed abstract class Interval
+  case class Range(from:Option[Int],to:Option[Int]) extends Interval
+  case class Bools(bools:Set[Boolean]) extends Interval
+
+  def guessSol(bExpr: BExpr): (Substitution,BExpr) = {
+    val  g = varIntIntervals(bExpr)
+    val (x,rest) = g
+    var res = Substitution()
+    for ((v,i) <- x) i match {
+      case Range(Some(n), _) => res += (v,IVal(n))
+      case Range(_, Some(n)) => res += (v,IVal(n))
+      case Range(None, None) => res += (v,IVal(1))
+      case Bools(bs) => res += (v,BVal(bs.head)) // only non-empty options
+    }
+    (res,Simplify(rest))
+  }
+
+  /**
+    * Tries to infer a domain interval for each variable.
+    * It only considers some cases - untreated cases are kept in the second part of the return value.
+    * @param bEXpr
+    * @return Some(a,b) if it finds intervals in "a" and fails to treat cases in "b".
+    */
+  def varIntIntervals(bEXpr:BExpr): (Map[Var,Interval],BExpr) = bEXpr match {
+    case Var(x) => (Map(Var(x) -> Bools(Set(true))),BVal(true))
+    case Not(Var(x)) => (Map(Var(x) -> Bools(Set(false))),BVal(true))
+    case And(Nil) => (Map(),BVal(true))
+    case And(b::bs) =>
+      val (map1,rest1) = varIntIntervals(b)
+      val (map2,rest2) = varIntIntervals(And(bs))
+      val map3 = mergeMap(map1,map2)
+      (map3,And(List(rest1,rest2)))
+    case EQ(Var(x), IVal(n)) => mkRange(x,Some(n),Some(n))
+    case GT(Var(x), IVal(n)) => mkRange(x,Some(n+1),None)
+    case LT(Var(x), IVal(n)) => mkRange(x,None,Some(n-1))
+    case LE(Var(x), IVal(n)) => mkRange(x,None,Some(n))
+    case GE(Var(x), IVal(n)) => mkRange(x,Some(n),None)
+      //
+    case EQ(IVal(n), Var(x)) => varIntIntervals(EQ(Var(x),IVal(n)))
+    case GT(IVal(n), Var(x)) => varIntIntervals(GT(Var(x),IVal(n)))
+    case LT(IVal(n), Var(x)) => varIntIntervals(LT(Var(x),IVal(n)))
+    case LE(IVal(n), Var(x)) => varIntIntervals(LE(Var(x),IVal(n)))
+    case GE(IVal(n), Var(x)) => varIntIntervals(GE(Var(x),IVal(n)))
+    //
+    case GT(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(GT(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(LT(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+    case LT(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(LT(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(GT(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+    case LE(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(LE(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(GE(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+    case GE(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(GE(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(LE(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+    case _ => (Map(),bEXpr)
+  }
+  private def mkRange(x:String,from:Option[Int],to:Option[Int]): (Map[Var,Interval],BExpr) =
+    (Map(Var(x) -> Range(from,to)),BVal(true))
+  private def mergeMap(m1:Map[Var,Interval],m2:Map[Var,Interval]) : Map[Var,Interval] =
+    m1.toList./:(m2)(insertPair)
+  private def insertPair(m:Map[Var,Interval],vi:(Var,Interval)): Map[Var,Interval] = {
+    var changed = false
+    var newmap = Map[Var,Interval]()
+    for ((v2,i2) <- m) {
+      if (vi._1 == v2) {
+        val i3 = mergeInterval(vi._2,i2,v2.x)
+        newmap += (v2 -> i3)
+        changed = true
+      }
+      else newmap += (v2 -> i2)
+    }
+    if (!changed) newmap += vi
+    newmap
+  }
+  private def mergeInterval(i1:Interval,i2:Interval,v:String): Interval = (i1,i2) match {
+    case (_,Range(None,None)) => i1
+    case (Range(None,None),_) => i2
+    case (Range(None,Some(n)),Range(None,Some(n2))) => Range(None, Some(Math.min(n, n2)))
+    case (Range(Some(n),None),Range(Some(n2),None)) => Range(Some(Math.max(n, n2)), None)
+    case (Range(Some(n1),None),Range(None,Some(n2))) =>
+      if (n1<=n2) Range(Some(n1), Some(n2))
+      else throw new TypeCheckException(s"Incompatible domains for $v: >=$n1 and <=$n2")
+    case (Range(None,Some(n1)),Range(Some(n2),None)) =>
+      if (n2<=n1) Range(Some(n2), Some(n1))
+      else throw new TypeCheckException(s"Incompatible domains for $v: <=$n1 and >=$n2")
+    case (Range(Some(n1),Some(n2)),Range(Some(n3),None)) =>
+      if (n3<=n2) Range(Some(n3), Some(n2))
+      else throw new TypeCheckException(s"Incompatible domains for $v: $n1..$n2 and >$n3")
+    case (Range(Some(n1),Some(n2)),Range(None,Some(n3))) =>
+      if (n3>=n1) Range(Some(n1), Some(n3))
+      else throw new TypeCheckException(s"Incompatible domains for $v: $n1..$n2 and <=$n3")
+    case (Range(None,Some(_)),Range(Some(_),Some(_))) => mergeInterval(i2,i1,v)
+    case (Range(Some(_),None),Range(Some(_),Some(_))) => mergeInterval(i2,i1,v)
+    case (Range(Some(n1),Some(n2)),Range(Some(n3),Some(n4))) =>
+      if (!((n2<n3) || (n4<n1))) Range(Some(Math.max(n1, n2)), Some(Math.min(n3, n4)))
+      else throw new TypeCheckException(s"Incompatible domains for $v: $n1..$n2 and $n3..$n4")
+    case (Bools(s1),Bools(s2)) =>
+      val s3 = s1 intersect s2
+      if (s3.isEmpty) throw new TypeCheckException(s"Incompatible boolean domains for $v:" +
+        s"${s1.mkString("{",",","}")} and ${s2.mkString("{",",","}")}.")
+      else Bools(s3)
+    case _ => throw new TypeCheckException(s"Incompatible intervals for $v: $i1 and $i2.")
+  }
 
 
 

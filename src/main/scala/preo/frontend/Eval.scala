@@ -288,7 +288,56 @@ object Eval {
     * @param c connector
     * @return instantiated connector
     */
-  def unsafeInstantiate(c: Connector): Option[Connector] = {
+  def unsafeInstantiate(c:Connector): Option[Connector] = {
+    // 1 - build derivation tree
+    val type1 = TypeCheck.check(c)
+    // 2 - unify constraints and get a substitution
+    val (subst2a,rest2a) = Unify.getUnification(type1.const)
+    // 3 - apply substitution to the type
+    val rest3a = subst2a(rest2a)
+    val type3a = Type(type1.args,subst2a(type1.i),subst2a(type1.j),rest3a,type1.isGeneral)
+    // 4 - try to get intervals - if success, update substitution
+//    val (interval,rest4a) = Solver.varIntIntervals(type3a.const)
+    val (subst4a,rest4b) = Solver.guessSol(type3a.const)
+    // update subst and type if succeeded
+    val (subst4c,rest4c,type4c) = if (rest4b==BVal(true) || rest4b==And(List()))
+                                       (subst2a.compose(subst4a),rest4b,subst4a(type3a))
+                                  else (subst2a,rest3a,type3a)
+    // 5 - extend with lost constraints over argument-variables
+    val rest5a = subst4c.getConstBoundedVars(type4c)
+    val type5a = Type(type4c.args,type4c.i,type4c.j,rest4c & rest5a,type4c.isGeneral)
+    // 6 - evaluate and simplify type
+//    val type6a = Simplify(type5a)
+    // 7 - apply subst4c
+    val type7a = Simplify(type5a)
+
+
+    // UNSAFE -> not checking for constraint solving first. Constraints may evaluate to false.
+    var subst = subst4c
+    var res = c
+    for ((a,etype) <- type7a.args.vars) {
+      var (expr, subst_) = subst.pop(a) // a -> expr, and rest is subst_
+      subst = subst_
+      expr match {
+        case Some(e: Expr) => // if e has free variables, give them default values, and update the substitution
+          val e2 = Eval(addDefaults(e,etype))
+          subst = subst.update(a, e2)
+          res = res.apply(e2)
+        case None => res = if (etype==IntType) res.apply(IVal(1)) else res.apply(BVal(true))
+      }
+    }
+    val reduced = Simplify.unsafe(subst(res))
+
+    def noFalseRestr(c: Connector): Boolean = c match {
+      case Seq(c1, c2) => noFalseRestr(c1) && noFalseRestr(c2)
+      case Restr(c, BVal(false)) => false
+      case _ => true
+    }
+
+    Some(reduced) filter noFalseRestr
+  }
+
+  def unsafeInstantiateOld(c: Connector): Option[Connector] = {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
@@ -296,9 +345,29 @@ object Eval {
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
     val type2b = Type(type1.args, subst1(type1.i), subst1(type1.j), rest2, type1.isGeneral)
+
+    // 3a- solve simple constraints with intervals
+    val (subst3a,rest3a) = Solver.guessSol(type2b.const)
+    // 3b- apply substitution to the type
+    val rest3b = Simplify(subst3a(rest3a))
+    val type3b = Type(type2b.args, subst3a(type2b.i), subst3a(type2b.j), rest3b, type2b.isGeneral)
+    // guessing done - now unification can fail if rest3a is not empty (guessed with partial information)
+    var type3d = type2b
+    var subst3e = subst1
+    var rest3d = rest2
+    if (rest3b == BVal(true) || rest3b == And(List())) {
+      // 3c- repeat unification
+      val (subst3c, rest3c): (Substitution, BExpr) = Unify.getUnification(type3b.const)
+      // 3d - apply substitution to the type
+      rest3d = subst3c(rest3c)
+      type3d = Type(type3b.args, subst3c(type3b.i), subst3c(type3b.j), rest3c, type3b.isGeneral)
+      // 3e - join substitutions
+      subst3e = subst1 ++ subst3c
+    }
+
     // 4 - extend with lost constraints over argument-variables
-    val rest3 = subst1.getConstBoundedVars(type2b)
-    val type_3 = Type(type2b.args, type2b.i, type2b.j, rest2 & rest3, type2b.isGeneral)
+    val rest3 = subst3e.getConstBoundedVars(type2b)
+    val type_3 = Type(type3d.args, type3d.i, type3d.j, rest3d & rest3, type3d.isGeneral)
     // 4.1 - evaluate and simplify type
     val type4 = Simplify(type_3)
     // 5 - solve constraints - SKIPPED
@@ -307,8 +376,10 @@ object Eval {
     //    var subst = subst2.get //subst_1 ++ subst2.get
     //    if (rest3 != BVal(true)) subst = subst.mkConcrete
 
+    // repeat unification
+
     // UNSAFE -> not checking for constraint solving first. Constraints may evaluate to false.
-    var subst = subst1
+    var subst = subst3e
 
     var res = c
     for ((a,etype) <- type4.args.vars) {
