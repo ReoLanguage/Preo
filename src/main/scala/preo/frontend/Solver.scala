@@ -294,7 +294,13 @@ object Solver {
 
   /// Guessing simple intervals
   sealed abstract class Interval
-  case class Range(from:Option[Int],to:Option[Int]) extends Interval
+  case class Range(from:Option[Int],to:Option[Int]) extends Interval {
+    override def toString: String = s"(${myval(from)},${myval(to)})"
+    private def myval(v:Option[_]): String = v match {
+      case Some(x) => x.toString
+      case None => "inf"
+    }
+  }
   case class Bools(bools:Set[Boolean]) extends Interval
 
   def guessSol(bExpr: BExpr): (Substitution,BExpr) = {
@@ -370,33 +376,31 @@ object Solver {
     newmap
   }
   private def mergeInterval(i1:Interval,i2:Interval,v:String): Interval = (i1,i2) match {
-    case (_,Range(None,None)) => i1
-    case (Range(None,None),_) => i2
-    case (Range(None,Some(n)),Range(None,Some(n2))) => Range(None, Some(Math.min(n, n2)))
-    case (Range(Some(n),None),Range(Some(n2),None)) => Range(Some(Math.max(n, n2)), None)
-    case (Range(Some(n1),None),Range(None,Some(n2))) =>
-      if (n1<=n2) Range(Some(n1), Some(n2))
-      else throw new TypeCheckException(s"Incompatible domains for $v: >=$n1 and <=$n2")
-    case (Range(None,Some(n1)),Range(Some(n2),None)) =>
-      if (n2<=n1) Range(Some(n2), Some(n1))
-      else throw new TypeCheckException(s"Incompatible domains for $v: <=$n1 and >=$n2")
-    case (Range(Some(n1),Some(n2)),Range(Some(n3),None)) =>
-      if (n3<=n2) Range(Some(n3), Some(n2))
-      else throw new TypeCheckException(s"Incompatible domains for $v: $n1..$n2 and >$n3")
-    case (Range(Some(n1),Some(n2)),Range(None,Some(n3))) =>
-      if (n3>=n1) Range(Some(n1), Some(n3))
-      else throw new TypeCheckException(s"Incompatible domains for $v: $n1..$n2 and <=$n3")
-    case (Range(None,Some(_)),Range(Some(_),Some(_))) => mergeInterval(i2,i1,v)
-    case (Range(Some(_),None),Range(Some(_),Some(_))) => mergeInterval(i2,i1,v)
-    case (Range(Some(n1),Some(n2)),Range(Some(n3),Some(n4))) =>
-      if (!((n2<n3) || (n4<n1))) Range(Some(Math.max(n1, n2)), Some(Math.min(n3, n4)))
-      else throw new TypeCheckException(s"Incompatible domains for $v: $n1..$n2 and $n3..$n4")
+    case (Range(r1,r2),Range(r3,r4)) =>
+      checkValidity(Range(myMax(r1,r3),myMin(r2,r4)),v)
     case (Bools(s1),Bools(s2)) =>
       val s3 = s1 intersect s2
       if (s3.isEmpty) throw new TypeCheckException(s"Incompatible boolean domains for $v:" +
         s"${s1.mkString("{",",","}")} and ${s2.mkString("{",",","}")}.")
       else Bools(s3)
     case _ => throw new TypeCheckException(s"Incompatible intervals for $v: $i1 and $i2.")
+  }
+
+  // None means -inf
+  private def myMax(r1:Option[Int],r2:Option[Int]): Option[Int] = (r1,r2) match {
+    case (None,_) => r2
+    case (_,None) => r1
+    case (Some(n1),Some(n2)) => Some(Math.max(n1,n2))
+  }
+  // None means +inf
+  private def myMin(r1:Option[Int],r2:Option[Int]): Option[Int] = (r1,r2) match {
+    case (None,_) => r2
+    case (_,None) => r1
+    case (Some(n1),Some(n2)) => Some(Math.min(n1,n2))
+  }
+  private def checkValidity(r:Range,v:String):Range = r match {
+    case Range(Some(n1),Some(n2)) if n1>n2 => throw new TypeCheckException(s"Incompatible domains: fails $n1 <= $v <= $n2")
+    case _ => r
   }
 
 

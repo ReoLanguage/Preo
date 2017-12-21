@@ -159,25 +159,27 @@ object DSL {
   /**
     * Type check a connector WITHOUT the constraint solving - only using unification and simplifications.
     * @param c connector to be type-checked
-    * @return the inferred type after simplifications and unification
+    * @return the inferred type after simplifications and unification, and the constraint that still need to be checked.
     */
-  def unsafeTypeOf(c:Connector): Type = {
+  def unsafeTypeOf(c:Connector): (Type,BExpr) = {
     // 1 - build derivation tree
     val type1 = TypeCheck.check(c)
     // 2 - unify constraints and get a substitution
     val (subst1,rest1) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest2 = subst1(rest1)
-    val type2b = Type(type1.args,subst1(type1.i),subst1(type1.j),rest2,type1.isGeneral)
+    val type2b = Simplify(Type(type1.args,subst1(type1.i),subst1(type1.j),rest2,type1.isGeneral))
+    // 3b -
+    val (_,leftovers1) = Solver.guessSol(type2b.const) // will throw an error if inconsistent
+    val leftovers2= Simplify(leftovers1)
+    val leftovers3 = if (leftovers2==And(List())) BVal(true) else leftovers2
     // 4 - extend with lost constraints over argument-variables
     val rest3 = subst1.getConstBoundedVars(type2b)
     val type3 = Type(type2b.args,type2b.i,type2b.j,rest2 & rest3,type2b.isGeneral)
     // 4.1 - evaluate and simplify type
     val type4 = Simplify(type3)
     // return the final type, without solving the missing constraints
-    // 5-heuristics for intervals
-    Solver.guessSol(type4.const) // will throw an error if inconsistent
-    type4
+    (type4,leftovers3)
   }
 
   /**
@@ -355,9 +357,9 @@ object DSL {
     println(s" - substituted:   $type3a")
 
     // 4 - try to get intervals - if success, update substitution
-    val (interval,rest4a) = Solver.varIntIntervals(type3a.const)
+    val (interval,rest4a) = Solver.varIntIntervals(Simplify(type3a).const)
     println(s" - got interval (pre-extension): ${interval.mkString("/")} - ${Show(rest4a)}")
-    val (subst4a,rest4b) = Solver.guessSol(type3a.const)
+    val (subst4a,rest4b) = Solver.guessSol(Simplify(type3a).const)
     println(s" - guessing solution: $subst4a - ${Show(rest4b)}")
     // update subst and type if succeeded
     val (subst4c,rest4c,type4c) = if (rest4b==BVal(true) || rest4b==And(List()))

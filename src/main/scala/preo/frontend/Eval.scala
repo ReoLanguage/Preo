@@ -295,7 +295,7 @@ object Eval {
     val (subst2a,rest2a) = Unify.getUnification(type1.const)
     // 3 - apply substitution to the type
     val rest3a = subst2a(rest2a)
-    val type3a = Type(type1.args,subst2a(type1.i),subst2a(type1.j),rest3a,type1.isGeneral)
+    val type3a = Simplify(Type(type1.args,subst2a(type1.i),subst2a(type1.j),rest3a,type1.isGeneral))
     // 4 - try to get intervals - if success, update substitution
 //    val (interval,rest4a) = Solver.varIntIntervals(type3a.const)
     val (subst4a,rest4b) = Solver.guessSol(type3a.const)
@@ -303,6 +303,7 @@ object Eval {
     val (subst4c,rest4c,type4c) = if (rest4b==BVal(true) || rest4b==And(List()))
                                        (subst2a.compose(subst4a),rest4b,subst4a(type3a))
                                   else (subst2a,rest3a,type3a)
+//    throw new TypeCheckException(s"Guessed: ${(subst4c,rest4c,type4c)}")
     // 5 - extend with lost constraints over argument-variables
     val rest5a = subst4c.getConstBoundedVars(type4c)
     val type5a = Type(type4c.args,type4c.i,type4c.j,rest4c & rest5a,type4c.isGeneral)
