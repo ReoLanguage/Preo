@@ -407,7 +407,8 @@ object Simplify {
       case (c2,a2) => App(c2,a2)
     }
     case Restr(c, phi) => (simplifyWithTypeChk(c,tcheck),Eval(phi)) match{
-      case (c2,BVal(true)) => c2
+      case (c2,BVal(true))  => c2
+      case (c2,And(List())) => c2
       case (c2,phi2) => Restr(c,phi2)
     }
   }

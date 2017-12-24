@@ -47,6 +47,13 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
     case Item(x2,e2)::tl => new Substitution(tl).update(x,e) + (x2,Substitution(x,e)(e2))
   }
 
+  def compose(substitution: Substitution): Substitution =
+    new Substitution((substitution.addTo(this).items ++ substitution.items).map((x:Item) => Item(x.v,Simplify(x.e))))
+  def addTo(target: Substitution): Substitution = items match {
+    case Nil => target
+    case Item(x2,e2)::tl => new Substitution(tl).addTo(target.update(x2,e2))
+  }
+
   def apply(exp:Expr): Expr = exp match {
     case e: IExpr => apply(e)
     case e: BExpr => apply(e)
