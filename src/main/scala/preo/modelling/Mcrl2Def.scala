@@ -45,11 +45,11 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
 
   def getVars: List[Action] = Set(before, after).toList
 
-  def setRight(action: Int): Unit = this.setRight(Action(action, 2))
+  def setRight(name: String, number: Int, state: Int = 1): Unit = this.setRight(Action(name, number, 2, state))
 
   def setRight(action: Action): Unit = this.after = action
 
-  def setLeft(action: Int): Unit = this.setLeft(Action(action, 2))
+  def setLeft(name: String, number: Int, state: Int = 3): Unit = this.setLeft(Action(name, number, 2, state))
 
   def setLeft(action: Action): Unit = this.before = action
 }
@@ -100,23 +100,24 @@ case class Mcrl2Init(number: Int, action: Action, operator: Mcrl2Process) extend
   def getName: ProcessName= ProcessName(s"Init$number")
 }
 
+
+//todo: we need to look how to put the action names here
 object Mcrl2Init{
-  def apply(number: Int, var_number: Int, proc: Mcrl2Process): Mcrl2Init = {
-    val action1 = Action(var_number, 3)
-    val action2 = Action(var_number, 2)
-    val action3 = Action(var_number, 1)
-    val operator = Hide(List(action1),Block(List(action2, action3), Comm((action2, action3, action1), ProcessName(proc.toString))))
+  def apply(number: Int, var_name:String, var_number: Int,var_state:Int, proc: Mcrl2Process): Mcrl2Init = {
+    val action1 = Action(var_name, var_number, 3, var_state)
+    val action2 = Action(var_name, var_number, 2, var_state)
+    val action3 = Action(var_name, var_number, 1, var_state)
+    val operator = Block(List(action2, action3), Comm((action2, action3, action1), ProcessName(proc.toString)))
     Mcrl2Init(number,action1, operator)
   }
 
-  def apply(number: Int, var_number: Int, proc1: Mcrl2Process, proc2: Mcrl2Process): Mcrl2Init = {
-    val action1 = Action(var_number, 3)
-    val action2 = Action(var_number, 2)
-    val action3 = Action(var_number, 1)
+  def apply(number: Int, var_name: String, var_number: Int,var_state:Int, proc1: Mcrl2Process, proc2: Mcrl2Process): Mcrl2Init = {
+    val action1 = Action(var_name, var_number, 3, var_state)
+    val action2 = Action(var_name, var_number, 2, var_state)
+    val action3 = Action(var_name, var_number, 1, var_state)
     val operator1 = Par(ProcessName(proc1.toString), ProcessName(proc2.toString))
     val operator2 = Comm((action2, action3, action1), operator1)
-    val operator3 = Block(List(action2, action3), operator2)
-    val operator = Hide(List(action1), operator3)
+    val operator = Block(List(action2, action3), operator2)
     Mcrl2Init(number,action1, operator)
   }
 }

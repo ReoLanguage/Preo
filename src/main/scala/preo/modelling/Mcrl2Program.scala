@@ -4,6 +4,8 @@ import preo.ast.{CPrim, CoreConnector}
 import preo.backend.ReoGraph
 import preo.backend.ReoGraph.Edge
 
+/**
+Deprecated
 class Mcrl2Program(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
   override def toString: String = {
     val acts = Mcrl2Def.toString(act.toList)
@@ -388,3 +390,4 @@ object Mcrl2Program{
   }
 
 }
+**/
