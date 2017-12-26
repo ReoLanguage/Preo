@@ -60,6 +60,9 @@ object Mcrl2Model{
 
   def apply(ccon: CoreConnector): Mcrl2Model = {
     val (_, channels,_) = conToChannels(ccon, Nil, Nil)
+    to_check = channels ++ nodes
+    missingVars = getVars(channels++nodes).toList.filter{case Action(number, group) => group < 3}
+    if(starterNodes.isEmpty) starterNodes = nodes.head :: starterNodes
     val inits = initsMaker
     if(last_init == null){
       last_init = nodes.head.getName
@@ -87,52 +90,40 @@ object Mcrl2Model{
     }
     case CPar(c1, c2) => {
       val (in1, channel1, out1) = conToChannels(c1, in_nodes, out_nodes)
-      val (in2, channel2, out2) = conToChannels(c1, in_nodes.drop(in1.length), out_nodes.drop(out1.length))
+      val (in2, channel2, out2) = conToChannels(c2, in_nodes.drop(in1.length), out_nodes.drop(out1.length))
       (in1 ++ in2, channel1 ++ channel2, out1 ++ out2)
     }
     case CSymmetry(CoreInterface(i), CoreInterface(j)) => {
-      val ins = if(in_nodes.isEmpty){
-        val nodes = makeNodes((channel_count until channel_count+i+j).toList)
+      val ins = {
+        val nodes = makeNodes((channel_count until channel_count + i + j - in_nodes.length).toList)
         starterNodes ++= nodes
-        channel_count += i+j
-        nodes
+        channel_count += Math.max(0, i + j - in_nodes.length)
+        in_nodes.take(i + j) ++ nodes
       }
-      else{
-        in_nodes.take(i+j)
-      }
-      val outs = if(out_nodes.isEmpty){
-        val nodes = makeNodes((channel_count until channel_count+ i + j).toList)
-        channel_count += i + j
-        nodes
-      }
-      else{
-        out_nodes.take(i+j)
+      val outs = {
+        val nodes = makeNodes((channel_count until channel_count+ i + j - out_nodes.length).toList)
+        channel_count += Math.max(0, i + j - out_nodes.length)
+        out_nodes.take(i + j) ++ nodes
       }
       val outs2 = outs.drop(i) ++ outs.take(i)
       (ins, makeSyncs(ins, outs), outs2)
     }
     case CTrace(CoreInterface(i), c) => {
       val (ins, channels, outs) = conToChannels(c, in_nodes, out_nodes);
-      val sincs = makeSyncs(ins.takeRight(i), outs.takeRight(i))
+      val sincs = makeSyncs(outs.takeRight(i), ins.takeRight(i) )
       (ins.dropRight(i), channels ++ sincs, outs.dropRight(i))
     }
     case CId(CoreInterface(i)) => {
-      val ins = if(in_nodes.isEmpty){
-        val nodes = makeNodes((channel_count until channel_count+i).toList)
-        channel_count += i
+      val ins = {
+        val nodes = makeNodes((channel_count until channel_count + i - in_nodes.length).toList)
         starterNodes ++= nodes
-        nodes
+        channel_count += Math.max(0, i - in_nodes.length)
+        in_nodes.take(i) ++ nodes
       }
-      else{
-        in_nodes.take(i)
-      }
-      val outs = if(out_nodes.isEmpty){
-        val nodes = makeNodes((channel_count until channel_count+ i).toList)
-        channel_count += i
-        nodes
-      }
-      else{
-        out_nodes.take(i)
+      val outs = {
+        val nodes = makeNodes((channel_count until channel_count+ i - out_nodes.length).toList)
+        channel_count += Math.max(0, i - out_nodes.length)
+        out_nodes.take(i) ++ nodes
       }
       (ins, makeSyncs(ins, outs), outs)
     }
@@ -259,7 +250,7 @@ object Mcrl2Model{
       } else outs.head
 
       in_node1.setRight(var_count)
-      in_node1.setRight(var_count + 1)
+      in_node2.setRight(var_count + 1)
       out_node.setLeft(var_count + 2)
 
       //channel
@@ -299,7 +290,7 @@ object Mcrl2Model{
       } else outs.tail.head
 
       in_node.setRight(var_count)
-      out_node1.setRight(var_count + 1)
+      out_node1.setLeft(var_count + 1)
       out_node2.setLeft(var_count + 2)
 
       //channel
@@ -333,7 +324,7 @@ object Mcrl2Model{
         node
       } else ins.tail.head
       in_node1.setRight(var_count)
-      in_node1.setRight(var_count + 1)
+      in_node2.setRight(var_count + 1)
 
       //channel
       val firstAction = Action(var_count, 1)
@@ -401,7 +392,7 @@ object Mcrl2Model{
   }
 
   private def makeNodes(numbers: List[Int]): List[Mcrl2Node] = numbers match{
-    case n :: rest => Mcrl2Node(n, Action(0, 6), Action(0, 6)) :: makeNodes(rest)
+    case n :: rest => val node =  Mcrl2Node(n, Action(0, 6), Action(0, 6)); this.nodes ++= List(node) ;node :: makeNodes(rest)
     case Nil => Nil
   }
 
