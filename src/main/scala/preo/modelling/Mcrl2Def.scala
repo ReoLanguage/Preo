@@ -106,7 +106,7 @@ object Mcrl2Init{
     val action1 = Action(var_name, var_number, 3, var_state)
     val action2 = Action(var_name, var_number, 2, var_state)
     val action3 = Action(var_name, var_number, 1, var_state)
-    val operator =  Hide(List(action1), Block(List(action2, action3), Comm((action2, action3, action1), ProcessName(proc.toString))))
+    val operator =  Block(List(action2, action3), Comm((action2, action3, action1), ProcessName(proc.toString)))
     Mcrl2Init(number,action1, operator)
   }
 
@@ -116,7 +116,7 @@ object Mcrl2Init{
     val action3 = Action(var_name, var_number, 1, var_state)
     val operator1 = Par(ProcessName(proc1.toString), ProcessName(proc2.toString))
     val operator2 = Comm((action2, action3, action1), operator1)
-    val operator = Hide(List(action1), Block(List(action2, action3), operator2))
+    val operator = Block(List(action2, action3), operator2)
     Mcrl2Init(number,action1, operator)
   }
 }
