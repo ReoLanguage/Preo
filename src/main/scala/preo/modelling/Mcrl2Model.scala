@@ -2,7 +2,6 @@ package preo.modelling
 
 import preo.ast.{CSeq, CSymmetry, CPar, CPrim, CSubConnector, CTrace, CId, CoreConnector, CoreInterface}
 
-//we need testing
 
 class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
   override def toString: String = {
@@ -432,7 +431,7 @@ object Mcrl2Model{
 
   private def check(element: Mcrl2Def): Unit = to_check = to_check.filter(x => x != element)
 
-  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number)
+  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number || x.state != action.state)
 
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
     case Action(name, number, group, state) :: rest => {

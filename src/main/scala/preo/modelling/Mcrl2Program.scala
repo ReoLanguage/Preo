@@ -52,8 +52,8 @@ class Mcrl2Program(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
 
 object Mcrl2Program{
 
-  var var_count = 0
-  var channel_count = 0
+  var var_count = 1
+  var channel_count = 1
   var nodes: List[Mcrl2Node] = List[Mcrl2Node]()
   var last_init: Mcrl2Process = null //maybe obsolete
   var starterNodes: List[Mcrl2Node] = List[Mcrl2Node]()
@@ -70,7 +70,7 @@ object Mcrl2Program{
       nodes = nodes ++ starterNodes ++ makeNodes(outs)
       val channels = edgetoMcrl2(edges)
       to_check = channels ++ nodes
-      missingVars = getVars(channels++nodes).toList.filter{case Action(name, number, group, state) => !(group == 3 && state == 5) && group < 4}
+      missingVars = getVars(channels++nodes).toList.filter{case Action(name, number, group, state) => state != 5 && group < 4}
       if(starterNodes.isEmpty) starterNodes = nodes.head :: starterNodes
       val inits = initsMaker
       if(last_init == null){
@@ -293,7 +293,7 @@ object Mcrl2Program{
 
   private def check(element: Mcrl2Def): Unit = to_check = to_check.filter(x => x != element)
 
-  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number)
+  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number || x.state != action.state)
 
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
     case Action(name, number, group, state) :: rest => {

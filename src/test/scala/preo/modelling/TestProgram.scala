@@ -192,10 +192,12 @@ class TestProgram {
         if(node.getAfter == Action(0, 6)) assert(outs.contains(node.number))
       }
       //we need to check that the inits cover all the actions except the ins, outs and nulls
-      var acts = program.getActions.toList.filter{case Action(_, n, g, s) => g < 4 && g > 0  && !(g == 3 && s == 5) }
+    println(program.getActions.toList)
+      var acts = program.getActions.toList.filter{case Action(_, n, g, s) => g < 4 && g > 0  &&  s != 5 }
+      println(acts)
       val inits = program.getInits
       for(Mcrl2Init(_, a, _) <- inits){
-        acts = acts.filter{case Action(_,n, _, _) => n != a.get_number}
+        acts = acts.filter{case Action(_,n, _, s ) => n != a.get_number || s != a.state}
       }
       println(acts)
       assert(acts.isEmpty)
