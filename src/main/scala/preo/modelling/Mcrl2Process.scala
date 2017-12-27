@@ -34,7 +34,7 @@ case class Action(name: String, number: Int, group: Int, state: Int) extends Mcr
     else if(o.getClass != this.getClass)
       false
     else
-      this.number == o.asInstanceOf[Action].get_number && this.group == o.asInstanceOf[Action].group
+      this.number == o.asInstanceOf[Action].get_number && this.group == o.asInstanceOf[Action].group && this.name ==o.asInstanceOf[Action].name && this.state == o.asInstanceOf[Action].state
 
   def get_number: Int = number
 

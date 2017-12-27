@@ -21,10 +21,10 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
   extends Mcrl2Def{
 
   if(before == null){
-      before = Action(-1, 6)
+      before = Action(0, 4)
   }
   if(after == null){
-      after = Action(-1, 6)
+      after = Action(0, 4)
   }
 
   override def toString: String = s"Node$number = (${before.toString} | ${after.toString}) . Node$number"

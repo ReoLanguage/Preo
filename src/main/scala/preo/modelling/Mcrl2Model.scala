@@ -50,8 +50,8 @@ class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
 
 object Mcrl2Model{
 
-  var var_count = 0
-  var channel_count = 0
+  var var_count = 1
+  var channel_count = 1
   var nodes: List[Mcrl2Node] = List[Mcrl2Node]()
   var last_init: Mcrl2Process = null //maybe obsolete
   var starterNodes: List[Mcrl2Node] = List[Mcrl2Node]()
@@ -435,7 +435,7 @@ object Mcrl2Model{
   private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number)
 
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
-    case a@Action(name, number, group, state) :: rest => {
+    case Action(name, number, group, state) :: rest => {
       val filtered_rest = rest.filter{case Action(_, n, g,_) => n != number}
       val m = Mcrl2Init(channel_count, name, number,state, last)
       channel_count += 1
