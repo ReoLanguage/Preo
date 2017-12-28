@@ -5,6 +5,7 @@ abstract class Mcrl2Process{
 }
 
 //atomic
+//todo: turn group and state into objects
 case class Action(name: String, number: Int, group: Int, state: Int) extends Mcrl2Process{
   //group 1 is for actions of the channels
   //group 2 is for actions of nodes

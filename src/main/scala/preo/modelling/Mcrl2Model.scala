@@ -52,7 +52,7 @@ object Mcrl2Model{
   var var_count = 1
   var channel_count = 1
   var nodes: List[Mcrl2Node] = List[Mcrl2Node]()
-  var last_init: Mcrl2Process = null //maybe obsolete
+  var last_init: Mcrl2Process = null
   var starterNodes: List[Mcrl2Node] = List[Mcrl2Node]()
   var to_check: List[Mcrl2Def] = List[Mcrl2Def]()
   var missingVars: List[Action] = List[Action]()
@@ -70,6 +70,7 @@ object Mcrl2Model{
       }
     }
     val program = new Mcrl2Model(getVars(channels++nodes++inits), channels ++ this.nodes ++ inits, last_init)
+
     var_count = 0
     channel_count = 0
     nodes= List[Mcrl2Node]()
@@ -82,17 +83,17 @@ object Mcrl2Model{
 
   def conToChannels(ccon: CoreConnector, in_nodes: List[Mcrl2Node], out_nodes: List[Mcrl2Node]):
     (List[Mcrl2Node], List[Mcrl2Def], List[Mcrl2Node]) = ccon match{
-    case CSeq(c1, c2) => {
+    case CSeq(c1, c2) =>
       val (in1, channel1, out1) = conToChannels(c1, in_nodes, Nil)
-      val (in2, channel2, out2) = conToChannels(c2, out1, out_nodes)
+      val (_, channel2, out2) = conToChannels(c2, out1, out_nodes)
       (in1, channel1 ++  channel2, out2)
-    }
-    case CPar(c1, c2) => {
+
+    case CPar(c1, c2) =>
       val (in1, channel1, out1) = conToChannels(c1, in_nodes, out_nodes)
       val (in2, channel2, out2) = conToChannels(c2, in_nodes.drop(in1.length), out_nodes.drop(out1.length))
       (in1 ++ in2, channel1 ++ channel2, out1 ++ out2)
-    }
-    case CSymmetry(CoreInterface(i), CoreInterface(j)) => {
+
+    case CSymmetry(CoreInterface(i), CoreInterface(j)) =>
       val ins = {
         val nodes = makeNodes((channel_count until channel_count + i + j - in_nodes.length).toList)
         starterNodes ++= nodes
@@ -106,13 +107,13 @@ object Mcrl2Model{
       }
       val outs2 = outs.drop(i) ++ outs.take(i)
       (ins, makeSyncs(ins, outs), outs2)
-    }
-    case CTrace(CoreInterface(i), c) => {
-      val (ins, channels, outs) = conToChannels(c, in_nodes, out_nodes);
+
+    case CTrace(CoreInterface(i), c) =>
+      val (ins, channels, outs) = conToChannels(c, in_nodes, out_nodes)
       val sincs = makeSyncs(outs.takeRight(i), ins.takeRight(i) )
       (ins.dropRight(i), channels ++ sincs, outs.dropRight(i))
-    }
-    case CId(CoreInterface(i)) => {
+
+    case CId(CoreInterface(i)) =>
       val ins = {
         val nodes = makeNodes((channel_count until channel_count + i - in_nodes.length).toList)
         starterNodes ++= nodes
@@ -125,30 +126,26 @@ object Mcrl2Model{
         out_nodes.take(i) ++ nodes
       }
       (ins, makeSyncs(ins, outs), outs)
-    }
+
     case CSubConnector(_, c) => conToChannels(c, in_nodes, out_nodes)
     case x@CPrim(_, _, _, _) => primToChannel(x, in_nodes, out_nodes)
     case _ => (Nil, Nil, Nil)
   }
 
 
-  //todo: simplify this
+  def getChannelNodes(total: Int, existingNodes: List[Mcrl2Node], in_node: Boolean): List[Mcrl2Node] = {
+    val nodes = existingNodes.take(total)
+    val new_nodes = makeNodes((channel_count until channel_count + total - nodes.length).toList)
+    channel_count += total - nodes.length
+    if(in_node) starterNodes ++= new_nodes
+    nodes ++ new_nodes
+  }
   def primToChannel(prim: CPrim, ins: List[Mcrl2Node], outs: List[Mcrl2Node]):
     (List[Mcrl2Node], List[Mcrl2Def], List[Mcrl2Node]) = prim match{
-    case CPrim("fifo", _, _, _) => {
+    case CPrim("fifo", CoreInterface(i), CoreInterface(j), _) => {
       //nodes
-      val in_node = if (ins.isEmpty){
-        val node = makeNodes(List(channel_count)).head
-        channel_count +=1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
-
-      val out_node = if(outs.isEmpty){
-        val node = makeNodes(List(channel_count)).head
-        channel_count +=1
-        node
-      } else outs.head
+      val in_node = getChannelNodes(i, ins, true).head
+      val out_node = getChannelNodes(j, outs, false).head
 
       in_node.setRight("fifo", channel_count)
       out_node.setLeft("fifo", channel_count)
@@ -165,20 +162,10 @@ object Mcrl2Model{
       channel_count += 1
       (List(in_node), List(channel), List(out_node))
     }
-    case CPrim("fifofull", _, _, _) => {
+    case CPrim("fifofull", CoreInterface(i), CoreInterface(j), _) => {
       //nodes
-      val in_node = if (ins.isEmpty){
-        val node = makeNodes(List(channel_count)).head
-        channel_count +=1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
-
-      val out_node = if(outs.isEmpty){
-        val node = makeNodes(List(channel_count)).head
-        channel_count +=1
-        node
-      } else outs.head
+      val in_node = getChannelNodes(i, ins, true).head
+      val out_node = getChannelNodes(j, outs, false).head
 
       in_node.setRight("fifofull", channel_count)
       out_node.setLeft("fifofull", channel_count)
@@ -194,20 +181,10 @@ object Mcrl2Model{
       channel_count += 1
       (List(in_node), List(channel), List(out_node))
     }
-    case CPrim("lossy",_,_, _ ) => {
+    case CPrim("lossy", CoreInterface(i), CoreInterface(j), _ ) => {
       //nodes
-      val in_node = if (ins.isEmpty){
-        val node = makeNodes(List(channel_count)).head
-        channel_count +=1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
-
-      val out_node = if(outs.isEmpty){
-        val node = makeNodes(List(channel_count)).head
-        channel_count +=1
-        node
-      } else outs.head
+      val in_node = getChannelNodes(i, ins, true).head
+      val out_node = getChannelNodes(j, outs, false).head
 
       in_node.setRight("lossy", channel_count)
       out_node.setLeft("lossy", channel_count)
@@ -223,27 +200,14 @@ object Mcrl2Model{
       channel_count += 1
       (List(in_node), List(channel), List(out_node))
     }
-    case CPrim("merger",_,_,_) => {
+    case CPrim("merger", CoreInterface(i), CoreInterface(j),_) => {
       //nodes
-      val in_node1 = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
 
-      val in_node2 = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.tail.head
+      val in_nodes = getChannelNodes(i, ins, true)
+      val in_node1 = in_nodes.head
+      val in_node2 = in_nodes.last
+      val out_node = getChannelNodes(j, outs, false).head
 
-      val out_node = if (outs.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        node
-      } else outs.head
 
       in_node1.setRight("merger", channel_count)
       in_node2.setRight("merger", channel_count, 2)
@@ -263,26 +227,11 @@ object Mcrl2Model{
       channel_count += 1
       (List(in_node1, in_node2), List(channel), List(out_node))
     }
-    case CPrim("dupl",_,_, _) => {
-      val in_node = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
-
-      val out_node1 = if (outs.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else outs.head
-
-      val out_node2 = if (outs.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        node
-      } else outs.tail.head
+    case CPrim("dupl", CoreInterface(i), CoreInterface(j), _) => {
+      val in_node = getChannelNodes(i, ins, true).head
+      val out_nodes = getChannelNodes(j, outs, false)
+      val out_node1 = out_nodes.head
+      val out_node2 = out_nodes.last
 
       in_node.setRight("dupl", channel_count)
       out_node1.setLeft("dupl", channel_count)
@@ -302,21 +251,12 @@ object Mcrl2Model{
       channel_count += 1
       (List(in_node), List(channel), List(out_node1, out_node2))
     }
-    case CPrim("drain",_,_, _) => {
+    case CPrim("drain", CoreInterface(i), CoreInterface(j), _) => {
       //nodes
-      val in_node1 = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
+      val in_nodes = getChannelNodes(i, ins, true)
+      val in_node1 = in_nodes.head
+      val in_node2 = in_nodes.last
 
-      val in_node2 = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.tail.head
       in_node1.setRight("drain", channel_count)
       in_node2.setRight("drain", channel_count, 2)
 
@@ -331,46 +271,27 @@ object Mcrl2Model{
       channel_count += 1
       (List(in_node1, in_node2), List(channel), Nil)
     }
-    case CPrim("reader", _, _, _) => {
-      val in_node = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        node
-      } else ins.head
+    case CPrim("reader", CoreInterface(i), CoreInterface(j), _) => {
+      val in_node = getChannelNodes(i, ins, false).head
 
       in_node.setRight(Action("reader", var_count, 3, 5))
       var_count +=1
       (List(in_node), Nil, Nil)
     }
-    case CPrim("writer", _, _, _) => {
-      val out_node = if (outs.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else outs.head
+    case CPrim("writer", CoreInterface(i), CoreInterface(j), _) => {
+      val out_node = getChannelNodes(j, outs, true).head
+
       out_node.setLeft(Action("writer", var_count, 3, 5))
       var_count += 1
       (Nil, Nil, List(out_node))
     }
-    case CPrim(name, _, _, _) => {
+    case CPrim(name, CoreInterface(i), CoreInterface(j), _) => {
       //nodes
-      val in_node = if (ins.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        starterNodes = starterNodes ++ List(node)
-        node
-      } else ins.head
-
-      val out_node = if (outs.isEmpty) {
-        val node = makeNodes(List(channel_count)).head
-        channel_count += 1
-        node
-      } else outs.head
+      val in_node = getChannelNodes(i, ins, true).head
+      val out_node = getChannelNodes(j, outs, false).head
 
       in_node.setRight(name, channel_count)
       out_node.setLeft(name, channel_count)
-
 
       val firstAction = Action(name, channel_count, 1, 1)
       val secondAction = Action(name, channel_count, 1, 3)
@@ -435,7 +356,7 @@ object Mcrl2Model{
 
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
     case Action(name, number, group, state) :: rest => {
-      val filtered_rest = rest.filter{case Action(_, n, g,_) => n != number}
+      val filtered_rest = rest.filter{case Action(_, n, g,s) => n != number || s != state}
       val m = Mcrl2Init(channel_count, name, number,state, last)
       channel_count += 1
       m :: makeblockers(filtered_rest, m.getName)
