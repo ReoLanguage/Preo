@@ -134,27 +134,39 @@ object Parser extends RegexParsers {
   def expr = iexpr | bexpr
 
   // boolean expressions
+
   def bexpr: Parser[BExpr] =
-    blit ~ bbop ~ bexpr ^^ {case l ~ op ~ r => op(l,r)} |
-      ilit ~ bibop ~ iexpr ^^ {case l ~ op ~ r => op(l,r)} |
-      "!" ~ bexpr ^^ {case _ ~ e => Not(e)} |
-      blit
+    disjP ~ opt("&"~bexpr) ^^ {
+      case e1~Some(_~e2) => e1 & e2
+      case e1~None       => e1
+    }
+  def disjP: Parser[BExpr] =
+    equivP ~ opt("|"~disjP) ^^ {
+      case e1~Some(_~e2) => e1 | e2
+      case e1~None       => e1
+    }
+  def equivP: Parser[BExpr] =
+    compP ~ opt("<->"~equivP) ^^ {
+      case e1~Some(_~e2) => e1 | e2
+      case e1~None       => e1
+    } |
+    "("~equivP~")" ^^ { case _~e~_ => e }
+  def compP: Parser[BExpr] =
+    ilit ~ bcontP ^^ { case e ~ co => co(e) }
+  def bcontP: Parser[IExpr=>BExpr] =
+    "<=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 <= e2 } |
+    ">=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 >= e2 } |
+    "<"  ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 < e2 }  |
+    ">"  ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 > e2 }  |
+    "==" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 === e2 }
+
   def blit: Parser[BExpr] =
     "true"     ^^ {_=>BVal(true)}               |
-      "false"    ^^ {_=>BVal(false)}              |
-      identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
-      identifier ^^ Var                           |
-      "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
-  def bbop: Parser[(BExpr,BExpr)=>BExpr] =
-    "&"  ^^ {_ => (e1:BExpr,e2:BExpr) => e1 & e2 } |
-      "|"  ^^ {_ => (e1:BExpr,e2:BExpr) => e1 | e2 } |
-      "<->" ^^ {_ => (e1:BExpr,e2:BExpr) => e1 === e2 }
-  def bibop: Parser[(IExpr,IExpr)=>BExpr] =
-    "<=" ^^ {_ => (e1:IExpr,e2:IExpr) => e1 <= e2 } |
-      ">=" ^^ {_ => (e1:IExpr,e2:IExpr) => e1 >= e2 } |
-      "<"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 < e2 }  |
-      ">"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 > e2 }  |
-      "==" ^^ {_ => (e1:IExpr,e2:IExpr) => e1 === e2 }
+    "false"    ^^ {_=>BVal(false)}              |
+    "!" ~ bexpr ^^ {case _ ~ e => Not(e)}       |
+    identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
+    identifier ^^ Var                           |
+    "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
 
   // integer expressions
   def iexpr: Parser[IExpr] =
