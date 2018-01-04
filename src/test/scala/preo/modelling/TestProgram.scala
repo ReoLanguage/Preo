@@ -14,17 +14,17 @@ class TestProgram {
   @Test
   def testWithReoGraph(): Unit = {
     //graph creation
-    val reoGraph1 = ReoGraph.toGraph(Eval.reduce(parse("Tr_(1)(fifo & fifo & fifo)")));
+    val reoGraph1 = ReoGraph.toGraph(Eval.reduce(parse("Tr(1)(fifo ; fifo ; fifo)")));
     val reoGraph2 = ReoGraph.toGraph(Eval.reduce(parse("reader")));
     val reoGraph3 = ReoGraph.toGraph(Eval.reduce(parse("writer")));
     val reoGraph4 = ReoGraph.toGraph(Eval.reduce(parse("lossy")));
     val reoGraph5 = ReoGraph.toGraph(Eval.reduce(parse("drain")));
     val reoGraph6 = ReoGraph.toGraph(Eval.reduce(parse("fifo * fifo")));
-    val reoGraph7 = ReoGraph.toGraph(Eval.reduce(parse("dupl & (fifo * fifofull)")));
+    val reoGraph7 = ReoGraph.toGraph(Eval.reduce(parse("dupl ; fifo*fifofull")));
     val reoGraph8 = ReoGraph.toGraph(Eval.reduce(parse("(fifo * fifofull) * merger")));;
-    val reoGraph9 = ReoGraph.toGraph(Eval.reduce(parse("writer & fifo & reader")));
-    val reoGraph10 = ReoGraph.toGraph(Eval.reduce(parse("(writer & fifo & reader) * (writer & fifo & reader)")));
-    val reoGraph11 = ReoGraph.toGraph(Eval.reduce(parse("zip =\n  \\n.Tr_((2*n)*(n-1))\n  (((((id^(n-x))*(sym(1,1)^x))*(id^(n-x)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nunzip =\n  \\n.Tr_((2*n)*(n - 1))\n  (((((id^(x+1))*(sym(1,1)^((n-x)-1)))*(id^(x+1)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nsequencer =\n  \\n.(((dupl^n)&unzip(n:I)) *\n    Tr_n(sym(n-1,1)&((fifofull&dupl)*((fifo & dupl)^(n-1)))&\n         unzip(n:I)))&\n    ((id^n)*((zip(n:I)) & (drain^n)));\n\n(writer^3) & sequencer 3 & (reader^3)")))
+    val reoGraph9 = ReoGraph.toGraph(Eval.reduce(parse("writer ; fifo ; reader")));
+    val reoGraph10 = ReoGraph.toGraph(Eval.reduce(parse("(writer ; fifo ; reader) * (writer ; fifo ; reader)")));
+    val reoGraph11 = ReoGraph.toGraph(Eval.reduce(parse("writer^3 ; sequencer 3 ; reader^3 \n\n{ \nzip =\n  \\n.Tr((2*n)*(n-1))\n  ((id^(n-x)*sym(1,1)^x*id^(n-x))^x<--n;\n   sym((2*n)*(n-1),2*n)),\n\nunzip =\n  \\n.Tr((2*n)*(n-1))\n  (((id^(x+1)*sym(1,1)^((n-x)-1)*id^(x+1))^x<--n);\n   sym((2*n)*(n-1),2*n)),\n\nsequencer =\n  \\n.((dupl^n;unzip(n:I)) *\n    Tr(n)(sym(n-1,1);((fifofull;dupl)*((fifo ; dupl)^(n-1)));\n         unzip(n:I))) ;\n    (id^n*(zip(n:I) ; drain^n))\n}")))
     val graphs = List(reoGraph1,reoGraph2,reoGraph3,reoGraph4,reoGraph5,reoGraph6,reoGraph7,reoGraph8,reoGraph9,reoGraph10, reoGraph11)
 
     //model getting
