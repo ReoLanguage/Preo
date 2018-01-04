@@ -152,7 +152,8 @@ object Parser extends RegexParsers {
     } |
     "("~equivP~")" ^^ { case _~e~_ => e }
   def compP: Parser[BExpr] =
-    ilit ~ bcontP ^^ { case e ~ co => co(e) }
+    ilit ~ bcontP ^^ { case e ~ co => co(e) } |
+    blit
   def bcontP: Parser[IExpr=>BExpr] =
     "<=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 <= e2 } |
     ">=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 >= e2 } |
