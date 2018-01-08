@@ -15,13 +15,13 @@ class TestProgram {
   @Test
   def test1(): Unit = {
     //graph creation
-    val reoGraph1 = ReoGraph.toGraph(Eval.reduce(parse("Tr_(1)(fifo & fifo & fifo)")));
+    val reoGraph1 = ReoGraph.toGraph(Eval.reduce(parse("Tr(1)(fifo ; fifo ; fifo)")));
 
     //program getting
     val program1 = Mcrl2Program(reoGraph1)
 
 
-    val model1 = Mcrl2Model(Eval.reduce(parse("Tr_(1)(fifo & fifo & fifo)")))
+    val model1 = Mcrl2Model(Eval.reduce(parse("Tr(1)(fifo ; fifo ; fifo)")))
 
 
 
@@ -32,6 +32,7 @@ class TestProgram {
 
   @Test
   def test2(): Unit = {
+
     val reoGraph2 = ReoGraph.toGraph(Eval.reduce(parse("reader")));
 
     val program2 = Mcrl2Program(reoGraph2)
@@ -99,11 +100,11 @@ class TestProgram {
 
   @Test
   def test7(): Unit = {
-    val reoGraph7 = ReoGraph.toGraph(Eval.reduce(parse("dupl & (fifo * fifofull)")));
+    val reoGraph7 = ReoGraph.toGraph(Eval.reduce(parse("dupl ; (fifo * fifofull)")));
 
     val program7 = Mcrl2Program(reoGraph7)
 
-    val model7 = Mcrl2Model(Eval.reduce(parse("dupl & (fifo * fifofull)")))
+    val model7 = Mcrl2Model(Eval.reduce(parse("dupl ; (fifo * fifofull)")))
 
     standardTests(reoGraph7, program7)
 
@@ -112,11 +113,11 @@ class TestProgram {
 
   @Test
   def test8(): Unit = {
-    val reoGraph8 = ReoGraph.toGraph(Eval.reduce(parse("(fifo * fifofull) & merger")));
+    val reoGraph8 = ReoGraph.toGraph(Eval.reduce(parse("(fifo * fifofull) ; merger")));
 
     val program8 = Mcrl2Program(reoGraph8)
 
-    val model8 = Mcrl2Model(Eval.reduce(parse("(fifo * fifofull) & merger")))
+    val model8 = Mcrl2Model(Eval.reduce(parse("(fifo * fifofull) ; merger")))
 
     standardTests(reoGraph8, program8)
 
@@ -125,11 +126,11 @@ class TestProgram {
 
   @Test
   def test9(): Unit = {
-    val reoGraph9 = ReoGraph.toGraph(Eval.reduce(parse("writer & fifo & reader")));
+    val reoGraph9 = ReoGraph.toGraph(Eval.reduce(parse("writer ; fifo ; reader")));
 
     val program9 = Mcrl2Program(reoGraph9)
 
-    val model9 = Mcrl2Model(Eval.reduce(parse("writer & fifo & reader")))
+    val model9 = Mcrl2Model(Eval.reduce(parse("writer ; fifo ; reader")))
 
     standardTests(reoGraph9, program9)
 
@@ -138,11 +139,11 @@ class TestProgram {
 
   @Test
   def test10(): Unit = {
-    val reoGraph10 = ReoGraph.toGraph(Eval.reduce(parse("(writer & fifo & reader) * (writer & fifo & reader)")));
+    val reoGraph10 = ReoGraph.toGraph(Eval.reduce(parse("(writer ; fifo ; reader) * (writer ; fifo ; reader)")));
 
     val program10 = Mcrl2Program(reoGraph10)
 
-    val model10 = Mcrl2Model(Eval.reduce(parse("(writer & fifo & reader) * (writer & fifo & reader)")))
+    val model10 = Mcrl2Model(Eval.reduce(parse("(writer ; fifo ; reader) * (writer ; fifo ; reader)")))
 
     standardTests(reoGraph10, program10)
 
@@ -151,11 +152,11 @@ class TestProgram {
 
   @Test
   def test11(): Unit = {
-    val reoGraph11 = ReoGraph.toGraph(Eval.reduce(parse("zip =\n  \\n.Tr_((2*n)*(n-1))\n  (((((id^(n-x))*(sym(1,1)^x))*(id^(n-x)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nunzip =\n  \\n.Tr_((2*n)*(n - 1))\n  (((((id^(x+1))*(sym(1,1)^((n-x)-1)))*(id^(x+1)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nsequencer =\n  \\n.(((dupl^n)&unzip(n:I)) *\n    Tr_n(sym(n-1,1)&((fifofull&dupl)*((fifo & dupl)^(n-1)))&\n         unzip(n:I)))&\n    ((id^n)*((zip(n:I)) & (drain^n)));\n\n(writer^3) & sequencer 3 & (reader^3)")))
+    val reoGraph11 = ReoGraph.toGraph(Eval.reduce(parse("writer^3 ; sequencer 3 ; reader^3 { zip =   \\n.Tr((2*n)*(n-1))  ((id^(n-x)*sym(1,1)^x*id^(n-x))^x<--n;   sym((2*n)*(n-1),2*n)),unzip =  \\n.Tr((2*n)*(n-1))  (((id^(x+1)*sym(1,1)^((n-x)-1)*id^(x+1))^x<--n);   sym((2*n)*(n-1),2*n)), sequencer =  \\n.((dupl^n;unzip(n:I)) *    Tr(n)(sym(n-1,1);((fifofull;dupl)*((fifo ; dupl)^(n-1)));         unzip(n:I))) ;    (id^n*(zip(n:I) ; drain^n))}")))
 
     val program11 = Mcrl2Program(reoGraph11)
 
-    val model11 = Mcrl2Model(Eval.reduce(parse("zip =\n  \\n.Tr_((2*n)*(n-1))\n  (((((id^(n-x))*(sym(1,1)^x))*(id^(n-x)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nunzip =\n  \\n.Tr_((2*n)*(n - 1))\n  (((((id^(x+1))*(sym(1,1)^((n-x)-1)))*(id^(x+1)))^(x<--n))&\n   sym((2*n)*(n-1),2*n));\n\nsequencer =\n  \\n.(((dupl^n)&unzip(n:I)) *\n    Tr_n(sym(n-1,1)&((fifofull&dupl)*((fifo & dupl)^(n-1)))&\n         unzip(n:I)))&\n    ((id^n)*((zip(n:I)) & (drain^n)));\n\n(writer^3) & sequencer 3 & (reader^3)")))
+    val model11 = Mcrl2Model(Eval.reduce(parse("writer^3 ; sequencer 3 ; reader^3 { zip =   \\n.Tr((2*n)*(n-1))  ((id^(n-x)*sym(1,1)^x*id^(n-x))^x<--n;   sym((2*n)*(n-1),2*n)),unzip =  \\n.Tr((2*n)*(n-1))  (((id^(x+1)*sym(1,1)^((n-x)-1)*id^(x+1))^x<--n);   sym((2*n)*(n-1),2*n)), sequencer =  \\n.((dupl^n;unzip(n:I)) *    Tr(n)(sym(n-1,1);((fifofull;dupl)*((fifo ; dupl)^(n-1)));         unzip(n:I))) ;    (id^n*(zip(n:I) ; drain^n))}")))
 
     standardTests(reoGraph11, program11)
 

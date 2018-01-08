@@ -27,7 +27,10 @@ object ReoGraph {
     * @param prim connector to be converted to a graph
     * @return graph representation
     */
-  def apply(prim:CoreConnector): ReoGraph = redGraph(toGraph(prim))
+  def apply(prim:CoreConnector): ReoGraph = {
+    seed=0
+    redGraph(toGraph(prim))
+  }
 
   /**
     * Calculates a graph representation of a (instantiated and simplified) connector.

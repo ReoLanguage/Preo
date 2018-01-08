@@ -2,7 +2,8 @@ package preo.lang
 
 import preo.DSL._
 import preo.ast._
-import preo.frontend.Substitution
+import preo.common.TypeCheckException
+import preo.frontend.{Show, Substitution}
 
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
@@ -19,7 +20,7 @@ object Parser extends RegexParsers {
     * @param c string representing a connector
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c:String): ParseResult[Connector] = parseAll(conn,c)
+  def parse(c:String): ParseResult[Connector] = parseAll(prog,c)
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
 
 
@@ -43,93 +44,147 @@ object Parser extends RegexParsers {
     case _          => str2conn(s)
   }
 
-  def conn: Parser[Connector] =
-    lit ~ combinator ^^ {case l ~ f => f(l) }
 
 
-  //todo-ruben: add priorities
-  def combinator: Parser[Connector => Connector] =
-    "&" ~ conn   ^^ {case _~ c => (_:Connector) & c} |
-      "*" ~ conn   ^^ {case _~ c => (_:Connector) * c} |
-      "!"          ^^ {_ => (c:Connector) =>  lam("n":I,c^Var("n")) } |
-      "^" ~ "("~identifier ~ "<--" ~ iexpr ~")" ^^
-        {case _~_~x~_~a~_=>(_:Connector)^((x:I)<--a)}|
-      "^" ~ iexpr  ^^ {case _~ i => (_:Connector) ^ i} |
-      "|" ~ bexpr  ^^ {case _~ b => (_:Connector) | b} |
-      bexpr        ^^ {b => (_: Connector)(b)}         |
-      iexpr        ^^ {e => (_: Connector)(e)}         |
-      ""           ^^ { _ => x:Connector => x}
+  ///////////////
+  /// Program ///
+  ///////////////
 
-  // Connector Literals:
-  def lit: Parser[Connector] =
-    "Tr_"~iexpr~conn                ^^ {case _~e~c     => Trace(Port(e),c)}                 |
-    "sym"~"("~iexpr~","~iexpr~")"   ^^ {case _~_~e1~_~e2~_ => Symmetry(Port(e1),Port(e2))}  |
-    bexpr ~ "?" ~ conn ~ "+" ~ conn ^^ {case b~_~c1~_~c2 => Choice(b,c1,c2)}                |
-    "\\" ~ identifier ~ lambdaCont  ^^ {case _~ s ~ cont => cont(s,IntType)}                |
-    "(" ~ conn ~ ")"                ^^ {case _ ~ c ~ _ => c}                                |
-    "(" ~ conn ~")"~"!"             ^^ {case _~c~_~_ => Abs(Var("n"),IntType,c^Var("n"))}        |
-    identifier~"!"                  ^^ {case s~_ => Abs(Var("n"),IntType,inferPrim(s)^Var("n"))} |
-    identifier~"="~conn~";"~conn    ^^ {case s~_~c1~_~c2 => Substitution.replacePrim(s,c2,SubConnector(s, c1))} |
-    identifier                      ^^ { inferPrim }
+  def prog: Parser[Connector] =
+    connP~opt("{"~whereP~"}")  ^^ {
+      case co ~ Some(_~p~_) => p(co)
+      case co ~ None => co
+    }
 
-  def lambdaCont: Parser[(String,ExprType)=>Connector] =
-    "." ~ conn                   ^^ {case _~ c   => lam(_:String,_:ExprType,c)}             |
-    identifier ~ lambdaCont      ^^ { case v ~ f => lam(_:String,_:ExprType,f(v,IntType)) } |
-    ":" ~ "I" ~ lambdaCont ^^ { case _~ _ ~ cont => (v:String,et:ExprType) => cont(v,et) }  |   // IntType is the default
-    ":" ~ "B" ~ lambdaCont ^^ { case _~ _ ~ cont => (v:String,_:ExprType) => cont(v,BoolType) } // IntType is the default
+  def whereP: Parser[Connector=>Connector] =
+    identifier~"="~connP~opt(","~whereP) ^^ {
+      case s~_~co2~Some(_~w) => { (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2))}
+      case s~_~co2~None => { (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2))}
+    }
+
+  ///////////////
+  // Connector //
+  ///////////////
+
+  def connP: Parser[Connector] = lamP
+
+  def lamP: Parser[Connector] =
+    "\\"~identifier~lamCont ^^ { case _~ s ~ cont => cont(s,IntType)}  |
+    seq
+
+  def lamCont: Parser[(String,ExprType)=>Connector] =
+    identifier ~ lamCont ^^ { case v ~ f  => lam(_:String,_:ExprType,f(v,IntType)) }          |
+    ":" ~ "I"  ~ lamCont ^^ { case _~ _ ~ cont => (v:String,et:ExprType) => cont(v,et) }      |  // IntType is the default
+    ":" ~ "B"  ~ lamCont ^^ { case _~ _ ~ cont => (v:String,_:ExprType) => cont(v,BoolType) } |  // IntType is the default
+    "." ~ connP ~ opt("|"~bexpr) ^^ {
+      case _ ~ c ~ Some(_~e)  => lam(_:String,_:ExprType,c | e)
+      case _ ~ c ~ None       => lam(_:String,_:ExprType,c )
+    }
+
+  def seq: Parser[Connector] =
+    prod~opt(";"~seq) ^^ {
+      case co ~ Some(_~p) => co & p
+      case co ~ None => co
+    }
+
+  def prod: Parser[Connector] =
+    appl~opt("*"~prod) ^^ {
+      case co ~ Some(_~p) => co * p
+      case co ~ None => co
+    }
+
+  def appl: Parser[Connector] =
+    pow~opt(expr) ^^ {
+      case co~Some(e) => co(e)
+      case co~None => co
+    }
+
+  def pow: Parser[Connector] =
+    elemP~opt("^"~exponP) ^^ {
+      case e~Some(_~a) => a(e)
+      case e~None => e
+    }
+
+  def exponP: Parser[Connector=>Connector] =
+    ilit~opt("<--"~ilit) ^? ({
+      case Var(v) ~ (Some(_ ~ e)) => (_: Connector).:^(Var(v), e)
+      case ie ~ None => (_: Connector) ^ ie
+    }, {
+      case ie1 ~ Some(_ ~ ie2) => s"${Show(ie1)} should be a variable, in '${Show(ie1)} <-- ${Show(ie2)}'."
+      case s => s"unknown exponent: '$s'."
+    }
+      ) |
+    "("~exponP~")" ^^ { case _~e~_ => e }
+
+  def elemP: Parser[Connector] =
+    "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~c~_ => Trace(ie,c) }   |
+    "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
+    bexpr~"?"~connP~"+"~connP        ^^ { case b~_~c1~_~c2 => (b ? c1) + c2 }    |
+    litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
+
+  def litP: Parser[Connector] =
+    "("~connP~")" ^^ { case _~c~_ => c } |
+    identifier ^^ inferPrim
+
+
+  ////////////////
+  // expression //
+  ////////////////
+
+  def expr = iexpr | bexpr
 
   // boolean expressions
+
   def bexpr: Parser[BExpr] =
-    blit ~ bbop ~ bexpr ^^ {case l ~ op ~ r => op(l,r)} |
-    ilit ~ bibop ~ iexpr ^^ {case l ~ op ~ r => op(l,r)} |
-    "!" ~ bexpr ^^ {case _ ~ e => Not(e)} |
+    disjP ~ opt("&"~bexpr) ^^ {
+      case e1~Some(_~e2) => e1 & e2
+      case e1~None       => e1
+    }
+  def disjP: Parser[BExpr] =
+    equivP ~ opt("|"~disjP) ^^ {
+      case e1~Some(_~e2) => e1 | e2
+      case e1~None       => e1
+    }
+  def equivP: Parser[BExpr] =
+    compP ~ opt("<->"~equivP) ^^ {
+      case e1~Some(_~e2) => e1 | e2
+      case e1~None       => e1
+    } |
+    "("~equivP~")" ^^ { case _~e~_ => e }
+  def compP: Parser[BExpr] =
+    ilit ~ bcontP ^^ { case e ~ co => co(e) } |
     blit
+  def bcontP: Parser[IExpr=>BExpr] =
+    "<=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 <= e2 } |
+    ">=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 >= e2 } |
+    "<"  ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 < e2 }  |
+    ">"  ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 > e2 }  |
+    "==" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 === e2 }
+
   def blit: Parser[BExpr] =
     "true"     ^^ {_=>BVal(true)}               |
     "false"    ^^ {_=>BVal(false)}              |
+    "!" ~ bexpr ^^ {case _ ~ e => Not(e)}       |
     identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
     identifier ^^ Var                           |
     "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
-  def bbop: Parser[(BExpr,BExpr)=>BExpr] =
-    "&"  ^^ {_ => (e1:BExpr,e2:BExpr) => e1 & e2 } |
-    "|"  ^^ {_ => (e1:BExpr,e2:BExpr) => e1 | e2 } |
-    "<->" ^^ {_ => (e1:BExpr,e2:BExpr) => e1 === e2 }
-  def bibop: Parser[(IExpr,IExpr)=>BExpr] =
-    "<=" ^^ {_ => (e1:IExpr,e2:IExpr) => e1 <= e2 } |
-    ">=" ^^ {_ => (e1:IExpr,e2:IExpr) => e1 >= e2 } |
-    "<"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 < e2 }  |
-    ">"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 > e2 }  |
-    "==" ^^ {_ => (e1:IExpr,e2:IExpr) => e1 === e2 }
 
   // integer expressions
   def iexpr: Parser[IExpr] =
     ilit ~ ibop ~ iexpr ^^ {case l ~ op ~ r => op(l,r)} |
-    ilit
+      ilit
   def ilit: Parser[IExpr] =
     intVal                                       |
-    identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
-    identifier ^^ Var                           |
-    "(" ~ iexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
+      identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
+      identifier ^^ Var                           |
+      "(" ~ iexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
   def intVal: Parser[IExpr] =
     """[0-9]+""".r ^^ { (s:String) => int2IExp(s.toInt) }
   def ibop: Parser[(IExpr,IExpr)=>IExpr] =
     "+"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 + e2 } |
-    "-"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 - e2 } |
-    "*"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 * e2 } |
-    "/"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 / e2 }
+      "-"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 - e2 } |
+      "*"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 * e2 } |
+      "/"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 / e2 }
 
 
-  /*
-  conn       := lit combinator
-  combinator :=  "&" ~ conn   ^^ {case _~ c => (_:Connector) & c} |
-      "*" ~ conn   ^^ {case _~ c => (_:Connector) * c} |
-      "!"          ^^ {_ => (c:Connector) =>  lam("n":I,c^"n") } | //  IAbs(IVar("n"),c^IVar("n"))} |
-      "^" ~ "("~identifier ~ "<--" ~ iexpr ~")" ^^
-        {case _~_~x~_~a~_=>(_:Connector)^(x<--a)}|
-      "^" ~ iexpr  ^^ {case _~ i => (_:Connector) ^ i} |
-      "|" ~ bexpr  ^^ {case _~ b => (_:Connector) | b} |
-      bexpr        ^^ {b => (_: Connector)(b)}         |
-      iexpr        ^^ {e => (_: Connector)(e)}         |
-      ""           ^^
-   */
 }
