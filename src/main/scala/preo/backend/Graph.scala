@@ -7,24 +7,24 @@ import preo.ast.CoreConnector
   */
 
 /**
-new simplified graph - to be visualied
+New simplified graph - to be visualied
   */
-case class Graph(edges: List[ReoChannel], nodes:List[ReoNode])
-
-case class ReoChannel(src:Int,trg:Int, srcType:EndType, trgType:EndType, name:String, style:Option[String])
-sealed abstract class EndType
-case object ArrowIn  extends EndType
-case object ArrowOut extends EndType
-case object NoArrow  extends EndType
-
-case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, style:Option[String])
-sealed abstract class NodeType     { def dual:NodeType}
-case object Source extends NodeType {def dual = Sink  }
-case object Sink   extends NodeType {def dual = Source}
-case object Mixed  extends NodeType {def dual = Mixed }
+case class Graph(edges: List[Graph.ReoChannel], nodes:List[Graph.ReoNode])
 
 
 object Graph {
+
+  case class ReoChannel(src:Int,trg:Int, srcType:EndType, trgType:EndType, name:String, style:Option[String])
+  sealed abstract class EndType
+  case object ArrowIn  extends EndType
+  case object ArrowOut extends EndType
+  case object NoArrow  extends EndType
+
+  case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, style:Option[String])
+  sealed abstract class NodeType     { def dual:NodeType}
+  case object Source extends NodeType {def dual = Sink  }
+  case object Sink   extends NodeType {def dual = Source}
+  case object Mixed  extends NodeType {def dual = Mixed }
 
   def apply(c:CoreConnector): Graph = {
     val g = ReoGraph(c)
