@@ -7,15 +7,15 @@ class TestProcess {
   @Test
   def testAction(): Unit ={
     //assert Prints
-    assert(Action(1, 1).toString == "X1''")
-    assert(Action(1, 2).toString == "X1'")
-    assert(Action(1, 3).toString == "X1")
-    assert(Action(1, 4).toString == "In1")
-    assert(Action(1, 5).toString == "Out1")
-    assert(Action(1, 6).toString == "Null")
+    assertEquals(Action("X", 1, 1, 1).toString , "X1in1''")
+    assertEquals(Action("X", 1, 1, 2).toString , "X1in2''")
+    assertEquals(Action("X", 1, 2, 3).toString , "X1out1'")
+    assertEquals(Action("X", 1, 2, 4).toString , "X1out2'")
+    assertEquals(Action("X", 1, 4, 1).toString , "Null")
+    assertEquals(Action("X", 1, 3, 5).toString , "X1")
     //assert Equals
-    assertNotEquals(Action(1, 6), Action(1, 3))
-    assertEquals(Action(1, 6), Action(1,6))
+    assertNotEquals(Action("X", 1, 1, 4), Action("X", 1, 3, 4))
+    assertEquals(Action("X", 1, 3, 5), Action("X", 1,3, 5))
   }
 
   @Test
