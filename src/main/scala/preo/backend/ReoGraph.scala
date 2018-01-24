@@ -101,7 +101,9 @@ object ReoGraph {
     val (inmap,outmap) = collectInsOuts(g2)
     val (es2,remap2) = dropReplDupl(g2,inmap,outmap)
     val g3 = applyRemap(ReoGraph(es2,g2.ins,g2.outs),remap2)
-    g3
+    val g4 = applyRemap(ReoGraph(g3.edges,g3.ins,g3.outs),remap2)
+    val g5 = applyRemap(ReoGraph(g4.edges,g4.ins,g4.outs),remap2)
+    g5
   }
 
   /**
@@ -150,7 +152,7 @@ object ReoGraph {
   private def dropSyncs(graph: ReoGraph): (List[Edge],Map[Int,Int]) = graph.edges match {
     case Nil => (graph.edges,Map())
     case Edge(CPrim("sync",_,_,_),List(in),List(out))::tl
-      if (!graph.ins.contains(in)) && (!graph.outs.contains(out)) =>
+      if (!graph.ins.contains(in)) && (!graph.outs.contains(out)) => // do not remove if connected to some boundary
       val (e,m) = dropSyncs(ReoGraph(tl,graph.ins,graph.outs))
       (e,m + (out -> in))
     case e::tl =>
