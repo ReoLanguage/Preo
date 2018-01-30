@@ -21,10 +21,10 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
   extends Mcrl2Def{
 
   if(before == null){
-      before = Action(0, 4)
+      before = Action.nullAction
   }
   if(after == null){
-      after = Action(0, 4)
+      after = Action.nullAction
   }
 
   override def toString: String = s"Node$number = (${before.toString} | ${after.toString}) . Node$number"
@@ -45,11 +45,11 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
 
   def getVars: List[Action] = Set(before, after).toList
 
-  def setRight(name: String, number: Int, state: Int = 1): Unit = this.setRight(Action(name, number, 2, state))
+  def setRight(name: String, number: Int, state: State = In1): Unit = this.setRight(Action(name, number, OneLine, state))
 
   def setRight(action: Action): Unit = this.after = action
 
-  def setLeft(name: String, number: Int, state: Int = 3): Unit = this.setLeft(Action(name, number, 2, state))
+  def setLeft(name: String, number: Int, state: State = Out1): Unit = this.setLeft(Action(name, number, OneLine, state))
 
   def setLeft(action: Action): Unit = this.before = action
 }
@@ -81,42 +81,93 @@ case class Mcrl2Channel(name:String = "Channel", number: Int,var before: List[Ac
 
   def getVars: List[Action] = before ++ after
 
-  def addRight(action: Int): Unit = this.addRight(Action(action, 2))
+  def addRight(action: Int): Unit = this.addRight(Action(action, TwoLine))
 
   def addRight(action: Action): Unit = this.after ++= List(action)
 
-  def addLeft(action: Int): Unit = this.addLeft(Action(action, 2))
+  def addLeft(action: Int): Unit = this.addLeft(Action(action, TwoLine))
 
   def addLeft(action: Action): Unit = this.before ++= List(action)
 }
 
 
 
-case class Mcrl2Init(number: Int, action: Action, operator: Mcrl2Process) extends Mcrl2Def{
+case class Mcrl2Init(number: Int, var_name:String, var_number: Int,var_state:State, procs: List[ProcessName]) extends Mcrl2Def{
+  def operator: Mcrl2Process = {
+    val action1 = Action(var_name, var_number, NoLine, var_state)
+    val action2 = Action(var_name, var_number, OneLine, var_state)
+    val action3 = Action(var_name, var_number, TwoLine, var_state)
+    val basicProc = procs.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
+    val operator =  Block(List(action2, action3), Comm((action2, action3, action1), basicProc))
+    operator
+  }
+
   override def toString: String = s"Init$number = ${operator.toString}"
 
-  def getVars = List(action)
+  def getVars = List(Action(var_name, var_number, NoLine, var_state))
 
   def getName: ProcessName= ProcessName(s"Init$number")
+
+  def getProcs: List[ProcessName] = procs
+
+  def replaceProc(old_proc: ProcessName, new_proc: ProcessName) = Mcrl2Init(number,var_name, var_number, var_state, procs.map(f =>if (f==old_proc) new_proc else f))
 }
 
 
 object Mcrl2Init{
-  def apply(number: Int, var_name:String, var_number: Int,var_state:Int, proc: Mcrl2Process): Mcrl2Init = {
-    val action1 = Action(var_name, var_number, 3, var_state)
-    val action2 = Action(var_name, var_number, 2, var_state)
-    val action3 = Action(var_name, var_number, 1, var_state)
-    val operator =  Block(List(action2, action3), Comm((action2, action3, action1), ProcessName(proc.toString)))
-    Mcrl2Init(number,action1, operator)
+  def apply(number: Int, var_name:String, var_number: Int,var_state:State, proc: Mcrl2Process): Mcrl2Init = {
+    val name = ProcessName(proc.toString)
+    Mcrl2Init(number,var_name, var_number, var_state, List(name))
   }
 
-  def apply(number: Int, var_name: String, var_number: Int,var_state:Int, proc1: Mcrl2Process, proc2: Mcrl2Process): Mcrl2Init = {
-    val action1 = Action(var_name, var_number, 3, var_state)
-    val action2 = Action(var_name, var_number, 2, var_state)
-    val action3 = Action(var_name, var_number, 1, var_state)
-    val operator1 = Par(ProcessName(proc1.toString), ProcessName(proc2.toString))
-    val operator2 = Comm((action2, action3, action1), operator1)
-    val operator = Block(List(action2, action3), operator2)
-    Mcrl2Init(number,action1, operator)
+  def apply(number: Int, var_name: String, var_number: Int,var_state:State, proc1: Mcrl2Process, proc2: Mcrl2Process): Mcrl2Init = {
+    val name1 = ProcessName(proc1.toString)
+    val name2 = ProcessName(proc2.toString)
+    Mcrl2Init(number,var_name, var_number, var_state, List(name1, name2))
   }
+}
+
+case class Mcrl2StarterNode(number: Int, node: Mcrl2Node) extends Mcrl2Def{
+  override def toString: String = s"StarterNode$number = ${getVars.head.toString} . ${node.getName}"
+
+  def getVars = List(Action("a", number, OneLine, Nothing))
+
+  def getName = ProcessName(s"StarterNode$number")
+
+  def getNext = node.getNext
+}
+
+//receives initial number of nodes to the ending number
+case class Mcrl2Manager(actions : List[MultiAction]) extends Mcrl2Def{
+  override def toString: String = s"Manager = ${getProcess.toString}"
+
+  private def getProcess: Mcrl2Process = {
+    actions.tail.foldRight(actions.head: Mcrl2Process)((a, b) => Choice(a, b))
+  }
+
+  def getVars: List[Action] = {
+    actions.map(m => m.actions).foldRight(Nil: List[Action])((a, b) => a++b)
+  }
+
+  def getName = ProcessName("Manager")
+
+  def addMultiAction(ma: MultiAction): Mcrl2Manager = Mcrl2Manager(actions ++ List(ma))
+}
+
+case class Mcrl2Starter(number: Int, proc1: ProcessName, proc2: ProcessName) extends Mcrl2Def{
+  private def getProcess = {
+    val a1 = Action("a", number, TwoLine, Nothing)
+    val a2 = Action("a", number, OneLine, Nothing)
+    val a3 = Action("a", number, NoLine, Nothing)
+    val operator1 = Par(proc1, proc2)
+    val operator2 = Comm((a1, a2, a3), operator1)
+    val operator3 = Block(List(a2, a1), operator2)
+    Hide(List(a3), operator3)
+  }
+
+  override def toString: String = s"Starter$number = ${getProcess.toString}"
+
+  def getVars = List(Action("a", number, NoLine, Nothing))
+
+  def getName = ProcessName(s"Starter$number")
 }

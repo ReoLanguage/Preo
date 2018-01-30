@@ -70,7 +70,7 @@ object Mcrl2Program{
       nodes = nodes ++ starterNodes ++ makeNodes(outs)
       val channels = edgetoMcrl2(edges)
       to_check = channels ++ nodes
-      missingVars = getVars(channels++nodes).toList.filter{case Action(name, number, group, state) => state != 5 && group < 4}
+      missingVars = getVars(channels++nodes).toList.filter{case a@Action(name, number, group, state) => state != Nothing && a != Action.nullAction}
       if(starterNodes.isEmpty) starterNodes = nodes.head :: starterNodes
       val inits = initsMaker
       if(last_init == null){
@@ -121,8 +121,8 @@ object Mcrl2Program{
       in_node.setRight("fifo", channel_count)
       out_node.setLeft("fifo", channel_count)
       //channel
-      val firstAction = Action("fifo", channel_count, 1, 1)
-      val secondAction = Action("fifo", channel_count, 1, 3)
+      val firstAction = Action("fifo", channel_count, TwoLine, In1)
+      val secondAction = Action("fifo", channel_count, TwoLine, Out1)
       val channel = Mcrl2Channel("Fifo", channel_count, List(firstAction), List(secondAction),
         Seq(firstAction, secondAction), List(in_node), List(out_node))
       //updating
@@ -138,8 +138,8 @@ object Mcrl2Program{
       in_node.setRight("fifofull", channel_count)
       out_node.setLeft("fifofull", channel_count)
       //channel
-      val firstAction = Action("fifofull", channel_count, 1, 1)
-      val secondAction = Action("fifofull", channel_count, 1, 3)
+      val firstAction = Action("fifofull", channel_count, TwoLine, In1)
+      val secondAction = Action("fifofull", channel_count, TwoLine, Out1)
       val channel = Mcrl2Channel("FifoFull", channel_count, List(firstAction), List(secondAction),
         Seq(secondAction, firstAction), List(in_node), List(out_node))
       //updating
@@ -155,8 +155,8 @@ object Mcrl2Program{
       in_node.setRight("lossy", channel_count)
       out_node.setLeft("lossy", channel_count)
       //channel
-      val firstAction = Action("lossy", channel_count, 1, 1)
-      val secondAction = Action("lossy", channel_count, 1, 3)
+      val firstAction = Action("lossy", channel_count, TwoLine, In1)
+      val secondAction = Action("lossy", channel_count, TwoLine, Out1)
       val channel = Mcrl2Channel("Lossy", channel_count, List(firstAction), List(secondAction),
               Choice(firstAction, MultiAction(firstAction, secondAction)), List(in_node), List(out_node))
       //updating
@@ -171,12 +171,12 @@ object Mcrl2Program{
       val in_node2 = ins.last
       val out_node = outs.head
       in_node1.setRight("merger", channel_count)
-      in_node2.setRight("merger", channel_count, 2)
+      in_node2.setRight("merger", channel_count, In2)
       out_node.setLeft("merger", channel_count)
       //channel
-      val firstAction = Action("merger", channel_count, 1, 1)
-      val secondAction = Action("merger", channel_count, 1, 2)
-      val thirdAction = Action("merger", channel_count, 1, 3)
+      val firstAction = Action("merger", channel_count, TwoLine, In1)
+      val secondAction = Action("merger", channel_count, TwoLine, In2)
+      val thirdAction = Action("merger", channel_count, TwoLine, Out1)
       val channel = Mcrl2Channel("Merger", channel_count, List(firstAction, secondAction), List(thirdAction),
               Choice(MultiAction(List(firstAction, thirdAction)), MultiAction(secondAction, thirdAction)),
         List(in_node1, in_node2), List(out_node))
@@ -194,11 +194,11 @@ object Mcrl2Program{
       val out_node2 = outs.last
       in_node.setRight("dupl", channel_count)
       out_node1.setLeft("dupl", channel_count)
-      out_node2.setLeft("dupl", channel_count, 4)
+      out_node2.setLeft("dupl", channel_count, Out2)
       //channel
-      val firstAction = Action("dupl", channel_count, 1, 1)
-      val secondAction = Action("dupl", channel_count, 1, 3)
-      val thirdAction = Action("dupl", channel_count, 1, 4)
+      val firstAction = Action("dupl", channel_count, TwoLine, In1)
+      val secondAction = Action("dupl", channel_count, TwoLine, Out1)
+      val thirdAction = Action("dupl", channel_count, TwoLine, Out2)
 
       val channel = Mcrl2Channel("Dupl", channel_count, List(firstAction), List(secondAction, thirdAction),
               MultiAction(List(firstAction, secondAction, thirdAction)), List(in_node), List(out_node1, out_node2))
@@ -214,10 +214,10 @@ object Mcrl2Program{
       val in_node1 = ins.head
       val in_node2 = ins.last
       in_node1.setRight("drain", channel_count)
-      in_node2.setRight("drain", channel_count, 2)
+      in_node2.setRight("drain", channel_count, In2)
       //channel
-      val firstAction = Action("drain", channel_count, 1, 1)
-      val secondAction = Action("drain", channel_count, 1, 2)
+      val firstAction = Action("drain", channel_count, TwoLine, In1)
+      val secondAction = Action("drain", channel_count, TwoLine, In2)
       val channel = Mcrl2Channel("Drain", channel_count, List(firstAction, secondAction),Nil,
               MultiAction(List(firstAction, secondAction)), List(in_node1, in_node2), Nil)
       //updating
@@ -229,13 +229,13 @@ object Mcrl2Program{
     }
     case CPrim("reader", _, _, _) => {
       val in_node = ins.head
-      in_node.setRight(Action("reader", var_count, 3, 5))
+      in_node.setRight(Action("reader", var_count, NoLine, Nothing))
       var_count +=1
       null
     }
     case CPrim("writer", _, _, _) => {
       val out_node = outs.head
-      out_node.setLeft(Action("writer", var_count, 3, 5))
+      out_node.setLeft(Action("writer", var_count, NoLine, Nothing))
       this.starterNodes = starterNodes ++ List(out_node)
       var_count += 1
       null
@@ -246,8 +246,8 @@ object Mcrl2Program{
       val out_node = outs.head
       in_node.setRight(name, channel_count)
       out_node.setLeft(name, channel_count)
-      val firstAction = Action(name, channel_count, 1, 1)
-      val secondAction = Action(name, channel_count, 1, 3)
+      val firstAction = Action(name, channel_count, TwoLine, In1)
+      val secondAction = Action(name, channel_count, TwoLine, Out1)
       val channel = Mcrl2Channel(number = channel_count, before= List(firstAction), after= List(secondAction),
         operator = MultiAction(firstAction, secondAction), prev = List(in_node), next = List(out_node))
       in_node.setNext(channel)
@@ -258,7 +258,7 @@ object Mcrl2Program{
   }
 
   private def makeNodes(numbers: List[Int]): List[Mcrl2Node] = numbers match{
-    case n :: rest => Mcrl2Node(n, Action(0, 6), Action(0, 6)) :: makeNodes(rest)
+    case n :: rest => Mcrl2Node(n, Action.nullAction, Action.nullAction) :: makeNodes(rest)
     case Nil => Nil
   }
 

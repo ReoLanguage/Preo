@@ -1,32 +1,45 @@
 package preo.modelling
 
 abstract class Mcrl2Process{
-  def vars: List[Action];
+  def vars: List[Action]
 }
+
+class Group
+
+case object NoLine extends Group
+case object OneLine extends Group
+case object TwoLine extends Group
+
+
+class State
+
+case object In1 extends State
+case object In2 extends State
+case object Out1 extends State
+case object Out2 extends State
+case object Nothing extends State
+
 
 //atomic
 //todo: turn group and state into objects
-case class Action(name: String, number: Int, group: Int, state: Int) extends Mcrl2Process{
+case class Action(name: String, number: Int, group: Group, state: State) extends Mcrl2Process{
   //group 1 is for actions of the channels
   //group 2 is for actions of nodes
   //group 3 is for actions of comunication
   override def toString: String = {
-    if(group > 3) "Null"
-    else{
-      val group_name = group match {
-        case 1 => "''"
-        case 2 => "'"
-        case 3 => ""
-      }
-      val state_name = state match{
-        case 1 => "in1"
-        case 2 => "in2"
-        case 3 => "out1"
-        case 4 => "out2"
-        case 5 => ""
-      }
-      s"$name$number$state_name$group_name"
+    val group_name = group match {
+      case TwoLine => "''"
+      case OneLine => "'"
+      case NoLine => ""
     }
+    val state_name = state match{
+      case In1 => "in1"
+      case In2 => "in2"
+      case Out1 => "out1"
+      case Out2 => "out2"
+      case Nothing => ""
+    }
+    s"$name${if (number!= -1) number else ""}$state_name$group_name"
   }
 
   override def equals(o: scala.Any): Boolean =
@@ -40,10 +53,13 @@ case class Action(name: String, number: Int, group: Int, state: Int) extends Mcr
   def get_number: Int = number
 
   override def vars: List[Action] = List(this)
+
 }
 
 object Action{
-  def apply(number: Int, group: Int): Action = new Action("X", number, group, 5)
+  def apply(number: Int, group: Group): Action = new Action("X", number, group, Nothing)
+
+  def nullAction: Action = new Action("Null", -1, NoLine, Nothing)
 }
 
 case class ProcessName(name: String) extends Mcrl2Process{
@@ -66,7 +82,7 @@ case class MultiAction(actions: List[Action]) extends Mcrl2Process{
 
   def getLast: Action = if(actions.nonEmpty) actions.last else null
 
-  override def vars: List[Action] = if(actions.isEmpty) List(Action(0, 4)) else actions
+  override def vars: List[Action] = if(actions.isEmpty) List(Action.nullAction) else actions
 
 }
 
