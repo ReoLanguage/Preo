@@ -27,6 +27,7 @@ object Graph {
   case object Mixed  extends NodeType {def dual = Mixed }
 
   def apply(c:CoreConnector): Graph = {
+//    val g = Automata.toAutomata(ReoGraph(c)).toGraph
     val g = ReoGraph(c)
     var seed:Int = (g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs)).max
 

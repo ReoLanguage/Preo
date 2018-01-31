@@ -35,6 +35,11 @@ object ReoGraph {
     simplifyGraph(toGraph(prim))
   }
 
+  def toGraphWithoutSimpl(prim:CoreConnector): ReoGraph = {
+    seed=0
+    toGraph(prim)
+  }
+
   /**
     * Calculates a graph representation of a (instantiated and simplified) connector.
     *
@@ -130,7 +135,7 @@ object ReoGraph {
   /**
     * maps ports to their edges in a graph
     */
-  private def collectInsOuts(graph: ReoGraph): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) =
+  def collectInsOuts(graph: ReoGraph): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) =
     collectInsOuts(graph.edges)
   private def collectInsOuts(edges: List[Edge]): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) = edges match {
     case Nil => (Map(),Map())
