@@ -3,7 +3,7 @@ package preo
 import preo.DSL._
 import preo.backend.{Graph, ReoGraph, Springy}
 import preo.frontend.Eval
-import preo.modelling.{Mcrl2Model, Mcrl2Program, Mcrl2FamilyModel}
+import preo.modelling.{Mcrl2Model}//, Mcrl2Program, Mcrl2FamilyModel}
 
 object Main extends App {
 
@@ -16,7 +16,7 @@ object Main extends App {
       val conn = parse(scala.io.StdIn.readLine())
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
-      println(Mcrl2FamilyModel(conn))
+      println(Mcrl2Model(Eval.reduce(conn)))
 //      println(ReoGraph.toGraph(Eval.reduce(conn)))
 //      println(Mcrl2Program(Eval.reduce(conn)))
 //      println(Mcrl2Model(Eval.reduce(conn)))

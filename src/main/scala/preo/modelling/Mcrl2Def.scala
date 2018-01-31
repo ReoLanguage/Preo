@@ -17,15 +17,9 @@ object Mcrl2Def{
   }
 }
 
-case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev: Mcrl2Channel = null,var next: Mcrl2Channel=null)
+case class Mcrl2Node(number: Int, before: Action, after: Action, var prev: Mcrl2Channel = null,var next: Mcrl2Channel=null)
   extends Mcrl2Def{
 
-  if(before == null){
-      before = Action.nullAction
-  }
-  if(after == null){
-      after = Action.nullAction
-  }
 
   override def toString: String = s"Node$number = (${before.toString} | ${after.toString}) . Node$number"
 
@@ -45,16 +39,17 @@ case class Mcrl2Node(number: Int, var before: Action, var after: Action,var prev
 
   def getVars: List[Action] = Set(before, after).toList
 
-  def setRight(name: String, number: Int, state: State = In1): Unit = this.setRight(Action(name, number, OneLine, state))
-
-  def setRight(action: Action): Unit = this.after = action
-
-  def setLeft(name: String, number: Int, state: State = Out1): Unit = this.setLeft(Action(name, number, OneLine, state))
-
-  def setLeft(action: Action): Unit = this.before = action
+  def ++(other: Mcrl2Node): Mcrl2Node = Mcrl2Node(number, before, other.after, prev, other.next)
+//  def setRight(name: String, number: Int, state: State = In1): Unit = this.setRight(Action(name, number, OneLine, state))
+//
+//  def setRight(action: Action): Unit = this.after = action
+//
+//  def setLeft(name: String, number: Int, state: State = Out1): Unit = this.setLeft(Action(name, number, OneLine, state))
+//
+//  def setLeft(action: Action): Unit = this.before = action
 }
 
-case class Mcrl2Channel(name:String = "Channel", number: Int,var before: List[Action],var after: List[Action],
+case class Mcrl2Channel(name:String = "Channel", number: Int, before: List[Action], after: List[Action],
                         operator: Mcrl2Process,var prev: List[Mcrl2Node] = Nil,var next: List[Mcrl2Node]= Nil)
   extends Mcrl2Def{
 
@@ -81,13 +76,18 @@ case class Mcrl2Channel(name:String = "Channel", number: Int,var before: List[Ac
 
   def getVars: List[Action] = before ++ after
 
-  def addRight(action: Int): Unit = this.addRight(Action(action, TwoLine))
+  def replace(replacements: Map[String, Mcrl2Node]): Unit = {
+    prev = prev.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
+    next = next.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
+  }
 
-  def addRight(action: Action): Unit = this.after ++= List(action)
-
-  def addLeft(action: Int): Unit = this.addLeft(Action(action, TwoLine))
-
-  def addLeft(action: Action): Unit = this.before ++= List(action)
+//  def addRight(action: Int): Unit = this.addRight(Action(action, TwoLine))
+//
+//  def addRight(action: Action): Unit = this.after ++= List(action)
+//
+//  def addLeft(action: Int): Unit = this.addLeft(Action(action, TwoLine))
+//
+//  def addLeft(action: Action): Unit = this.before ++= List(action)
 }
 
 
@@ -97,7 +97,7 @@ case class Mcrl2Init(number: Int, var_name:String, var_number: Int,var_state:Sta
     val action1 = Action(var_name, var_number, NoLine, var_state)
     val action2 = Action(var_name, var_number, OneLine, var_state)
     val action3 = Action(var_name, var_number, TwoLine, var_state)
-    val basicProc = procs.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
+    val basicProc = procs.tail.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
     val operator =  Block(List(action2, action3), Comm((action2, action3, action1), basicProc))
     operator
   }
