@@ -17,7 +17,7 @@ case class Automata(ports:Set[Int],init:Int,trans:Automata.Trans) {
 
   // states: ints, transitions: maps from states to (new state,ports fired, primitives involved)
   def ++(other:Automata): Automata = {
-    println(s"combining ${this}\nwith ${other}")
+    // println(s"combining ${this.show}\nwith ${other.show}")
     var seed = 0
     val shared = other.ports intersect ports
     var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
@@ -47,10 +47,10 @@ case class Automata(ports:Set[Int],init:Int,trans:Automata.Trans) {
         restrans += mkState(from1,from2) -> (mkState(to1,to2),fire1++fire2,es1++es2)
     }
     val allStates = newStates.values.toSet
-    println(s"ports: $newStates")
+    // println(s"ports: $newStates")
     // cleanup before?
     val a = Automata(ports++other.ports,mkState(init,other.init),restrans)
-    println(s"got $a")
+    // println(s"got ${a.show}")
     a
   }
 
@@ -74,7 +74,7 @@ case class Automata(ports:Set[Int],init:Int,trans:Automata.Trans) {
     ReoGraph(edges,Nil,Nil)
   }
 
-  override def toString: String =
+  def show: String =
     s"$init:\n"+trans.map(x=>s" - ${x._1}->${x._2._1} "+
       s"${x._2._2.mkString("[",",","]")} "+
       s"${x._2._3.map(_.prim.name).mkString("(",",",")")}").mkString("\n")
@@ -86,14 +86,19 @@ object Automata {
   private var seed = 0
 
   def apply(str:String): Automata = {
-    seed = 0
     val c = preo.DSL.parse(str)
     val cc = preo.DSL.reduce(c)
-    val gr = ReoGraph.toGraphWithoutSimpl(cc)
-    toAutomata(gr)
+    apply(cc)
   }
 
-  def toAutomata(e:Edge): Automata = e match {
+  def apply(cc:CoreConnector): Automata = {
+    seed = 0
+    val gr = ReoGraph.toGraphWithoutSimpl(cc)
+//    println("about to create automata from\n"+gr)
+    buildAutomata(gr)
+  }
+
+  private def buildAutomata(e:Edge): Automata = e match {
     case Edge(CPrim("sync",i,j,extra), List(a), List(b)) =>
       seed += 1
       Automata(Set(a,b),seed,Set(seed -> (seed,Set(a,b),Set(e))))
@@ -129,7 +134,7 @@ object Automata {
       throw new TypeCheckException(s"Unknown automata for primitive $p")
   }
 
-  def toAutomata(g: ReoGraph): Automata = {
+  private def buildAutomata(g: ReoGraph): Automata = {
     val (ins,outs) = collectInsOuts(g)
     def getNeighbours(e:Edge): List[Edge] =
       (for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
@@ -137,7 +142,7 @@ object Automata {
 
     if (g.edges.nonEmpty) {
       var prev = g.edges.head
-      var aut = toAutomata(prev)
+      var aut = buildAutomata(prev)
       var nexts = getNeighbours(prev)
       var missing = g.edges.tail.toSet
       //    var next = if (g.ins.nonEmpty) ins(g.ins.head)
@@ -148,12 +153,12 @@ object Automata {
           // pop "prev" from "nexts"
           prev = nexts.head
           nexts = nexts.tail
-          aut = aut ++ toAutomata(prev) // update automata with "prev"
+          aut = aut ++ buildAutomata(prev) // update automata with "prev"
           missing -= prev // add "prev" to known edges
         }
         if (missing.nonEmpty) {
           prev = missing.head
-          aut = aut ++ toAutomata(prev)
+          aut = aut ++ buildAutomata(prev)
           nexts = getNeighbours(prev)
           missing = missing.tail
         }
