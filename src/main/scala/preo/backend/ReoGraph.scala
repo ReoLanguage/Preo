@@ -22,6 +22,7 @@ object ReoGraph {
   case class Edge(prim: CPrim, ins:List[Int], outs:List[Int])
 
   private var seed:Int = 0 // global variable
+  private var prioritySeed:Int = 0 // measure to assign priority to edges
 
   /**
     * Calculates and reduces a graph representation of a (instantiated and simplified) connector.
@@ -69,13 +70,18 @@ object ReoGraph {
       val ins =  gc.ins.takeRight(i)
       val outs = gc.outs.takeRight(i)
       val loop = mkGrSyncs(outs,ins)
-      ReoGraph(gc.edges++loop,gc.ins.dropRight(i),gc.outs.dropRight(i))
+      val g = ReoGraph(gc.edges++loop,gc.ins.dropRight(i),gc.outs.dropRight(i))
+      g
     //      gc ++ Graph(mkGrSyncs(outs,ins),outs,ins)
     case p@CPrim(name, CoreInterface(pi), CoreInterface(pj), extra) =>
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j)),i,j)
-    case CSubConnector(name, sub) => toGraph(sub)
+    case CSubConnector(name, sub) =>
+//      prioritySeed += 1
+      val g = toGraph(sub)
+//      prioritySeed -=1
+      g
     case _ =>
       throw new TypeCheckException("Failed to compile a non-instantiated connector "+Show(prim))
   }

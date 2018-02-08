@@ -2,6 +2,7 @@ package preo.backend
 
 import preo.ast.{CPrim, CoreConnector, CoreInterface}
 import ReoGraph._
+import preo.backend.Automata.Trans
 import preo.common.TypeCheckException
 
 /**
@@ -11,13 +12,19 @@ import preo.common.TypeCheckException
   * @param trans Transitions - Relation between input and output states, with associated
   *              sets of actions and of edges (as in [[ReoGraph.Edge]]).
   */
-case class Automata(ports:Set[Int],init:Int,trans:Automata.Trans) {
+case class Automata(ports:Set[Int],init:Int,trans:Trans) {
 
  def getStates: Set[Int] = (for((x,(y,_,_)) <- trans) yield Set(x,y)).flatten
-
   // states: ints, transitions: maps from states to (new state,ports fired, primitives involved)
+
+  /**
+    * Automata composition - combining every possible transition,
+    * and including transitions that can occur in parallel.
+    * @param other automata to be composed
+    * @return composed automata
+    */
   def ++(other:Automata): Automata = {
-    // println(s"combining ${this.show}\nwith ${other.show}")
+//     println(s"combining ${this.show}\nwith ${other.show}")
     var seed = 0
     val shared = other.ports intersect ports
     var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
@@ -50,10 +57,29 @@ case class Automata(ports:Set[Int],init:Int,trans:Automata.Trans) {
     // println(s"ports: $newStates")
     // cleanup before?
     val a = Automata(ports++other.ports,mkState(init,other.init),restrans)
-    // println(s"got ${a.show}")
-    a
+//    println(s"got ${a.show}")
+    val a2 = a.cleanup
+//    println(s"cleaned ${a2.show}")
+    a2
   }
 
+  def cleanup: Automata = {
+    var missing = Set(init)
+    var done = Set[Int]()
+    var ntrans:Trans = Set()
+    while (missing.nonEmpty) {
+      val next = missing.head
+      missing = missing.tail
+      done += next
+      for (t@(from,(to,_,_)) <- trans if from==next) {
+        ntrans += t
+        if (!(done contains to)) missing += to
+      }
+    }
+    Automata(ports,init,ntrans)
+  }
+
+  @deprecated("starting experiment to produce automata/graphs","jan 2018")
   def toGraph: ReoGraph = {
     var s = 0
     var edges = List[Edge]()
@@ -134,32 +160,41 @@ object Automata {
       throw new TypeCheckException(s"Unknown automata for primitive $p")
   }
 
+  /**
+    * Build automata by starting at a random edge, and follow neighbours.
+    * @param g
+    * @return
+    */
   private def buildAutomata(g: ReoGraph): Automata = {
     val (ins,outs) = collectInsOuts(g)
     def getNeighbours(e:Edge): List[Edge] =
       (for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
       (for (o <- e.outs) yield ins.getOrElse(o,Set())).flatten
 
+
     if (g.edges.nonEmpty) {
       var prev = g.edges.head
+      var missing = g.edges.toSet - prev
+//      println(s"next: ${prev.prim.name} ${prev.ins} ${prev.outs} ${prev.priority}")
       var aut = buildAutomata(prev)
-      var nexts = getNeighbours(prev)
-      var missing = g.edges.tail.toSet
+      var next = getNeighbours(prev)
       //    var next = if (g.ins.nonEmpty) ins(g.ins.head)
       //    for (in <- g.ins.headOption; set <- ins.get(in); e <- )
 
       while (missing.nonEmpty) {
-        while (nexts.nonEmpty) {
-          // pop "prev" from "nexts"
-          prev = nexts.head
-          nexts = nexts.tail
+        while (next.nonEmpty) {
+          // pop "prev" from "next"
+          prev = next.head
+          next = next.tail
+//          println(s"next: ${prev.prim.name} ${prev.ins} ${prev.outs} ${prev.priority}")
           aut = aut ++ buildAutomata(prev) // update automata with "prev"
           missing -= prev // add "prev" to known edges
         }
         if (missing.nonEmpty) {
           prev = missing.head
+//          println(s"next: ${prev.prim.name} ${prev.ins} ${prev.outs} ${prev.priority}")
           aut = aut ++ buildAutomata(prev)
-          nexts = getNeighbours(prev)
+          next = getNeighbours(prev)
           missing = missing.tail
         }
       }

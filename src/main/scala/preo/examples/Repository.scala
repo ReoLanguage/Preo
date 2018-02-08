@@ -47,6 +47,9 @@ object Repository {
       (((id^(x+1)) * (swap^(n-x-1)) * (id^(x+1)))^(x,n)) &
         sym(2*(n:IExpr)*(n-1),2*(n:IExpr))
     ))
+  /** alternates between the output of a value on each of its n outputs */
+  val alternateOut =
+    lam(n,Tr(n, sym(n-1,1) & ((fifofull & dupl) * ((fifo & dupl)^(n-1))) & unzip(n) ))
   /** alternate flow between n flows [[http://reo.project.cwi.nl/webreo/generated/sequencer/frameset.htm]] */
   val sequencer = lam(n, (((dupl^n) & unzip(n)) *
     Tr(n, sym(n-1,1) & ((fifofull & dupl) * ((fifo & dupl)^(n-1))) & unzip(n) ) ) &
@@ -56,25 +59,28 @@ object Repository {
     Tr(n, sym(n-1,1) & ((fifofull & dupl) * ((fifo & dupl)^(n-1))) & unzip(n) ) ) &
     (zip(n) & (drain^n)))
 
+  /** n-ary duplicator */
+  val dupls = lam (n, Tr(n-1,(id * (dupl^(n-1))) & sym(1,(n-1)*2)))
+
+  /** n-ary merger */
+  val mergers = lam (n, Tr(n-1,sym((n-1)*2,1) & (id * (merger^(n-1)))))
+
+  /** n-ary merger and duplicator (node) */
+  val node = mergers & dupls
+
   /** n-ary exrouter */
   // n-ary exrouter
   //   val nexrouter = lam(n, Prim("dupl",1,n+1) &
   //     (((lossy & dupl)^n) & unzip(n))*id &
   //     (id^(n+1))*(dupl^(n-1))*id &
   //     (id^n)*(drain^n) )
-  val nexrouter = lam(n, Prim("dupl",1,n+1) &
+  val nexrouter = lam(n, (dupls(n+1)) &
     (((lossy & dupl)^n) & unzip(n))*id &
-    (id^n)*Prim("merger",n,1)*id &
+    (id^n)*(mergers(n))* id &
     (id^n)*drain )
 
 //  val ndupl = lam(n, Trace( NN, ((dupl * (id^x))^(x<--(n-1))) & sym(NN,n) ))
 //  val dupl4 = lam(n, Trace( 5 , ((dupl * (id^x))^(x<--3))     & sym(5,4) ))
 //  val ndupl = lam(n, Tr( ((n+1)*(n-2))/2, ((dupl * (id^x))^(x<--(n-1))) & sym( ((n+1)*(n-2))/2 ,n) ))
-
-  val dupls = lam (n, Tr(n-1,(id * (dupl^(n-1))) & sym(1,(n-1)*2)))
-
-  val mergers = lam (n, Tr(n-1,sym((n-1)*2,1) & (id * (merger^(n-1)))))
-
-  val node = mergers & dupls
 
 }
