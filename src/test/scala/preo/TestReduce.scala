@@ -24,7 +24,7 @@ class TestReduce extends FlatSpec {
   testOK(lam(n,lam(x,id^x)),"id")
   testOK(lam(x,id^x) & lam(y,id^y),"nil")
   testOK(lam(n,lam(x,id^x) & lam(y,id^y)),"nil")
-  testOK(sequencer,"(dupl ⊗ Tr_1{fifofull ; dupl}) ; (id ⊗ drain)")
+  testOK(sequencer,"(dupl ⊗ Tr(1)(fifofull ; dupl)) ; (id ⊗ drain)")
   // (dupl ⊗ Tr_1{fifo ; dupl}) ; (id ⊗ drain)
 
 

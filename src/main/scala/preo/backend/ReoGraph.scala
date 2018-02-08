@@ -4,8 +4,6 @@ import preo.ast._
 import preo.frontend.Show
 import preo.common.TypeCheckException
 
-import scala.collection.immutable
-
 /**
   * Created by jose on 21/07/16.
   * A graph is a list of edges, a list on input ports (identified with Ints), and a list of output ports.
@@ -73,7 +71,7 @@ object ReoGraph {
       val g = ReoGraph(gc.edges++loop,gc.ins.dropRight(i),gc.outs.dropRight(i))
       g
     //      gc ++ Graph(mkGrSyncs(outs,ins),outs,ins)
-    case p@CPrim(name, CoreInterface(pi), CoreInterface(pj), extra) =>
+    case p@CPrim(_, CoreInterface(pi), CoreInterface(pj), _) =>
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j)),i,j)
@@ -181,7 +179,7 @@ object ReoGraph {
   private def dropReplDupl(g:ReoGraph,inmap:Map[Int,Set[Edge]],outmap:Map[Int,Set[Edge]])
       : (List[Edge],Map[Int,Int]) = g.edges match {
     case Nil => (Nil,Map())
-    case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(o1,o2)))::tl =>
+    case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(_,_)))::tl =>
       val (e,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       var syncs: List[Edge] = List()
       var binds: Map[Int,Int] = Map()

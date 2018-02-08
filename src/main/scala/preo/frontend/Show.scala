@@ -12,7 +12,7 @@ object Show {
     case Id(Port(IVal(0))) => "nil"
     case Id(x)          => s"Id(${apply(x)})"
     case Symmetry(i, j) => s"sym(${apply(i)},${apply(j)})"
-    case Trace(i, c)    => s"Tr_${showP(i)}{${apply(c)}}"
+    case Trace(i, c)    => s"Tr(${apply(i)})(${apply(c)})"
     case Prim(name,_,_,_) => name
     case Exp(a, c)  => s"${showP(c)}^${showP(a)}"
     case ExpX(x, a, c)  => s"${showP(c)}^{${apply(x:IExpr)}<--${apply(a)}}"
