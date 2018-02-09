@@ -40,13 +40,6 @@ case class Mcrl2Node(number: Int, before: Action, after: Action, var prev: Mcrl2
   def getVars: List[Action] = Set(before, after).toList
 
   def ++(other: Mcrl2Node): Mcrl2Node = Mcrl2Node(number, before, other.after, prev, other.next)
-//  def setRight(name: String, number: Int, state: State = In1): Unit = this.setRight(Action(name, number, OneLine, state))
-//
-//  def setRight(action: Action): Unit = this.after = action
-//
-//  def setLeft(name: String, number: Int, state: State = Out1): Unit = this.setLeft(Action(name, number, OneLine, state))
-//
-//  def setLeft(action: Action): Unit = this.before = action
 }
 
 case class Mcrl2Channel(name:String = "Channel", number: Int, before: List[Action], after: List[Action],
@@ -80,14 +73,6 @@ case class Mcrl2Channel(name:String = "Channel", number: Int, before: List[Actio
     prev = prev.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
     next = next.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
   }
-
-//  def addRight(action: Int): Unit = this.addRight(Action(action, TwoLine))
-//
-//  def addRight(action: Action): Unit = this.after ++= List(action)
-//
-//  def addLeft(action: Int): Unit = this.addLeft(Action(action, TwoLine))
-//
-//  def addLeft(action: Action): Unit = this.before ++= List(action)
 }
 
 
