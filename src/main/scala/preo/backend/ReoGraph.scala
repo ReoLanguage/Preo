@@ -4,8 +4,6 @@ import preo.ast._
 import preo.frontend.Show
 import preo.common.TypeCheckException
 
-import scala.collection.immutable
-
 /**
   * Created by jose on 21/07/16.
   * A graph is a list of edges, a list on input ports (identified with Ints), and a list of output ports.
@@ -22,6 +20,7 @@ object ReoGraph {
   case class Edge(prim: CPrim, ins:List[Int], outs:List[Int])
 
   private var seed:Int = 0 // global variable
+  private var prioritySeed:Int = 0 // measure to assign priority to edges
 
   /**
     * Calculates and reduces a graph representation of a (instantiated and simplified) connector.
@@ -33,6 +32,11 @@ object ReoGraph {
     seed=0
     //    reduceGraph(toGraph(prim))
     simplifyGraph(toGraph(prim))
+  }
+
+  def toGraphWithoutSimpl(prim:CoreConnector): ReoGraph = {
+    seed=0
+    toGraph(prim)
   }
 
   /**
@@ -64,13 +68,18 @@ object ReoGraph {
       val ins =  gc.ins.takeRight(i)
       val outs = gc.outs.takeRight(i)
       val loop = mkGrSyncs(outs,ins)
-      ReoGraph(gc.edges++loop,gc.ins.dropRight(i),gc.outs.dropRight(i))
+      val g = ReoGraph(gc.edges++loop,gc.ins.dropRight(i),gc.outs.dropRight(i))
+      g
     //      gc ++ Graph(mkGrSyncs(outs,ins),outs,ins)
-    case p@CPrim(name, CoreInterface(pi), CoreInterface(pj), extra) =>
+    case p@CPrim(_, CoreInterface(pi), CoreInterface(pj), _) =>
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j)),i,j)
-    case CSubConnector(name, sub) => toGraph(sub)
+    case CSubConnector(name, sub) =>
+//      prioritySeed += 1
+      val g = toGraph(sub)
+//      prioritySeed -=1
+      g
     case _ =>
       throw new TypeCheckException("Failed to compile a non-instantiated connector "+Show(prim))
   }
@@ -130,7 +139,7 @@ object ReoGraph {
   /**
     * maps ports to their edges in a graph
     */
-  private def collectInsOuts(graph: ReoGraph): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) =
+  def collectInsOuts(graph: ReoGraph): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) =
     collectInsOuts(graph.edges)
   private def collectInsOuts(edges: List[Edge]): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) = edges match {
     case Nil => (Map(),Map())
@@ -170,7 +179,7 @@ object ReoGraph {
   private def dropReplDupl(g:ReoGraph,inmap:Map[Int,Set[Edge]],outmap:Map[Int,Set[Edge]])
       : (List[Edge],Map[Int,Int]) = g.edges match {
     case Nil => (Nil,Map())
-    case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(o1,o2)))::tl =>
+    case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(_,_)))::tl =>
       val (e,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       var syncs: List[Edge] = List()
       var binds: Map[Int,Int] = Map()

@@ -3,6 +3,7 @@ package preo.lang
 import preo.DSL._
 import preo.ast._
 import preo.common.TypeCheckException
+import preo.examples.Repository
 import preo.frontend.{Show, Substitution}
 
 import scala.util.matching.Regex
@@ -40,7 +41,13 @@ object Parser extends RegexParsers {
     case "swap"     => swap
     case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)))
     case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)))
-    case "node"     => preo.examples.Repository.node
+    case "node"     => SubConnector(s,Repository.node)
+    case "dupls"    => SubConnector(s,Repository.dupls)
+    case "mergers"  => SubConnector(s,Repository.mergers)
+    case "zip"      => SubConnector(s,Repository.zip)
+    case "unzip"    => SubConnector(s,Repository.unzip)
+    case "exrouter" => SubConnector(s,Repository.exrouter)
+    case "exrouters"=> SubConnector(s,Repository.nexrouter)
     case _          => str2conn(s)
   }
 
@@ -58,8 +65,8 @@ object Parser extends RegexParsers {
 
   def whereP: Parser[Connector=>Connector] =
     identifier~"="~connP~opt(","~whereP) ^^ {
-      case s~_~co2~Some(_~w) => { (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2))}
-      case s~_~co2~None => { (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2))}
+      case s~_~co2~Some(_~w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2))
+      case s~_~co2~None      => (co:Connector) => Substitution.replacePrim(s,  co ,SubConnector(s, co2))
     }
 
   ///////////////
@@ -94,9 +101,8 @@ object Parser extends RegexParsers {
     }
 
   def appl: Parser[Connector] =
-    pow~opt(expr) ^^ {
-      case co~Some(e) => co(e)
-      case co~None => co
+    pow~rep(ilit) ^^ {
+      case co~es => es.foldLeft(co)((co2,e)=>co2(e))
     }
 
   def pow: Parser[Connector] =
