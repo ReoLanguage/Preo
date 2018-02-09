@@ -41,7 +41,7 @@ For example, the exclusive router example ["exrouter.preo"](src/main/scala/preo/
      <img src="src/resources/exrouter.svg">
 </p>
 
-You can also try it by yourself online - using a snapshot of this project in http://jose.proenca.org/reolive.
+You can also try it by yourself online - using a snapshot of this project in https://reolanguage.github.io/ReoLive/snapshot.
 
 <!-- ## Why a new project?
 The emphasise is in the core language, which we call Preo, it's parser, and its static analysis.
