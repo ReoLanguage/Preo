@@ -2,7 +2,12 @@ package preo.modelling
 
 import preo.ast.{CSeq, CSymmetry, CPar, CPrim, CSubConnector, CTrace, CId, CoreConnector, CoreInterface}
 
-
+/**
+  * The Mcrl2Model defines a printable model in mcrl2 for a CoreConnector
+  * @param act the actions of this Model
+  * @param proc The processes of this model
+  * @param init The init process
+  */
 class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
   override def toString: String = {
     val acts = Mcrl2Def.toString(act.toList)
@@ -19,6 +24,10 @@ class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
       """.stripMargin
   }
 
+  /**
+    * Creates a string that can be printed in the HTML
+    * @return the string formated for HTML
+    */
   def webString: String = {
     val acts = Mcrl2Def.toString(act.toList)
     var procs = ""
@@ -37,39 +46,65 @@ class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
       """.stripMargin
   }
 
+  /**
+    * Gets the nodes which have as a left action the Null action
+    */
   def getStarterNodes: List[Mcrl2Node] = proc.filter(p => p.isInstanceOf[Mcrl2Node] && p.asInstanceOf[Mcrl2Node].getBefore.equals(Action.nullAction)).asInstanceOf[List[Mcrl2Node]]
 
+  /**
+    * returns the actions
+    */
   def getActions: Set[Action] = act
 
+  /**
+    * returns all the processes
+    */
   def getProc: List[Mcrl2Def] = proc
 
+  /**
+    * returns the init process
+    */
   def getInit: Mcrl2Process = init
 
   //testing usefull stuff
+  /**
+    * Filters the nodes from the processes
+    */
   def getNodes: List[Mcrl2Node] = proc.filter(p => p.isInstanceOf[Mcrl2Node]).asInstanceOf[List[Mcrl2Node]]
 
+  /**
+    * Filters the Channels from the processes
+    */
   def getChannels: List[Mcrl2Channel] = proc.filter(p => p.isInstanceOf[Mcrl2Channel]).asInstanceOf[List[Mcrl2Channel]]
 
+  /**
+    * Filters the Inits from the processes
+    * @return
+    */
   def getInits: List[Mcrl2Init] = proc.filter(p => p.isInstanceOf[Mcrl2Init]).asInstanceOf[List[Mcrl2Init]]
 
 
 }
 
+
 object Mcrl2Model{
 
   var var_count = 1
   var channel_count = 1
-//  var nodes: List[Mcrl2Node] = List[Mcrl2Node]()
-  var last_init: Mcrl2Process = null
-//  var starterNodes: List[Mcrl2Node] = List[Mcrl2Node]()
+  var last_init: Mcrl2Process = _
   var to_check: List[Mcrl2Def] = List[Mcrl2Def]()
   var missingVars: List[Action] = List[Action]()
 
+  /**
+    * Converts the CoreConnector into an instance of the Mcrl2Model
+    * @param ccon the coreConnector to convert
+    * @return the converted Mcrl2Model
+    */
   def apply(ccon: CoreConnector): Mcrl2Model = {
     val (ins, channels, middle_nodes, outs) = conToChannels(ccon)
     val nodes = ins ++ middle_nodes ++ outs
     to_check = channels ++ nodes
-    missingVars = Util.getVars(channels++nodes).toList.filter{case a@Action(name, number, group, state) => !(group == NoLine && state == Nothing) && a != Action.nullAction}
+    missingVars = Util.getVars(channels++nodes).toList.filter{case a@Action(_, _, group, state) => !(group == NoLine && state == Nothing) && a != Action.nullAction}
     var starterNodes = ins
     if(starterNodes.isEmpty) starterNodes = nodes.head :: starterNodes
     val inits = initsMaker(starterNodes)
@@ -89,7 +124,11 @@ object Mcrl2Model{
     program
   }
 
-
+  /**
+    * Convertes a CoreConnector into (Input Nodes, Channels, Middle Nodes, Output Nodes)
+    * @param ccon The CoreConnector to Convert
+    * @return the output mentioned above
+    */
   def conToChannels(ccon: CoreConnector):
     (List[Mcrl2Node], List[Mcrl2Channel], List[Mcrl2Node], List[Mcrl2Node]) = ccon match{
     case CSeq(c1, c2) =>
@@ -97,13 +136,13 @@ object Mcrl2Model{
       val (in2, channel2, nodes2, out2) = conToChannels(c2)
       var replacements: Map[String, Mcrl2Node] = Map()
       val nodes = out1.zip(in2).map((n: (Mcrl2Node, Mcrl2Node)) => {
-        val result: Mcrl2Node = n._1 ++ n._2;
+        val result: Mcrl2Node = n._1 ++ n._2
         replacements = replacements + (n._1.getName.toString -> result)
         replacements = replacements + (n._2.getName.toString -> result)
         result
       })
-      channel1.map(channel => channel.replace(replacements))
-      channel2.map(channel => channel.replace(replacements))
+      channel1.foreach(channel => channel.replace(replacements))
+      channel2.foreach(channel => channel.replace(replacements))
       (in1,  channel1 ++  channel2, nodes++nodes1++nodes2, out2)
 
     case CPar(c1, c2) =>
@@ -130,12 +169,12 @@ object Mcrl2Model{
       val (ins, channels,nodes, outs) = conToChannels(c)
       var replacements: Map[String, Mcrl2Node] = Map()
       val new_nodes = outs.takeRight(i).zip(ins.takeRight(i)).map((n: (Mcrl2Node, Mcrl2Node)) => {
-        val result: Mcrl2Node = n._1 ++ n._2;
+        val result: Mcrl2Node = n._1 ++ n._2
         replacements = replacements + (n._1.getName.toString -> result)
         replacements = replacements + (n._2.getName.toString -> result)
         result
       })
-      channels.map(channel => channel.replace(replacements))
+      channels.foreach(channel => channel.replace(replacements))
       (ins.dropRight(i), channels , nodes ++ new_nodes, outs.dropRight(i))
 
     case CId(CoreInterface(i)) =>
@@ -159,10 +198,14 @@ object Mcrl2Model{
   }
 
 
-
+  /**
+    * Converts a primitive into (Input Nodes, Channel, Nil, Output Nodes) based on the name of the primitive
+    * @param prim The primitive to Convert
+    * @return The output mentioned above
+    */
   def primToChannel(prim: CPrim):
     (List[Mcrl2Node], List[Mcrl2Channel], List[Mcrl2Node], List[Mcrl2Node]) = prim match{
-    case CPrim("fifo", CoreInterface(i), CoreInterface(j), _) => {
+    case CPrim("fifo", _, _, _) =>
       //nodes
       val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("fifo", channel_count, OneLine, In1))
       val out_node = Mcrl2Node(channel_count+2, Action("fifo", channel_count, OneLine, Out1), Action.nullAction)
@@ -179,8 +222,8 @@ object Mcrl2Model{
       out_node.setPrev(channel)
       channel_count += 3
       (List(in_node), List(channel), Nil, List(out_node))
-    }
-    case CPrim("fifofull", CoreInterface(i), CoreInterface(j), _) => {
+
+    case CPrim("fifofull", _, _, _) =>
       //nodes
       val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("fifofull", channel_count, OneLine, In1))
       val out_node = Mcrl2Node(channel_count+2, Action("fifofull", channel_count, OneLine, Out1), Action.nullAction)
@@ -197,8 +240,8 @@ object Mcrl2Model{
       out_node.setPrev(channel)
       channel_count += 3
       (List(in_node), List(channel), Nil,  List(out_node))
-    }
-    case CPrim("lossy", CoreInterface(i), CoreInterface(j), _ ) => {
+
+    case CPrim("lossy", _, _, _ ) =>
       //nodes
       val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("lossy", channel_count, OneLine, In1))
       val out_node = Mcrl2Node(channel_count+2, Action("lossy", channel_count, OneLine, Out1), Action.nullAction)
@@ -214,8 +257,8 @@ object Mcrl2Model{
       out_node.setPrev(channel)
       channel_count += 3
       (List(in_node), List(channel), Nil, List(out_node))
-    }
-    case CPrim("merger", CoreInterface(i), CoreInterface(j),_) => {
+
+    case CPrim("merger", _, _,_) =>
       //nodes
 
       val in_node1 = Mcrl2Node(channel_count+1, Action.nullAction, Action("merger", channel_count, OneLine, In1))
@@ -237,8 +280,8 @@ object Mcrl2Model{
       out_node.setPrev(channel)
       channel_count += 4
       (List(in_node1, in_node2), List(channel), Nil, List(out_node))
-    }
-    case CPrim("dupl", CoreInterface(i), CoreInterface(j), _) => {
+
+    case CPrim("dupl", _, _, _) =>
       val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("dupl", channel_count, OneLine, In1))
       val out_node1 = Mcrl2Node(channel_count+2, Action("dupl", channel_count, OneLine, Out1), Action.nullAction)
       val out_node2 = Mcrl2Node(channel_count+3, Action("dupl", channel_count, OneLine, Out2), Action.nullAction)
@@ -256,8 +299,8 @@ object Mcrl2Model{
       out_node2.setPrev(channel)
       channel_count += 4
       (List(in_node), List(channel),Nil, List(out_node1, out_node2))
-    }
-    case CPrim("drain", CoreInterface(i), CoreInterface(j), _) => {
+
+    case CPrim("drain", _, _, _) =>
       //nodes
       val in_node1 = Mcrl2Node(channel_count+1, Action.nullAction, Action("drain", channel_count, OneLine, In1))
       val in_node2 = Mcrl2Node(channel_count+2, Action.nullAction, Action("drain", channel_count, OneLine, In2))
@@ -272,20 +315,20 @@ object Mcrl2Model{
       in_node2.setNext(channel)
       channel_count += 3
       (List(in_node1, in_node2), List(channel),Nil, Nil)
-    }
-    case CPrim("reader", CoreInterface(i), CoreInterface(j), _) => {
+
+    case CPrim("reader", _, _, _) =>
       val in_node = Mcrl2Node(channel_count, Action.nullAction, Action("reader", var_count,NoLine, Nothing))
       var_count +=1
       (List(in_node), Nil, Nil, Nil)
-    }
-    case CPrim("writer", CoreInterface(i), CoreInterface(j), _) => {
+
+    case CPrim("writer", _, _, _) =>
       val out_node = Mcrl2Node(channel_count, Action("writer", channel_count, NoLine, Nothing), Action.nullAction)
 
       var_count += 1
       channel_count += 1
       (Nil, Nil, Nil, List(out_node))
-    }
-    case CPrim(name, CoreInterface(i), CoreInterface(j), _) => {
+
+    case CPrim(name, _, _, _) =>
       //nodes
       val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action(name, channel_count, OneLine, In1))
       val out_node = Mcrl2Node(channel_count+2, Action(name, channel_count, OneLine, Out1), Action.nullAction)
@@ -299,11 +342,15 @@ object Mcrl2Model{
       out_node.setPrev(channel)
       channel_count += 3
       (List(in_node), List(channel), Nil, List(out_node))
-    }
+
   }
 
 
-
+  /**
+    * Makes some sync channels
+    * @param i the number of channels to make
+    * @return the list of channels created
+    */
   private def makeSyncs(i: Int): List[Mcrl2Channel] =
     if (i == 0) {
       Nil
@@ -318,7 +365,12 @@ object Mcrl2Model{
     }
 
 
-
+  /**
+    * After the convertion of CoreConnector to Channels and Nodes, we use this function to create the inits
+    * by traveling throught the graph defined by them
+    * @param starterNodes the initial nodes which we will use to travel throught the graph
+    * @return A list of inits
+    */
   private def initsMaker(starterNodes: List[Mcrl2Node]): List[Mcrl2Init] =
     if(starterNodes.nonEmpty){
       val inits = makeInitsNode(starterNodes.head, null)
@@ -336,22 +388,44 @@ object Mcrl2Model{
       Nil
     }
 
-
+  /**
+    * removes a channel or node from the to_check list
+    * this list is usefull to know if we have travelled through all the nodes and channels
+    * @param element the element to remove from the list
+    */
   private def check(element: Mcrl2Def): Unit = to_check = to_check.filter(x => x != element)
 
+  /**
+    * removes an action from the missingVars list
+    * this list is usefull to know if we have used all the vars in the init processes
+    * @param action the action to remove
+    */
   private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number || x.state != action.state)
 
+  /**
+    * The blockers are inits that we create when all the processes have been used but some vars are still
+    * left out from the inits
+    * @param actions the remaining actions
+    * @param last the last init process we created
+    * @return a list of inits
+    */
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
-    case Action(name, number, group, state) :: rest => {
-      val filtered_rest = rest.filter{case Action(_, n, g,s) => n != number || s != state}
+    case Action(name, number, _ , state) :: rest =>
+      val filtered_rest = rest.filter{case Action(_, n, _,s) => n != number || s != state}
       val m = Mcrl2Init(channel_count, name, number,state, last)
       channel_count += 1
       m :: makeblockers(filtered_rest, m.getName)
-    }
+
     case Nil => Nil
   }
 
-  //we have to prepare this to the spout in case we had it
+  /**
+    * Creates an init process for the node received
+    * @param current The current node we need to put in an init
+    * @param last the last init created
+    * @param backwards are we going backwards in the graph?
+    * @return a list of inits
+    */
   private def makeInitsNode(current: Mcrl2Node, last: Mcrl2Def, backwards: Boolean = false): List[Mcrl2Init] = {
     if(to_check.contains(current)) {
       //in this case we know the node doesn't have prev
@@ -363,7 +437,7 @@ object Mcrl2Model{
       else {
         if (!backwards) {
           notMissing(current.before)
-          val Action(name, number, group, state) = current.before
+          val Action(name, number, _, state) = current.before
           val init = Mcrl2Init(channel_count, name, number, state, current.getName, last.getName)
           channel_count += 1
           val rest = makeInitsChannel(current.next, init, current)
@@ -371,8 +445,8 @@ object Mcrl2Model{
         }
         else{
           notMissing(current.getAfter)
-          val Action(name, number, group, state) = current.after
-          var init = Mcrl2Init(channel_count, name, number, state, current.getName, last.getName)
+          val Action(name, number, _, state) = current.after
+          val init = Mcrl2Init(channel_count, name, number, state, current.getName, last.getName)
           channel_count +=1
           val rest = makeInitsChannel(current.prev, init, current, true)
           init::rest
@@ -384,6 +458,13 @@ object Mcrl2Model{
     }
   }
 
+  /**
+    * Creates an init process for the channel received
+    * @param current The current channel we need to put in an init
+    * @param last the last init created
+    * @param backwards are we going backwards in the graph?
+    * @return a list of inits
+    */
   private def makeInitsChannel(current: Mcrl2Channel, last: Mcrl2Def, last_node: Mcrl2Node, backwards: Boolean = false): List[Mcrl2Init] = {
     if(to_check.contains(current)) {
       check(current)
@@ -394,7 +475,7 @@ object Mcrl2Model{
       else {
         if (!backwards) {
           notMissing(last_node.getAfter)
-          val Action(name, number, group, state) = last_node.getAfter
+          val Action(name, number, _, state) = last_node.getAfter
           var inits = List(Mcrl2Init(channel_count, name, number, state, current.getName, last.getName))
           channel_count += 1
           for(n <- current.getNext){
@@ -411,7 +492,7 @@ object Mcrl2Model{
         }
         else{
           notMissing(last_node.getBefore)
-          val Action(name, number, group, state) = last_node.getBefore
+          val Action(name, number, _, state) = last_node.getBefore
           var inits = List(Mcrl2Init(channel_count, name, number, state, current.getName, last.getName))
           channel_count += 1
           for(n <- current.getPrev){
@@ -432,8 +513,5 @@ object Mcrl2Model{
       Nil
     }
   }
-
-
-
 }
 
