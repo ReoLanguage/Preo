@@ -33,6 +33,58 @@ object Solver {
 
 
   /**
+    * returns the number of solutions required or as many as possible
+    * @param typ type used to extract constraints and relevant vars
+    * @param n number of desired solutions
+    * @return (boolVars, intVars) after solverAux function applies
+    */
+
+  def getSolutions(n:Int, typ: Type): Map[String, List[Expr]] = {
+    if (typ.const == BVal(true) || typ.const == And(List()))
+      return Map()
+
+    var values = Map(): Map[String, List[Expr]]
+
+    val sol = solveAux(typ.const)
+    if(sol.isDefined){
+      var i = 0
+      //add the values to our map
+      for ((x, v) <- intVars)
+        values += (x -> List())
+      for ((x, v) <- boolVars)
+        values += (x -> List())
+      var solved = true
+      do{
+        if(Math.random <= 0.4){
+          for((x, v) <- intVars){
+            val valueX = values(x)
+            values = values +  (x -> (valueX.take(i) ++ List(IVal(v.getValue)) ++ valueX.drop(i) ))
+          }
+          for((x, v) <- boolVars){
+            val valueX = values(x)
+            values = values + (x -> (valueX.take(i) ++ List(BVal(v.getValue == 1)) ++ valueX.drop(i)) )
+          }
+          i += 1
+        }
+        else{
+          for((x, v) <- intVars){
+            values += (x -> (values(x) ++ List(IVal(v.getValue))))
+          }
+          for((x, v) <- boolVars){
+            values += (x -> (values(x) ++ List(BVal(v.getValue == 1))))
+          }
+        }
+        solved = sol.get.nextSolution()
+      }while(solved && i < n)
+      for((x, v) <- values){
+        values += (x -> v.take(n))
+      }
+      values
+    }
+    else null
+  }
+
+  /**
    * Solve a boolean constraint with integers using the Choco library.
     *
     * @param bExpr boolean constraint to be solved
@@ -45,6 +97,7 @@ object Solver {
       return Some(Substitution())
 
     val sol = solveAux(bExpr)
+
     // build reply (substitution) and return value
     if (sol.isDefined) {
       var res = Substitution()

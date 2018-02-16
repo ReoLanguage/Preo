@@ -173,7 +173,7 @@ object Parser extends RegexParsers {
     "false"    ^^ {_=>BVal(false)}              |
     "!" ~ bexpr ^^ {case _ ~ e => Not(e)}       |
     identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
-    identifier ^^ Var                           |
+    identifier ^^ Var                            |
     "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
 
   // integer expressions
