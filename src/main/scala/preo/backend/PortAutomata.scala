@@ -23,9 +23,13 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set
   override def getInit: Int = init
 
   /** Returns the transitions to be displayed */
-  override def getTrans: Set[(Int, Any, Int)] =
-//    for ((from,(to,fire,_)) <- trans) yield (from,fire.mkString("."),to)
-    for ((from,(to,_,es)) <- trans) yield (from,es.map(_.prim.name).filterNot(_=="sync").mkString("."),to)
+  override def getTrans: Set[(Int, Any, String, Int)] =
+    for ((from, (to, fire, es)) <- trans)
+      yield (from, es.map(_.prim.name).filterNot(_ == "sync").mkString("."), (fire,es).hashCode().toString, to)
+
+  private def printPrim(edge: Edge):String = {
+    s"""${edge.prim.name}-${edge.prim.i.ports}-${edge.prim.j.ports}-${edge.ins.mkString(".")}-${edge.outs.mkString(".")}"""
+  }
 
   /**
     * Automata composition - combining every possible transition,

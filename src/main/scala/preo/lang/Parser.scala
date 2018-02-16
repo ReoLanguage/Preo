@@ -35,6 +35,7 @@ object Parser extends RegexParsers {
     case "fifofull" => fifofull
     case "drain"    => drain
     case "id"       => id
+    case "ids"      => lam(n,id^n)
     case "dupl"     => dupl
     case "lossy"    => lossy
     case "merger"   => merger

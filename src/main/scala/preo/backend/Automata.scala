@@ -17,7 +17,7 @@ trait Automata[A <: Automata[A]] {
   def getInit: Int
 
   /** Returns the transitions to be displayed */
-  def getTrans: Set[(Int,Any,Int)]
+  def getTrans: Set[(Int,Any,String,Int)] // from, label, id, to
 
   /**
     * Automata composition - combining every possible transition,
