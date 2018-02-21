@@ -2,7 +2,7 @@ package preo.backend
 
 import preo.ast.CPrim
 import preo.backend.ReoGraph.Edge
-import preo.common.TypeCheckException
+import preo.common.{GenerationException, TypeCheckException}
 
 /**
   * Representation of an automata, aimed at being generated from a [[ReoGraph]].
@@ -130,7 +130,7 @@ object PortAutomata {
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
 
       case Edge(p, _, _) =>
-        throw new TypeCheckException(s"Unknown automata for primitive $p")
+        throw new GenerationException(s"Unknown port automata for primitive $p")
     }
 
     def emptyAutomata = PortAutomata(Set(), 0, Set())

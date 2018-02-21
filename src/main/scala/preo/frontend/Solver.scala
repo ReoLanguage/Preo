@@ -1,16 +1,16 @@
 package preo.frontend
 
 import org.chocosolver.solver.constraints.Constraint
-import org.chocosolver.solver.constraints.IntConstraintFactory._
-import org.chocosolver.solver.constraints.LogicalConstraintFactory._
-import org.chocosolver.solver.search.loop.monitors.SearchMonitorFactory
-import org.chocosolver.solver.search.strategy.IntStrategyFactory
-import org.chocosolver.solver.variables.{BoolVar, IntVar, VariableFactory}
-import org.chocosolver.solver.{Solver => CSolver}
+import org.chocosolver.solver.search.strategy.strategy.IntStrategy
+import preo.common.TypeCheckException
+//import org.chocosolver.solver.constraints.IntConstraintFactory._
+//import org.chocosolver.solver.constraints.LogicalConstraintFactory._
+//import org.chocosolver.solver.search.loop.monitors.SearchMonitorFactory
+//import org.chocosolver.solver.search.strategy.IntStrategyFactory
+import org.chocosolver.solver.variables.{BoolVar, IntVar, IVariableFactory}
+import org.chocosolver.solver.{Model, Solver => CSolver}
 import preo.ast._
-import preo.common.{TypeCheckException, Utils}
-
-import scala.collection.immutable
+import preo.common.Utils
 
 
 /**
@@ -34,54 +34,54 @@ object Solver {
 
   /**
     * returns the number of solutions required or as many as possible
+    * NOTE: need to be fixed - used by Eval.getInstances, and indirectly by Mcrl2FamilyModel.apply.
     * @param typ type used to extract constraints and relevant vars
     * @param n number of desired solutions
     * @return (boolVars, intVars) after solverAux function applies
     */
 
-  def getSolutions(n:Int, typ: Type): Map[String, List[Expr]] = {
+  def getSolutions(n:Int, typ: Type): List[Map[String, List[Expr]]] = {
     if (typ.const == BVal(true) || typ.const == And(List()))
-      return Map()
+      return List(Map())
 
-    var values = Map(): Map[String, List[Expr]]
+    var res = List[Map[String, List[Expr]]]()
+    var counter = n
 
-    val sol = solveAux(typ.const)
-    if(sol.isDefined){
-      var i = 0
+    val solver = solveAux(typ.const)
+    while (solver.solve() && counter >= 0) {
+      var values = Map(): Map[String, List[Expr]]
       //add the values to our map
       for ((x, v) <- intVars)
         values += (x -> List())
       for ((x, v) <- boolVars)
         values += (x -> List())
-      var solved = true
-      do{
-        if(Math.random <= 0.4){
-          for((x, v) <- intVars){
-            val valueX = values(x)
-            values = values +  (x -> (valueX.take(i) ++ List(IVal(v.getValue)) ++ valueX.drop(i) ))
-          }
-          for((x, v) <- boolVars){
-            val valueX = values(x)
-            values = values + (x -> (valueX.take(i) ++ List(BVal(v.getValue == 1)) ++ valueX.drop(i)) )
-          }
-          i += 1
+
+      if(Math.random <= 0.4){
+        for((x, v) <- intVars){
+          val valueX = values(x)
+          values = values +  (x -> (valueX.take(n-counter) ++ List(IVal(v.getValue)) ++ valueX.drop(n-counter) ))
         }
-        else{
-          for((x, v) <- intVars){
-            values += (x -> (values(x) ++ List(IVal(v.getValue))))
-          }
-          for((x, v) <- boolVars){
-            values += (x -> (values(x) ++ List(BVal(v.getValue == 1))))
-          }
+        for((x, v) <- boolVars){
+          val valueX = values(x)
+          values = values + (x -> (valueX.take(n-counter) ++ List(BVal(v.getValue == 1)) ++ valueX.drop(n-counter)) )
         }
-        solved = sol.get.nextSolution()
-      }while(solved && i < n)
+        counter -= 1
+      }
+      else{
+        for((x, v) <- intVars){
+          values += (x -> (values(x) ++ List(IVal(v.getValue))))
+        }
+        for((x, v) <- boolVars){
+          values += (x -> (values(x) ++ List(BVal(v.getValue == 1))))
+        }
+      }
+
       for((x, v) <- values){
         values += (x -> v.take(n))
       }
-      values
+      res ::= values
     }
-    else null
+    res
   }
 
   /**
@@ -96,17 +96,18 @@ object Solver {
     if (bExpr == BVal(true))
       return Some(Substitution())
 
-    val sol = solveAux(bExpr)
-
+    val solver = solveAux(bExpr)
+    val solved = solver.solve()
     // build reply (substitution) and return value
-    if (sol.isDefined) {
+    if (solved) {
       var res = Substitution()
       for ((x, v) <- intVars)
         res +=(Var(x), IVal(v.getValue))
       for ((x, v) <- boolVars)
         res +=(Var(x), BVal(v.getValue == 1))
       // a substitution is concrete if the constraints have more than 1 solution (more common)
-      if (sol.get.nextSolution())
+//      if (sol.get.nextSolution())
+      if (solver.solve())
         Some(res.mkConcrete)
       else Some(res)
       //      for (v <- boolVars.values ++ intVars.values)
@@ -138,10 +139,11 @@ object Solver {
     if (typ.const == BVal(true) || typ.const == And(List()))
       return Some(Substitution())
 
-    val sol = solveAux(typ.const)
-    if (sol.isDefined) {
-      if (sol.isEmpty)
-        return Some(Substitution())
+    val solver = solveAux(typ.const)
+    val solved = solver.solve()
+    if (solved) {
+//      if (sol.isEmpty)
+//        return Some(Substitution())
 
       var res = Substitution()
       for ((x, v) <- intVars)
@@ -170,8 +172,9 @@ object Solver {
       if (vars.nonEmpty) {
         val newExp = typ.const & Not(And(toNeg))
 //        println(s"#### got new expression: ${Show(newExp)}")
-        val sndSol = solveAux(newExp)
-        if (sndSol.isDefined)
+        val sndSolver = solveAux(newExp)
+        val sndSolved = sndSolver.solve()
+        if (sndSolved)
           res = res.mkConcrete
 //        else println(s"#### 2nd solution not found (general).")
       }
@@ -182,78 +185,91 @@ object Solver {
       None
   }
 
-  private def solveAux(bExpr: Expr): Option[CSolver] = {
+  private def solveAux(bExpr: Expr): CSolver = {
 
     seed = 0
     boolVars = scala.collection.mutable.Map[String,BoolVar]()
     intVars  = scala.collection.mutable.Map[String,IntVar]()
-    solver = new CSolver()
-    SearchMonitorFactory.limitTime(solver,TIME_LIMIT)
+//..    solver = new CSolver()
+//..    SearchMonitorFactory.limitTime(solver,TIME_LIMIT)
+    val model: Model = new Model("bExpr")
 
-    val c = bexpr2choco(bExpr)
-    solver.post(c)
+    val c = bexpr2choco(bExpr,model)
+    model.post(c)
+//    solver.post(c)
+
+    val solver = model.getSolver
+    val vars = model.retrieveIntVars(true)
+//    if (intVars.isEmpty && boolVars.isEmpty)
+//      solver.setSearch(new IntStrategy(Array(),))
 
     // set strategy and finds solution
 //    if (intVars.isEmpty)
 //      solver.set(IntStrategyFactory.lexico_LB())
 //    else
 //      solver.set(IntStrategyFactory.domOverWDeg(intVars.values.toArray,0))
-    val vars = solver.retrieveIntVars()
-        if (intVars.isEmpty && boolVars.isEmpty)
-          solver.set(IntStrategyFactory.lexico_LB())
-        else
-        solver.set(IntStrategyFactory.domOverWDeg(vars,0))
-    val solved = solver.findSolution()
 
-    if (solved) Some(solver)
-    else None
+//    val vars = solver.retrieveIntVars()
+//        if (intVars.isEmpty && boolVars.isEmpty)
+//          solver.set(IntStrategyFactory.lexico_LB())
+//        else
+//        solver.set(IntStrategyFactory.domOverWDeg(vars,0))
+
+//    val solution = solver.findSolution()
+//
+//    if (solution!=null) Some(solver)
+//    else None
+
+    solver
   }
 
   // get a choco variable for an internal (intermediate) variable
-  private def genFreshIVar(): IntVar = genFreshIVar(MIN_INT_TMP,MAX_INT_TMP)
-  private def genFreshIVar(from:Int,to:Int): IntVar = {
+  private def genFreshIVar(m:Model): IntVar = genFreshIVar(MIN_INT_TMP,MAX_INT_TMP,m)
+  private def genFreshIVar(from:Int,to:Int,m:Model): IntVar = {
     seed += 1
     // note: not added to list of cached variables.
-    VariableFactory.bounded("__"+(seed-1),from,to,solver)
+    //VariableFactory.bounded("__"+(seed-1),from,to,solver)
+    m.intVar(from,to) // NOTE: no name in internal variables now!
   }
 
 //  // get a non-negative choco variable
 //  private def genFreshPosIVar(): IntVar = genFreshIVar(MIN_INT,MAX_INT)
 
   // get a choco variable for a user-defined variable
-  private def getIVar(v:String): IntVar = {
+  private def getIVar(v:String,model:Model): IntVar = {
     if (intVars contains v) intVars(v)
     else {
-      val res = VariableFactory.bounded(v,MIN_INT,MAX_INT,solver)
+      val res = model.intVar(v,MIN_INT,MAX_INT)  //VariableFactory.bounded(v,MIN_INT,MAX_INT,solver)
       intVars(v) = res
       res
     }
   }
-  private def getIVar(exp:IExpr): IntVar = exp match {
-    case IVal(n) => VariableFactory.fixed(n,solver)
-    case Var(x) => getIVar(x)
-    case Add(e1, e2) => combineIExpr(e1,e2,"+")
-    case Sub(e1, e2) => combineIExpr(e1,e2,"-")
-    case Mul(e1, e2) => combineIExpr(e1,e2,"*")
-    case Div(e1, e2) => combineIExpr(e1,e2,"/")
+  private def getIVar(exp:IExpr,m:Model): IntVar = exp match {
+    case IVal(n) => m.intVar(n) // VariableFactory.fixed(n,solver)
+    case Var(x) => getIVar(x,m)
+    case Add(e1, e2) => combineIExpr(e1,e2,"+",m)
+    case Sub(e1, e2) => combineIExpr(e1,e2,"-",m)
+    case Mul(e1, e2) => combineIExpr(e1,e2,"*",m)
+    case Div(e1, e2) => combineIExpr(e1,e2,"/",m)
     case Sum(x, IVal(from), IVal(to), e) =>
       if (from < to){ // "from" did not reach "to" yet
         val e1 = Substitution(x,IVal(from)).apply(e)
-        getIVar(Add(e1,Sum(x,IVal(from+1),IVal(to),e)))
+        getIVar(Add(e1,Sum(x,IVal(from+1),IVal(to),e)),m)
       }
       else {
-        val v = genFreshIVar(0,0)
+        val v = genFreshIVar(0,0,m)
 //        val c = arithm(v,"=",0)
 //        solver.post(c)
         v
       }
     case ITE(b, ifTrue, ifFalse) => // if b then v=intval1 else v=intval2; v
-      val v = genFreshIVar()
-      val bv = bexpr2choco(b)
-      val ct = arithm(v,"=",getIVar(ifTrue))
-      val cf = arithm(v,"=",getIVar(ifFalse))
-      val c =  ifThenElse_reifiable(bv,ct,cf)
-      solver.post(c)
+      val v = genFreshIVar(m)
+      val bv = bexpr2choco(b,m)
+      val ct = m.arithm(v,"=",getIVar(ifTrue,m))
+      val cf = m.arithm(v,"=",getIVar(ifFalse,m))
+//      val c =  ifThenElse_reifiable(bv,ct,cf)
+//      m.post(c)
+      m.ifThenElse(bv,ct,cf)
       v
     case Sum(_, f, t, _) =>
       throw new UnhandledOperException(s"Case not handled - neither ${Show(f)} nor ${Show(t)} can have variables, in:\n  "+Show.apply(exp))
@@ -261,88 +277,98 @@ object Solver {
       throw new UnhandledOperException("Case not handled: "+Show.apply(exp))
   }
 
-  private def combineIExpr(e1:IExpr,e2:IExpr,op:String): IntVar = (e1,e2) match {
+  private def combineIExpr(e1:IExpr,e2:IExpr,op:String,m:Model): IntVar = (e1,e2) match {
     case (IVal(i1),IVal(i2)) => // i1 'op' i2
-      val v = genFreshIVar()
-      var c: Constraint = null
+      val v = genFreshIVar(m)
+//      var c: Constraint = null
       op match {
-        case "+" => c = arithm(v, "=", i1+i2)
-        case "-" => c = arithm(v, "=", i1-i2)
-        case "*" => c = arithm(v, "=", i1*i2)
-        case "/" => c = arithm(v, "=", i1/i2)
+        case "+" => m.arithm(v, "=", i1+i2).post()
+        case "-" => m.arithm(v, "=", i1-i2).post()
+        case "*" => m.arithm(v, "=", i1*i2).post()
+        case "/" => m.arithm(v, "=", i1/i2).post()
         case _ => throw new UnhandledOperException("unexpected operator: "+op)
       }
-      solver.post(c)
+//      solver.post(c)
       v
     case (Var(x),IVal(i)) => // x 'op' i
-      val v = genFreshIVar()
+      val v = genFreshIVar(m)
       op match {
         case "+" | "-" =>
-          solver.post(arithm(v,"=",getIVar(x),op,i))
+          m.arithm(v,"=",getIVar(x,m),op,i).post()
         case "*" =>
-          solver.post(times(getIVar(x),i,v))
+          m.times(getIVar(x,m),i,v).post()
         case "/" =>
-          solver.post(eucl_div(getIVar(x),VariableFactory.fixed(i,solver),v))
+          m.div(getIVar(x,m), m.intVar(i),v).post()
+//          solver.post(eucl_div(getIVar(x),VariableFactory.fixed(i,solver),v))
       }
       v
     case (IVal(i),Var(x)) => // i 'op' x (3-x --> -x + 3)
-      val v = genFreshIVar()
+      val v = genFreshIVar(m)
       op match {
         case "+" =>
-          solver.post(arithm(v,"=",getIVar(x),op,i))
+          m.arithm(v,"=",getIVar(x,m),op,i).post()
         case "-" =>
-          solver.post(arithm(v,"=",VariableFactory.minus(getIVar(x)),"+",i))
+          val vconst = m.intVar(i)
+          m.arithm(v,"=",vconst,"-",getIVar(x,m)).post()
+//          val v2 = genFreshIVar(m)
+//          m.arithm(v2,"=", getIVar(x,m))
+//          m.arithm(v,"=", getIVar(x,m))
+//          m.arithm(v,"=",  VariableFactory.minus(getIVar(x)),"+",i))
         case "*" =>
-          solver.post(times(getIVar(x),i,v))
+          m.times(getIVar(x,m),i,v).post()
         case "/" =>
-          solver.post(eucl_div(VariableFactory.fixed(i,solver),getIVar(x),v))
+//          solver.post(eucl_div(VariableFactory.fixed(i,solver),getIVar(x),v))
       }
       v
     case _ => // exp1 'op' exp2
-      val v = genFreshIVar()
-      op match {
-        case "+" => solver.post(sum(List(getIVar(e1),getIVar(e2)).toArray, v))
-        case "-" => solver.post(sum(
-          List(getIVar(e1),VariableFactory.minus(getIVar(e2))).toArray, v))
-        case "*" => solver.post(times(getIVar(e1),getIVar(e2), v))
-        case "/" => solver.post(eucl_div(getIVar(e1),getIVar(e2), v))
-      }
+      val v = genFreshIVar(m)
+      m.arithm(v,"=",getIVar(e1,m),op,getIVar(e2,m)).post()
+//      op match {
+//        case "+" => sum(List(getIVar(e1,m),getIVar(e2,m)).toArray,"=",v).post()
+//        case "-" =>
+//        case "+" => solver.post(sum(List(getIVar(e1),getIVar(e2)).toArray, v))
+//        case "-" => solver.post(sum(
+//          List(getIVar(e1),VariableFactory.minus(getIVar(e2))).toArray, v))
+//        case "*" => solver.post(times(getIVar(e1),getIVar(e2), v))
+//        case "/" => solver.post(eucl_div(getIVar(e1),getIVar(e2), v))
+//      }
       v
   }
 
-  private def getBVar(v:String): BoolVar = {
+  private def getBVar(v:String,m:Model): BoolVar = {
     if (boolVars contains v) boolVars(v)
     else {
-      val res = VariableFactory.bool(v,solver)
+      val res = m.boolVar(v)  // VariableFactory.bool(v,solver)
       boolVars(v) = res
       res
     }
   }
 
-  def bexpr2choco(bExpr: Expr): Constraint = bExpr match {
-    case BVal(b) => if (b) TRUE(solver) else FALSE(solver)
-    case Var(x) => reification_reifiable(getBVar(x),TRUE(solver))
-    case And(Nil) => TRUE(solver)
-    case And(e::es) => and(bexpr2choco(e),bexpr2choco(And(es)))
-    case Or(e1, e2) => or(bexpr2choco(e1),bexpr2choco(e2))
-    case Not(e1) => not(bexpr2choco(e1))
-    case EQ(e1,e2) => comp(e1,e2,"=","=",_==_)
-    case GT(e1,e2) => comp(e1,e2,">","<",_>_)
-    case LT(e1,e2) => comp(e1,e2,"<",">",_<_)
-    case GE(e1,e2) => comp(e1,e2,">=","<=",_>=_)
-    case LE(e1,e2) => comp(e1,e2,"<=",">=",_<=_)
+  def bexpr2choco(bExpr: Expr, m: Model): Constraint = bExpr match {
+    case BVal(b) => if (b) m.trueConstraint() else m.falseConstraint() // FALSE(solver)
+    case Var(x) => m.arithm(getBVar(x,m).intVar(),"=",1) //getBVar(x).extension() //??
+      //m.reification(getBVar(x),m.trueConstraint()) //reification_reifiable(getBVar(x),TRUE(solver))
+    case And(Nil) => m.trueConstraint() //TRUE(solver)
+    case And(e::es) => m.and(bexpr2choco(e,m),bexpr2choco(And(es),m))
+    case Or(e1, e2) => m.or(bexpr2choco(e1,m),bexpr2choco(e2,m))
+    case Not(e1) => m.not(bexpr2choco(e1,m))
+    case EQ(e1,e2) => comp(e1,e2,"=","=",_==_,m)
+    case GT(e1,e2) => comp(e1,e2,">","<",_>_,m)
+    case LT(e1,e2) => comp(e1,e2,"<",">",_<_,m)
+    case GE(e1,e2) => comp(e1,e2,">=","<=",_>=_,m)
+    case LE(e1,e2) => comp(e1,e2,"<=",">=",_<=_,m)
     case AndN(_, f, t, _) =>
       throw new UnhandledOperException(s"Case not handled - neither ${Show(f)} nor ${Show(t)} can have variables, in:\n  "+Show.apply(bExpr))
     case _ =>
       throw new UnhandledOperException(s"Could not encode expression as a boolean expression (in Choco):\n  "+Show.apply(bExpr))
   }
 
-  private def comp(e1:IExpr,e2:IExpr,op:String,revop:String,test:(Int,Int)=>Boolean): Constraint =
+  private def comp(e1:IExpr,e2:IExpr,op:String,revop:String,test:(Int,Int)=>Boolean,m:Model): Constraint =
     (e1,e2) match {
-      case (IVal(i1), IVal(i2)) => if (test(i1,i2)) TRUE(solver) else FALSE(solver)
-      case (Var(x), IVal(i)) => arithm(getIVar(x),op,i)
-      case (IVal(i), exp) => arithm(getIVar(exp),revop,i)
-      case (exp1, exp2) => arithm(getIVar(exp1),op,getIVar(exp2))
+      case (IVal(i1), IVal(i2)) => if (test(i1,i2)) m.trueConstraint() else m.falseConstraint()
+      case (Var(x), IVal(i)) => m.arithm(getIVar(x,m),op,i)
+      case (IVal(i), exp) => m.arithm(getIVar(exp,m),revop,i)
+      case (exp1, exp2) => m.arithm(getIVar(exp1,m),op,getIVar(exp2,m))
     }
 
   /// Guessing simple intervals
@@ -389,7 +415,7 @@ object Solver {
     case LT(Var(x), IVal(n)) => mkRange(x,None,Some(n-1))
     case LE(Var(x), IVal(n)) => mkRange(x,None,Some(n))
     case GE(Var(x), IVal(n)) => mkRange(x,Some(n),None)
-      //
+    //
     case EQ(IVal(n), Var(x)) => varIntIntervals(EQ(Var(x),IVal(n)))
     case GT(IVal(n), Var(x)) => varIntIntervals(GT(Var(x),IVal(n)))
     case LT(IVal(n), Var(x)) => varIntIntervals(LT(Var(x),IVal(n)))
@@ -455,7 +481,6 @@ object Solver {
     case Range(Some(n1),Some(n2)) if n1>n2 => throw new TypeCheckException(s"Incompatible domains: fails $n1 <= $v <= $n2")
     case _ => r
   }
-
 
 
   /// OLD EXPERIMENTS FROM HERE

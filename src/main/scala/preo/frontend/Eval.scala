@@ -420,51 +420,54 @@ object Eval {
   }
 
   def getInstances(c: Connector): List[Connector] = {
-    val type1 = TypeCheck.check(c)
-    // 2 - unify constraints and get a substitution
-    val (subst1, rest1) = Unify.getUnification(type1.const)
-    // 3 - apply substitution to the type
-    val rest2 = subst1(rest1)
-    val type2b = Type(type1.args, subst1(type1.i), subst1(type1.j), rest2, type1.isGeneral)
-    // 4 - extend with lost constraints over argument-variables
-    val rest3 = subst1.getConstBoundedVars(type2b)
-    val type_3 = Type(type2b.args, type2b.i, type2b.j, rest2 & rest3, type2b.isGeneral)
-    // 4.1 - evaluate and simplify type
-    val type4 = Simplify(type_3)
-    // 5 - solve constraints
-    var solutions = Solver.getSolutions(3, type4)
-    if(solutions != null) {
-      val n = if(solutions.size > 0) solutions(solutions.keys.head).length else 3
-      var connectors = List() : List[Connector]
-      var i = 0
-
-      //var results = Map(): Map[Var, List[Either[IVal, BVal]]]
-      while (i < n) {
-        var res = c
-        for ((Var(x), t) <- type4.args.vars) {
-          val solution = solutions.get(x)
-          if (solution.isDefined) {
-            res = res.apply(solution.get.head)
-            solutions = solutions + (x -> solution.get.tail)
-          }
-          else {
-            //n solutions
-            if (t == IntType) {
-              res = res.apply(IVal(nextInt(4) +1))
-            }
-            else {
-              res = res.apply(BVal(nextBoolean()))
-            }
-          }
-        }
-        connectors = res :: connectors
-        i += 1
-      }
-      connectors
-    }
-    else{
-      throw new TypeCheckException("Solver failed")
-    }
+//    val type1 = TypeCheck.check(c)
+//    // 2 - unify constraints and get a substitution
+//    val (subst1, rest1) = Unify.getUnification(type1.const)
+//    // 3 - apply substitution to the type
+//    val rest2 = subst1(rest1)
+//    val type2b = Type(type1.args, subst1(type1.i), subst1(type1.j), rest2, type1.isGeneral)
+//    // 4 - extend with lost constraints over argument-variables
+//    val rest3 = subst1.getConstBoundedVars(type2b)
+//    val type_3 = Type(type2b.args, type2b.i, type2b.j, rest2 & rest3, type2b.isGeneral)
+//    // 4.1 - evaluate and simplify type
+//    val type4 = Simplify(type_3)
+//    // 5 - solve constraints
+//    var solutions = Solver.getSolutions(3, type4)
+//
+//
+//    if(solutions != null) {
+//      val n = if (solutions.size > 0) solutions(solutions.keys.head).length else 3
+//      var connectors = List() : List[Connector]
+//      var i = 0
+//
+//      //var results = Map(): Map[Var, List[Either[IVal, BVal]]]
+//      while (i < n) {
+//        var res = c
+//        for ((Var(x), t) <- type4.args.vars) {
+//          val solution = solutions.get(x)
+//          if (solution.isDefined) {
+//            res = res.apply(solution.get.head)
+//            solutions = solutions + (x -> solution.get.tail)
+//          }
+//          else {
+//            //n solutions
+//            if (t == IntType) {
+//              res = res.apply(IVal(nextInt(4) +1))
+//            }
+//            else {
+//              res = res.apply(BVal(nextBoolean()))
+//            }
+//          }
+//        }
+//        connectors = res :: connectors
+//        i += 1
+//      }
+//      connectors
+//    }
+//    else{
+//      throw new TypeCheckException("Solver failed")
+//    }
+    List()
   }
 
   private def addDefaults(expr: Expr,etype:ExprType): Expr = expr match {
