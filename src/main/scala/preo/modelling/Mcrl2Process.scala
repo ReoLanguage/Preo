@@ -55,6 +55,9 @@ case class Action(name: String, number: Int, group: Group, state: State) extends
     else
       this.number == o.asInstanceOf[Action].get_number && this.group == o.asInstanceOf[Action].group && this.name ==o.asInstanceOf[Action].name && this.state == o.asInstanceOf[Action].state
 
+  def sameType(a: Action): Boolean =
+    this.number == a.get_number && this.name == a.name && this.state == a.state
+
   def get_number: Int = number
 
   override def vars: List[Action] = List(this)

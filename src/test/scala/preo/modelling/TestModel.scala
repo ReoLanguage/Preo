@@ -3,12 +3,8 @@ package preo.modelling
 import org.junit.Test
 import org.junit.Assert._
 import preo.DSL.parse
-import preo.Main.readFromFile
 import preo.ast._
-import preo.backend.ReoGraph
-import preo.backend.ReoGraph.Edge
 import preo.frontend.Eval
-import preo.modelling._
 
 
 class TestModel {
@@ -163,11 +159,11 @@ class TestModel {
 
       case CPar(c1, c2) => getReadersAndWriters(c1) ++ getReadersAndWriters(c2)
 
-      case CSymmetry(CoreInterface(i), CoreInterface(j)) => Nil
+      case CSymmetry(_, _) => Nil
 
-      case CTrace(CoreInterface(i), c) => getReadersAndWriters(c)
+      case CTrace(_, c) => getReadersAndWriters(c)
 
-      case CId(CoreInterface(i)) => Nil
+      case CId(_) => Nil
 
       case CSubConnector(_, c) => getReadersAndWriters(c)
       case x@CPrim(name , _, _, _) => if (name == "reader" || name == "writer") List(x) else Nil
@@ -182,12 +178,12 @@ class TestModel {
 
       case CSymmetry(CoreInterface(i), CoreInterface(j)) => i+j
 
-      case CTrace(CoreInterface(i), c) => getNumberOfPrims(c)
+      case CTrace(_, c) => getNumberOfPrims(c)
 
       case CId(CoreInterface(i)) => i
 
       case CSubConnector(_, c) => getNumberOfPrims(c)
-      case x@CPrim(name , _, _, _) => if (name != "reader" && name != "writer") 1 else 0
+      case CPrim(name , _, _, _) => if (name != "reader" && name != "writer") 1 else 0
       case _ =>  0
     }
 
