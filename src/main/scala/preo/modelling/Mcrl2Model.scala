@@ -97,10 +97,14 @@ object Mcrl2Model{
 
   /**
     * Converts the CoreConnector into an instance of the Mcrl2Model
-    * @param ccon the coreConnector to convert
+    * @param realccon the coreConnector to convert
     * @return the converted Mcrl2Model
     */
-  def apply(ccon: CoreConnector): Mcrl2Model = {
+  def apply(realccon: CoreConnector): Mcrl2Model = {
+    val ccon = realccon match{
+      case CSubConnector(name, c1, a) if name == "" => c1
+      case c => c
+    }
     val (ins, channels, middle_nodes, outs) = conToChannels(ccon)
     val nodes = ins ++ middle_nodes ++ outs
     to_check = channels ++ nodes
@@ -192,7 +196,7 @@ object Mcrl2Model{
       }
       (ins, channels, Nil , outs)
 
-    case CSubConnector(name, c) => {
+    case CSubConnector(name, c, _) => {
       val (in_nodes, channels, middle_nodes, out_nodes) = conToChannels(c)
       var replacements: Map[String, (String, State)] = Map()
       var nodeReplacement: Map[String, Mcrl2Node] = Map()

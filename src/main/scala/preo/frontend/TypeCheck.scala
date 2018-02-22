@@ -127,7 +127,7 @@ object TypeCheck {
       Type(args, Port(ci), Port(cj), /*nonNeg(newi,newj)*/ nonNeg(a) & phi2,isG)
     // END OF TRICKY CASE
 
-    case SubConnector(_, c) => check (gamma, c)
+    case SubConnector(_, c, _) => check (gamma, c)
 
 
     case Choice(b, c1, c2) =>

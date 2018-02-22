@@ -22,7 +22,7 @@ object Show {
     case Abs(x,et, c)  => s"\\${apply(x)}:${apply(et)}${showAP(c)}"
     case App(c, a)     => s"${showP(c)}(${apply(a)})"
     case Restr(c,b)     => s"${showP(c)} | ${showP(b)}"
-    case SubConnector(name, c) => (if (name=="") "" else name) + s"{${showP(c)}}"
+    case SubConnector(name, c, _) => if (name=="") showP(c) else name + s"{${showP(c)}}"
   }
   private def showP(con:Connector): String = con match {
     case Seq(_,_) | Par(_,_) | Choice(_,_,_) | Abs(_,_,_) |
@@ -129,7 +129,7 @@ object Show {
 //    case BApp(c, b)     => s"${showSP(c)}(${apply(b)})"
     case Restr(c,b)     => s"${showSP(c)} | ${showP(b)}"
 
-    case SubConnector(name, c) => (if (name=="") "" else name) + s"{${showSP(c)}}"
+    case SubConnector(name, c, _) => if (name=="") showSP(c) else name + s"{${showSP(c)}}"
   }
 
   private def showSP(con:Connector): String = con match {

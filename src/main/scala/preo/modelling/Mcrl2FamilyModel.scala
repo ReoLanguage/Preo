@@ -1,6 +1,6 @@
 package preo.modelling
 
-import preo.ast.{CPar, CSeq, Connector, CoreConnector, CSymmetry, CTrace, CId, CoreInterface, CSubConnector, CPrim}
+import preo.ast.{CPar, CSeq, Connector, CoreConnector, CSymmetry, CTrace, CId, CoreInterface, CSubConnector, CPrim, SubConnector}
 import preo.frontend._
 
 //todo: use Channel Subs to make better counting system
@@ -101,7 +101,11 @@ object Mcrl2FamilyModel{
 
 
   //todo: define block notion
-  def apply(con: Connector): Mcrl2FamilyModel ={
+  def apply(realcon: Connector): Mcrl2FamilyModel ={
+    val con = realcon match{
+      case SubConnector(name, c1, a) if name == "" => c1
+      case c => c
+    }
     // get applied connectors
     val instances = Eval.getInstances(con)
     //for every value we create an app with the vars in the instances and turn it into a core connector
@@ -244,7 +248,7 @@ object Mcrl2FamilyModel{
       }
       (ins, channels, Nil , outs)
 
-    case CSubConnector(name, c) =>
+    case CSubConnector(name, c, _) =>
       val (in_nodes, channels, middle_nodes, out_nodes) = conToChannels(c)
       var replacements: Map[String, (String, State)] = Map()
       var nodeReplacement: Map[String, Mcrl2Node] = Map()
@@ -678,7 +682,11 @@ object Mcrl2FamilyModel{
 
   //for usage in testing
 
-  def testApply(con: Connector): List[CoreConnector] = {
+  def testApply(realcon: Connector): List[CoreConnector] = {
+    val con = realcon match{
+      case SubConnector(name, c1, _) if name == "" => c1
+      case c => c
+    }
     // get applied connectors
     val instances = Eval.getInstances(con)
     //for every value we create an app with the vars in the instances and turn it into a core connector

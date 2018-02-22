@@ -75,7 +75,7 @@ object ReoGraph {
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j)),i,j)
-    case CSubConnector(name, sub) =>
+    case CSubConnector(name, sub, _) =>
 //      prioritySeed += 1
       val g = toGraph(sub)
 //      prioritySeed -=1

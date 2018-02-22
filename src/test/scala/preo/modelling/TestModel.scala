@@ -165,7 +165,7 @@ class TestModel {
 
       case CId(_) => Nil
 
-      case CSubConnector(_, c) => getReadersAndWriters(c)
+      case CSubConnector(_, c, _) => getReadersAndWriters(c)
       case x@CPrim(name , _, _, _) => if (name == "reader" || name == "writer") List(x) else Nil
       case _ =>  Nil
     }
@@ -182,7 +182,7 @@ class TestModel {
 
       case CId(CoreInterface(i)) => i
 
-      case CSubConnector(_, c) => getNumberOfPrims(c)
+      case CSubConnector(_, c, _) => getNumberOfPrims(c)
       case CPrim(name , _, _, _) => if (name != "reader" && name != "writer") 1 else 0
       case _ =>  0
     }

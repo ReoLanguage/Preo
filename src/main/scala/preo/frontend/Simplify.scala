@@ -387,7 +387,7 @@ object Simplify {
       case n => ExpX(x,n,simplifyWithTypeChk(c,tcheck))
     }
 
-    case SubConnector(name, c) => SubConnector(name, simplifyWithTypeChk(c, tcheck))
+    case SubConnector(name, c, a) => SubConnector(name, simplifyWithTypeChk(c, tcheck), a)
 
     case Choice(b, c1, c2) => Eval(b) match {
       case BVal(true) => simplifyWithTypeChk(c1,tcheck)
@@ -403,7 +403,7 @@ object Simplify {
       case (Par(c1,c2),a2) =>
         if (tcheck(App(c1,a2))) simplifyWithTypeChk(Par(App(c1,a2),c2),tcheck)
         else simplifyWithTypeChk(Par(c1,App(c2,a2)),tcheck)
-      case (SubConnector(name, c), a2) => simplifyWithTypeChk(SubConnector(name, App(c, a2)), tcheck)
+      case (SubConnector(name, c, a), a2) => simplifyWithTypeChk(SubConnector(name, App(c, a2), a), tcheck)
       case (c2,a2) => App(c2,a2)
     }
     case Restr(c, phi) => (simplifyWithTypeChk(c,tcheck),Eval(phi)) match{
