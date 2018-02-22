@@ -14,6 +14,8 @@ class TestFamily {
     val instances = Mcrl2FamilyModel.testApply(core)
     val familyModel = Mcrl2FamilyModel.restApply(instances)
     val models = instances.map(x => Mcrl2Model(x))
+
+
     testStarters(familyModel)
     testActions(familyModel, models)
     testDefs(familyModel, models)
@@ -50,7 +52,7 @@ class TestFamily {
     //graph creation
     val core = parse(
       """
-        |(\n. nexrouter n)
+        |(\n. nexrouter n | n < 4)
         |{
         |  unzip =
         |    \n.Tr((2*n)*(n - 1))
@@ -97,6 +99,19 @@ class TestFamily {
     testDefs(familyModel, models)
   }
 
+  @Test
+  def test6(): Unit = {
+    //graph creation
+    val core = parse("(\\n. x^n) {x = fifo}")
+
+    val instances = Mcrl2FamilyModel.testApply(core)
+    val familyModel = Mcrl2FamilyModel.restApply(instances)
+    val models = instances.map(x => Mcrl2Model(x))
+    testStarters(familyModel)
+    testActions(familyModel, models)
+    testDefs(familyModel, models)
+  }
+
 
   private def testStarters(model: Mcrl2FamilyModel): Unit = {
     val starterNodes = model.getStarterNodes
@@ -113,17 +128,15 @@ class TestFamily {
 
   private def testActions(f: Mcrl2FamilyModel, models: List[Mcrl2Model]): Unit = {
     val max_size = models.tail.foldRight(models.head.getActions.size)((m, maximum) =>{
-      val actions = m.getActions.size
-      if (actions > maximum) actions else maximum
+      m.getActions.size + maximum
     })
-    assertEquals(max_size + 3* f.getStarterNodes.length, f.getActions.size)
-    models.foreach(f => f.getActions.foreach(a => f.getActions.contains(a)))
+    assertEquals(max_size -2 + 3* f.getStarterNodes.length, f.getActions.size)
+    models.foreach(m => m.getActions.foreach(a => f.getActions.contains(a)))
   }
 
   private def testDefs(f: Mcrl2FamilyModel, models: List[Mcrl2Model]): Unit = {
     val max_size = models.tail.foldRight(models.head.getChannels.length)((m, maximum) =>{
-      val channels = m.getChannels.length
-      if (channels > maximum) channels else maximum
+      m.getChannels.length + maximum
     })
     assertEquals(max_size, f.getChannels.size)
 

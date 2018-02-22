@@ -3,7 +3,7 @@ package preo.modelling
 import preo.ast.{CPar, CSeq, Connector, CoreConnector, CSymmetry, CTrace, CId, CoreInterface, CSubConnector, CPrim}
 import preo.frontend._
 
-
+//todo: use Channel Subs to make better counting system
 /**
   * The Mcrl2FamilyModel defines a printable model in mcrl2 for a Connector with several instances
   * @param act the actions of this Model
@@ -15,7 +15,7 @@ class Mcrl2FamilyModel(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Proces
     val acts = Mcrl2Def.toString(act.toList)
     var procs = ""
     for(p <- proc) procs += s"${p.toString};\n"
-    val initProc = init.toString
+    val initProc = Hide(List(Action.nullAction), init)
     s"""
        |act
        |  $acts;
@@ -96,7 +96,7 @@ object Mcrl2FamilyModel{
   var nodes: List[Mcrl2Node] = List[Mcrl2Node]()
   var starterNodes: List[Mcrl2StarterNode] = List[Mcrl2StarterNode]()
   var starters: List[Mcrl2Starter] = List()
-  var channels: Map[String, ChannelSubs] = Map()
+  var channels: List[Mcrl2Channel] = List()
   var manager: Mcrl2Manager = Mcrl2Manager(Nil)
 
 
@@ -121,10 +121,6 @@ object Mcrl2FamilyModel{
       for((n, p) <- last_inits){
         starters = starters ++ List(Mcrl2Starter(n, if(starters.isEmpty) manager.getName else starters.last.getName, p))
       }
-      for((_, sub) <- this.channels){
-        println(sub.items)
-        sub.reset()
-      }
 
       our_nodes = our_nodes ++ nodes
       our_starters = our_starters ++ starterNodes
@@ -137,20 +133,17 @@ object Mcrl2FamilyModel{
       starterNodes= List[Mcrl2StarterNode]()
 
     }
-    val list_of_channels = channels.values.map(f => f.items).foldRight(Nil: List[Mcrl2Channel])((a, b) => a ++ b)
-    val family = new Mcrl2FamilyModel(Util.getVars(list_of_channels ++ our_nodes ++ inits ++ starters ++ our_starters ++ List(manager) ), list_of_channels ++ our_nodes ++ our_starters ++ inits ++ starters ++ List(manager) , starters.last.getName)
+    val family = new Mcrl2FamilyModel(Util.getVars(channels ++ our_nodes ++ inits ++ starters ++ our_starters ++ List(manager) ), channels ++ our_nodes ++ our_starters ++ inits ++ starters ++ List(manager) , starters.last.getName)
 
     starters= List()
     channel_count = 0
     starter_count = 0
     var_count = 0
-    channels= Map()
     manager= Mcrl2Manager(Nil)
-
-
     nodes = List[Mcrl2Node]()
     starterNodes = List[Mcrl2StarterNode]()
     starters = List()
+    channels = List()
 
 
     family
@@ -168,6 +161,7 @@ object Mcrl2FamilyModel{
 //    missingVars = Util.getVars(channels++nodes).toList.filter{case a@Action(name, number, group, state) => !(group == NoLine && state == Nothing) && a != Action.nullAction}
     starterNodes = in_nodes.map(node => makeStarterNode(node))
     nodes = in_nodes ++ middle_nodes ++ out_nodes
+    this.channels = this.channels ++ channels
     if(starterNodes.isEmpty) starterNodes = makeStarterNode(nodes.head) :: starterNodes
     to_check = channels ++ nodes ++ starterNodes
     val inits = initsMaker(starterNodes)
@@ -250,7 +244,34 @@ object Mcrl2FamilyModel{
       }
       (ins, channels, Nil , outs)
 
-    case CSubConnector(_, c) => conToChannels(c)
+    case CSubConnector(name, c) =>
+      val (in_nodes, channels, middle_nodes, out_nodes) = conToChannels(c)
+      var replacements: Map[String, (String, State)] = Map()
+      var nodeReplacement: Map[String, Mcrl2Node] = Map()
+      var channelReplacement: Map[String, Mcrl2Channel] = Map()
+      var count = 0
+      replacements = in_nodes.foldRight(replacements)((node, r) =>{count +=1; r + (node.getAfter.identification -> (name, In(count)))})
+      count = 0
+      replacements = middle_nodes.foldRight(replacements)((node, r) =>{count +=1; val k = r + (node.getBefore.identification -> (name, Middle(count))); count +=1; k + (node.getAfter.identification -> (name, Middle(count)))})
+      count = 0
+      replacements = out_nodes.foldRight(replacements)((node, r) =>{count +=1; r + (node.getBefore.identification -> (name, Out(count)))})
+
+      val new_in_nodes =in_nodes.map(n => Replacements.replaceActions(n, replacements))
+      nodeReplacement = nodeReplacement ++ in_nodes.map(a => a.getName.toString).zip(new_in_nodes)
+      val new_channels = channels.map(c =>{channel_count += 1; Replacements.replaceActionsWithName(c, replacements, name, channel_count-1)})
+
+      channelReplacement = channelReplacement ++ channels.map(c => c.getName.toString).zip(new_channels)
+      val new_middle_nodes = middle_nodes.map(n => Replacements.replaceActions(n, replacements))
+      nodeReplacement = nodeReplacement ++ middle_nodes.map(a => a.getName.toString).zip(new_middle_nodes)
+      val new_out_nodes = out_nodes.map(n => Replacements.replaceActions(n, replacements))
+      nodeReplacement = nodeReplacement ++ out_nodes.map(a => a.getName.toString).zip(new_out_nodes)
+
+      (new_in_nodes ++ new_middle_nodes ++ new_out_nodes).foreach(n => n.replace(channelReplacement))
+      new_channels.foreach(c => c.replace(nodeReplacement))
+
+
+      (new_in_nodes, new_channels, new_middle_nodes, new_out_nodes)
+
     case x@CPrim(_, _, _, _) => primToChannel(x)
     case _ => (Nil, Nil, Nil, Nil)
   }
@@ -266,27 +287,13 @@ object Mcrl2FamilyModel{
       Nil
     }
     else {
-      val reusable_channels = this.channels.get("Channel")
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()) {
-        val channel = reusable_channels.get.getNext()
-        channel :: makeSyncs(i - 1)
-      }
-      else {
-        val firstAction = Action("sync", channel_count, TwoLine, In1)
-        val secondAction = Action("sync", channel_count, TwoLine, Out1)
-        val channel = Mcrl2Channel(number = channel_count, before = List(firstAction), after = List(secondAction),
-          operator = MultiAction(firstAction, secondAction), prev = List(), next = List())
+      val firstAction = Action("sync", channel_count, TwoLine, In1)
+      val secondAction = Action("sync", channel_count, TwoLine, Out1)
+      val channel = Mcrl2Channel(number = channel_count, before = List(firstAction), after = List(secondAction),
+        operator = MultiAction(firstAction, secondAction), prev = List(), next = List())
 
-        if (reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-          this.channels = this.channels + ("Channel" -> reusable_channels.get)
-        }
-        else{
-          this.channels = this.channels + ("Channel" -> new ChannelSubs("Channel", List(channel)))
-        }
-        channel_count += 1
-        channel :: makeSyncs(i - 1)
-      }
+      channel_count += 1
+      channel :: makeSyncs(i - 1)
     }
 
 
@@ -318,28 +325,14 @@ object Mcrl2FamilyModel{
   (List[Mcrl2Node], List[Mcrl2Channel], List[Mcrl2Node], List[Mcrl2Node]) = prim match{
     case CPrim("fifo", _ , _, _) =>
 
-      val reusable_channels = channels.get("Fifo")
-      var channel: Mcrl2Channel = null
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        //channel
-        val firstAction = Action("fifo",channel_count, TwoLine, In1)
-        val secondAction = Action("fifo",channel_count, TwoLine, Out1)
+      //channel
+      val firstAction = Action("fifo",channel_count, TwoLine, In1)
+      val secondAction = Action("fifo",channel_count, TwoLine, Out1)
 
-        channel = Mcrl2Channel("Fifo", channel_count, List(firstAction), List(secondAction),
+      val channel = Mcrl2Channel("Fifo", channel_count, List(firstAction), List(secondAction),
           Seq(firstAction, secondAction), Nil, Nil)
 
-        channel_count += 1
-
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + ("Fifo" -> new ChannelSubs("Fifo", List(channel)))
-        }
-      }
+      channel_count += 1
 
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
@@ -349,26 +342,13 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel),Nil, out_nodes)
 
     case CPrim("fifofull", _, _, _) =>
-      val reusable_channels = channels.get("FifoFull")
-      var channel:Mcrl2Channel = null
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        val firstAction = Action("fifofull",channel_count, TwoLine, In1)
-        val secondAction = Action("fifofull",channel_count, TwoLine, Out1)
+      val firstAction = Action("fifofull",channel_count, TwoLine, In1)
+      val secondAction = Action("fifofull",channel_count, TwoLine, Out1)
 
-        val channel = Mcrl2Channel("FifoFull", channel_count, List(firstAction), List(secondAction),
-          Seq(secondAction, firstAction), Nil, Nil)
+      val channel = Mcrl2Channel("FifoFull", channel_count, List(firstAction), List(secondAction),
+        Seq(secondAction, firstAction), Nil, Nil)
 
-        channel_count += 1
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + ("FifoFull" -> new ChannelSubs("FifoFull", List(channel)))
-        }
-      }
+      channel_count += 1
 
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
@@ -380,28 +360,14 @@ object Mcrl2FamilyModel{
 
 
     case CPrim("lossy", _, _, _ ) =>
+      val firstAction = Action("lossy",channel_count, TwoLine, In1)
+      val secondAction = Action("lossy",channel_count, TwoLine, Out1)
 
-      val reusable_channels = channels.get("Lossy")
-      var channel:Mcrl2Channel = null
+      val channel = Mcrl2Channel("Lossy", channel_count, List(firstAction), List(secondAction),
+        Choice(firstAction, MultiAction(firstAction, secondAction)), Nil, Nil)
 
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        val firstAction = Action("lossy",channel_count, TwoLine, In1)
-        val secondAction = Action("lossy",channel_count, TwoLine, Out1)
+      channel_count += 1
 
-        channel = Mcrl2Channel("Lossy", channel_count, List(firstAction), List(secondAction),
-          Choice(firstAction, MultiAction(firstAction, secondAction)), Nil, Nil)
-
-        channel_count += 1
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + ("Lossy" -> new ChannelSubs("Lossy", List(channel)))
-        }
-      }
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
       channel.next = out_nodes
@@ -412,28 +378,16 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel), Nil, out_nodes)
 
     case CPrim("merger", _, _,_) =>
-      val reusable_channels = channels.get("Merger")
-      var channel:Mcrl2Channel = null
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        val firstAction1 = Action("merger",channel_count, TwoLine, In1)
-        val firstAction2 = Action("merger",channel_count, TwoLine, In2)
-        val secondAction = Action("merger",channel_count, TwoLine, Out1)
+      val firstAction1 = Action("merger",channel_count, TwoLine, In1)
+      val firstAction2 = Action("merger",channel_count, TwoLine, In2)
+      val secondAction = Action("merger",channel_count, TwoLine, Out1)
 
-        channel = Mcrl2Channel("Merger", channel_count, List(firstAction1, firstAction2), List(secondAction),
-          Choice(MultiAction(List(firstAction1, secondAction)),
-            MultiAction(firstAction2, secondAction)), Nil, Nil)
+      val channel = Mcrl2Channel("Merger", channel_count, List(firstAction1, firstAction2), List(secondAction),
+        Choice(MultiAction(List(firstAction1, secondAction)),
+          MultiAction(firstAction2, secondAction)), Nil, Nil)
 
-        channel_count += 1
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + ("Merger" -> new ChannelSubs("Merger", List(channel)))
-        }
-      }
+      channel_count += 1
+
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
       channel.next = out_nodes
@@ -443,27 +397,15 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel), Nil, out_nodes)
 
     case CPrim("dupl", _, _, _) =>
-      val reusable_channels = channels.get("Dupl")
-      var channel:Mcrl2Channel = null
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        val firstAction = Action("dupl",channel_count, TwoLine, In1)
-        val secondAction1 = Action("dupl",channel_count, TwoLine, Out1)
-        val secondAction2 = Action("dupl",channel_count, TwoLine, Out2)
+      val firstAction = Action("dupl",channel_count, TwoLine, In1)
+      val secondAction1 = Action("dupl",channel_count, TwoLine, Out1)
+      val secondAction2 = Action("dupl",channel_count, TwoLine, Out2)
 
-        channel = Mcrl2Channel("Dupl", channel_count, List(firstAction), List(secondAction1, secondAction2),
-          MultiAction(List(firstAction, secondAction1, secondAction2)), Nil, Nil)
+      val channel = Mcrl2Channel("Dupl", channel_count, List(firstAction), List(secondAction1, secondAction2),
+        MultiAction(List(firstAction, secondAction1, secondAction2)), Nil, Nil)
 
-        channel_count += 1
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + ("Dupl" -> new ChannelSubs("Dupl", List(channel)))
-        }
-      }
+      channel_count += 1
+
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
       channel.next = out_nodes
@@ -473,27 +415,14 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel), Nil, out_nodes)
 
     case CPrim("drain", _, _, _) =>
-      //nodes
-      val reusable_channels = channels.get("Drain")
-      var channel: Mcrl2Channel = null
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        val firstAction1 = Action("drain",channel_count, TwoLine, In1)
-        val firstAction2 = Action("drain",channel_count, TwoLine, In2)
+      val firstAction1 = Action("drain",channel_count, TwoLine, In1)
+      val firstAction2 = Action("drain",channel_count, TwoLine, In2)
 
-        channel = Mcrl2Channel("Drain", channel_count, List(firstAction1, firstAction2),Nil,
-          MultiAction(List(firstAction1, firstAction2)), Nil, Nil)
+      val channel = Mcrl2Channel("Drain", channel_count, List(firstAction1, firstAction2),Nil,
+        MultiAction(List(firstAction1, firstAction2)), Nil, Nil)
 
-        channel_count += 1
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + ("Drain" -> new ChannelSubs("Drain", List(channel)))
-        }
-      }
+      channel_count += 1
+
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
       channel.next = out_nodes
@@ -517,27 +446,13 @@ object Mcrl2FamilyModel{
       (Nil, Nil, Nil, List(out_node))
 
     case CPrim(name, _, _, _) =>
-      //nodes
-      val reusable_channels = channels.get(name.head.toUpper.toString ++ name.tail)
-      var channel: Mcrl2Channel = null
-      if(reusable_channels.isDefined && reusable_channels.get.hasNext()){
-        channel = reusable_channels.get.getNext()
-      }
-      else{
-        val firstAction = Action(name,channel_count, TwoLine, In1)
-        val secondAction = Action(name,channel_count, TwoLine, Out1)
+      val firstAction = Action(name,channel_count, TwoLine, In1)
+      val secondAction = Action(name,channel_count, TwoLine, Out1)
 
-        channel = Mcrl2Channel(name.head.toUpper.toString ++ name.tail, channel_count, List(firstAction), List(secondAction),
+      val channel = Mcrl2Channel(name.head.toUpper.toString ++ name.tail, channel_count, List(firstAction), List(secondAction),
           MultiAction(firstAction, secondAction), Nil, Nil)
 
-        channel_count += 1
-        if(reusable_channels.isDefined){
-          reusable_channels.get.put(channel)
-        }
-        else{
-          channels = channels + (name.head.toUpper.toString ++ name.tail -> new ChannelSubs(name.head.toUpper.toString ++ name.tail, List(channel)))
-        }
-      }
+      channel_count += 1
 
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
       channel.prev = in_nodes
@@ -545,7 +460,6 @@ object Mcrl2FamilyModel{
       in_nodes.map(node => {node.setNext(channel); null})
       out_nodes.map(node => {node.setPrev(channel); null})
       (in_nodes, List(channel),Nil, out_nodes)
-
   }
 
   /**
@@ -736,7 +650,7 @@ object Mcrl2FamilyModel{
           notMissing(starter, last_node.getBefore)
           val Action(name, number, group, state) = last_node.getBefore
           (current.getAfter ++ current.getBefore).foreach{
-            case a@Action(_, _, group, state) =>
+            case a@Action(_, _, _, _) =>
               if(! (checkedVars.exists(x => x.sameType(a)) || a.sameType(last_node.getBefore)|| a == Action.nullAction || (group == NoLine && state == Nothing) )){
                 isMissing(starter, a)
               }
@@ -777,7 +691,7 @@ object Mcrl2FamilyModel{
     channel_count = 0
     starter_count = 0
     var_count = 0
-    channels= Map()
+    channels= List()
     manager= Mcrl2Manager(Nil)
 
     last_inits = Nil
@@ -805,9 +719,6 @@ object Mcrl2FamilyModel{
       for((n, p) <- last_inits){
         starters = starters ++ List(Mcrl2Starter(n, if(starters.isEmpty) manager.getName else starters.last.getName, p))
       }
-      for((_, sub) <- this.channels){
-        sub.reset()
-      }
 
       our_nodes = our_nodes ++ nodes
       our_starters = our_starters ++ starterNodes
@@ -820,14 +731,13 @@ object Mcrl2FamilyModel{
       starterNodes= List[Mcrl2StarterNode]()
 
     }
-    val list_of_channels = channels.values.map(f => f.items).foldRight(Nil: List[Mcrl2Channel])((a, b) => a ++ b)
-    val family = new Mcrl2FamilyModel(Util.getVars(list_of_channels ++ our_nodes ++ inits ++ starters ++ our_starters ++ List(manager) ), list_of_channels ++ our_nodes ++ our_starters ++ inits ++ starters ++ List(manager) , starters.last.getName)
+    val family = new Mcrl2FamilyModel(Util.getVars(channels ++ our_nodes ++ inits ++ starters ++ our_starters ++ List(manager) ), channels ++ our_nodes ++ our_starters ++ inits ++ starters ++ List(manager) , starters.last.getName)
 
     starters= List()
     channel_count = 0
     starter_count = 0
     var_count = 0
-    channels= Map()
+    channels= List()
     manager= Mcrl2Manager(Nil)
 
     last_inits = Nil
