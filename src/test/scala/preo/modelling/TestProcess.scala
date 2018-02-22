@@ -19,7 +19,7 @@ class TestProcess {
   }
 
   @Test
-  def testMultiAction: Unit={
+  def testMultiAction(): Unit={
     //assert prints for 0, 1 and 2 Actions
     assertEquals(MultiAction().toString, "Null")
     assertEquals(MultiAction(Action("X", 1, NoLine, Nothing)).toString, Action("X",1, NoLine, Nothing).toString)

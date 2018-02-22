@@ -13,7 +13,7 @@ class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
     val acts = Mcrl2Def.toString(act.toList)
     var procs = ""
     for(p <- proc) procs += s"${p.toString};\n"
-    val initProc = init.toString
+    val initProc = Hide(List(Action.nullAction), init)
     s"""
        |act
        |  $acts;
@@ -64,7 +64,7 @@ class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
   /**
     * returns the init process
     */
-  def getInit: Mcrl2Process = init
+  def getInit[A <: Mcrl2Process]: Mcrl2Process = init
 
   //testing usefull stuff
   /**
@@ -192,7 +192,33 @@ object Mcrl2Model{
       }
       (ins, channels, Nil , outs)
 
-    case CSubConnector(_, c) => conToChannels(c)
+    case CSubConnector(name, c) => {
+      val (in_nodes, channels, middle_nodes, out_nodes) = conToChannels(c)
+      var replacements: Map[String, (String, State)] = Map()
+      var nodeReplacement: Map[String, Mcrl2Node] = Map()
+      var channelReplacement: Map[String, Mcrl2Channel] = Map()
+      var count = 0
+      replacements = in_nodes.foldRight(replacements)((node, r) =>{count +=1; r + (node.getAfter.identification -> (name, In(count)))})
+      count = 0
+      replacements = middle_nodes.foldRight(replacements)((node, r) =>{count +=1; val k = r + (node.getBefore.identification -> (name, Middle(count))); count +=1; k + (node.getAfter.identification -> (name, Middle(count)))})
+      count = 0
+      replacements = out_nodes.foldRight(replacements)((node, r) =>{count +=1; r + (node.getBefore.identification -> (name, Out(count)))})
+
+      val new_in_nodes =in_nodes.map(n => Replacements.replaceActions(n, replacements))
+      nodeReplacement = nodeReplacement ++ in_nodes.map(a => a.getName.toString).zip(new_in_nodes)
+      val new_channels = channels.map(c => Replacements.replaceActions(c, replacements))
+      channelReplacement = channelReplacement ++ channels.map(c => c.getName.toString).zip(new_channels)
+      val new_middle_nodes = middle_nodes.map(n => Replacements.replaceActions(n, replacements))
+      nodeReplacement = nodeReplacement ++ middle_nodes.map(a => a.getName.toString).zip(new_middle_nodes)
+      val new_out_nodes = out_nodes.map(n => Replacements.replaceActions(n, replacements))
+      nodeReplacement = nodeReplacement ++ out_nodes.map(a => a.getName.toString).zip(new_out_nodes)
+
+      (new_in_nodes ++ new_middle_nodes ++ new_out_nodes).foreach(n => n.replace(channelReplacement))
+      new_channels.foreach(c => c.replace(nodeReplacement))
+
+
+      (new_in_nodes, new_channels, new_middle_nodes, new_out_nodes)
+    }
     case x@CPrim(_, _, _, _) => primToChannel(x)
     case _ => (Nil, Nil,Nil, Nil)
   }

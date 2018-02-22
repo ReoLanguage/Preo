@@ -68,6 +68,17 @@ class Mcrl2FamilyModel(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Proces
     * returns the actions
     */
   def getActions: Set[Action] = act
+
+  /**
+    * Filters the Starters from the processes
+    */
+  def getStarters: List[Mcrl2Starter] = proc.filter(p => p.isInstanceOf[Mcrl2Starter]).asInstanceOf[List[Mcrl2Starter]]
+
+
+  /**
+    * Filters the StarterNodes from the processes
+    */
+  def getStarterNodes: List[Mcrl2StarterNode] = proc.filter(p => p.isInstanceOf[Mcrl2StarterNode]).asInstanceOf[List[Mcrl2StarterNode]]
 }
 
 object Mcrl2FamilyModel{
@@ -78,7 +89,9 @@ object Mcrl2FamilyModel{
   var channel_count = 0
   var last_inits: List[(Int, ProcessName)] = Nil
   var to_check: List[Mcrl2Def] = List[Mcrl2Def]()
+
   var missingVars: Map[Int, List[Action]] = Map()
+  var checkedVars: List[Action] = List()
 
   var nodes: List[Mcrl2Node] = List[Mcrl2Node]()
   var starterNodes: List[Mcrl2StarterNode] = List[Mcrl2StarterNode]()
@@ -88,7 +101,6 @@ object Mcrl2FamilyModel{
 
 
   //todo: define block notion
-  //todo: exrouter não funciona
   def apply(con: Connector): Mcrl2FamilyModel ={
     // get applied connectors
     val instances = Eval.getInstances(con)
@@ -110,6 +122,7 @@ object Mcrl2FamilyModel{
         starters = starters ++ List(Mcrl2Starter(n, if(starters.isEmpty) manager.getName else starters.last.getName, p))
       }
       for((_, sub) <- this.channels){
+        println(sub.items)
         sub.reset()
       }
 
@@ -118,7 +131,7 @@ object Mcrl2FamilyModel{
       last_inits= Nil
       to_check= List[Mcrl2Def]()
       missingVars= Map()
-
+      checkedVars = List()
 
       nodes= List[Mcrl2Node]()
       starterNodes= List[Mcrl2StarterNode]()
@@ -135,6 +148,10 @@ object Mcrl2FamilyModel{
     manager= Mcrl2Manager(Nil)
 
 
+    nodes = List[Mcrl2Node]()
+    starterNodes = List[Mcrl2StarterNode]()
+    starters = List()
+
 
     family
   }
@@ -148,7 +165,7 @@ object Mcrl2FamilyModel{
     */
   private def convertCcon(ccon: CoreConnector): List[Mcrl2Def] = {
     val (in_nodes, channels, middle_nodes, out_nodes) = conToChannels(ccon)
-    //missingVars = Util.getVars(channels++nodes).toList.filter{case a@Action(name, number, group, state) => !(group == NoLine && state == Nothing) && a != Action.nullAction}
+//    missingVars = Util.getVars(channels++nodes).toList.filter{case a@Action(name, number, group, state) => !(group == NoLine && state == Nothing) && a != Action.nullAction}
     starterNodes = in_nodes.map(node => makeStarterNode(node))
     nodes = in_nodes ++ middle_nodes ++ out_nodes
     if(starterNodes.isEmpty) starterNodes = makeStarterNode(nodes.head) :: starterNodes
@@ -466,7 +483,7 @@ object Mcrl2FamilyModel{
         val firstAction1 = Action("drain",channel_count, TwoLine, In1)
         val firstAction2 = Action("drain",channel_count, TwoLine, In2)
 
-        val channel = Mcrl2Channel("Drain", channel_count, List(firstAction1, firstAction2),Nil,
+        channel = Mcrl2Channel("Drain", channel_count, List(firstAction1, firstAction2),Nil,
           MultiAction(List(firstAction1, firstAction2)), Nil, Nil)
 
         channel_count += 1
@@ -474,7 +491,7 @@ object Mcrl2FamilyModel{
           reusable_channels.get.put(channel)
         }
         else{
-          channels = channels + ("Dupl" -> new ChannelSubs("Dupl", List(channel)))
+          channels = channels + ("Drain" -> new ChannelSubs("Drain", List(channel)))
         }
       }
       val (in_nodes, out_nodes) = primToChannelAux(prim, channel.number)
@@ -507,8 +524,8 @@ object Mcrl2FamilyModel{
         channel = reusable_channels.get.getNext()
       }
       else{
-        val firstAction = Action("name",channel_count, TwoLine, In1)
-        val secondAction = Action("name",channel_count, TwoLine, Out1)
+        val firstAction = Action(name,channel_count, TwoLine, In1)
+        val secondAction = Action(name,channel_count, TwoLine, Out1)
 
         channel = Mcrl2Channel(name.head.toUpper.toString ++ name.tail, channel_count, List(firstAction), List(secondAction),
           MultiAction(firstAction, secondAction), Nil, Nil)
@@ -518,7 +535,7 @@ object Mcrl2FamilyModel{
           reusable_channels.get.put(channel)
         }
         else{
-          channels = channels + ("Fifo" -> new ChannelSubs("Fifo", List(channel)))
+          channels = channels + (name.head.toUpper.toString ++ name.tail -> new ChannelSubs(name.head.toUpper.toString ++ name.tail, List(channel)))
         }
       }
 
@@ -577,8 +594,9 @@ object Mcrl2FamilyModel{
   private def notMissing(number: Int, action: Action): Unit ={
     val value = missingVars.get(number)
     if(value.isDefined){
-      missingVars = missingVars updated (number, value.get.filter(x=> x.get_number !=  action.get_number || x.state != action.state))
+      missingVars = missingVars updated (number, value.get.filter(x=> ! x.sameType(action)))
     }
+    checkedVars = checkedVars ++ List(action)
   }
 
   /**
@@ -604,7 +622,7 @@ object Mcrl2FamilyModel{
     * @return a list of inits
     */
   private def makeblockers(actions: List[Action], last: Mcrl2Process): List[Mcrl2Init] = actions match{
-    case Action(name, number, group, state) :: rest =>
+    case Action(name, number, _, state) :: rest =>
       val filtered_rest = rest.filter{case Action(_, n, g,s) => n != number || s != state}
       val m = Mcrl2Init(channel_count, name, number,state, last)
       channel_count += 1
@@ -645,7 +663,8 @@ object Mcrl2FamilyModel{
 
       check(current)
       if (last == null) {
-        if(current.getBefore != Action.nullAction) isMissing(starter, current.getBefore)
+        if(current.getBefore != Action.nullAction && current.getBefore.group != NoLine && current.getBefore.state != Nothing)
+          isMissing(starter, current.getBefore)
         makeInitsChannel(current.getNext, current, current, starter)
       }
       else {
@@ -692,6 +711,12 @@ object Mcrl2FamilyModel{
       else {
         if (!backwards) {
           notMissing(starter, last_node.getAfter)
+          (current.getBefore ++ current.getAfter).foreach{
+            case a@Action(_, _, gr, st) =>
+              if(!(checkedVars.exists(x => x.sameType(a)) || a.sameType(last_node.getAfter) || a == Action.nullAction || (gr == NoLine && st == Nothing) )){
+                isMissing(starter, a)
+              }
+          }
           val Action(name, number, group, state) = last_node.getAfter
           var inits = List(Mcrl2Init(channel_count, name, number, state, current.getName, last.getName))
           channel_count += 1
@@ -710,6 +735,12 @@ object Mcrl2FamilyModel{
         else{
           notMissing(starter, last_node.getBefore)
           val Action(name, number, group, state) = last_node.getBefore
+          (current.getAfter ++ current.getBefore).foreach{
+            case a@Action(_, _, group, state) =>
+              if(! (checkedVars.exists(x => x.sameType(a)) || a.sameType(last_node.getBefore)|| a == Action.nullAction || (group == NoLine && state == Nothing) )){
+                isMissing(starter, a)
+              }
+          }
           var inits = List(Mcrl2Init(channel_count, name, number, state, current.getName, last.getName))
           channel_count += 1
           for(n <- current.getPrev){
@@ -729,6 +760,86 @@ object Mcrl2FamilyModel{
     else{
       Nil
     }
+  }
+
+  //for usage in testing
+
+  def testApply(con: Connector): List[CoreConnector] = {
+    // get applied connectors
+    val instances = Eval.getInstances(con)
+    //for every value we create an app with the vars in the instances and turn it into a core connector
+    val connectors = instances.map(x => Eval.simpleReduce(x))
+    connectors
+  }
+
+  def restApply(connectors: List[CoreConnector]): Mcrl2FamilyModel = {
+    starters= List()
+    channel_count = 0
+    starter_count = 0
+    var_count = 0
+    channels= Map()
+    manager= Mcrl2Manager(Nil)
+
+    last_inits = Nil
+    to_check = List[Mcrl2Def]()
+    missingVars = Map()
+    checkedVars = List()
+
+    nodes = List[Mcrl2Node]()
+    starterNodes = List[Mcrl2StarterNode]()
+    starters = List()
+
+
+    //if there is only one possible connector then we simply use the mcrl2model of the connector
+    if (connectors.length == 1){
+      val m = Mcrl2Model(connectors.head)
+      return new Mcrl2FamilyModel(m.getActions, m.getProc, m.getInit)
+    }
+    var inits: List[Mcrl2Def] = Nil
+    var our_starters: List[Mcrl2StarterNode] = List()
+    var our_nodes: List[Mcrl2Node] = List()
+    for(ccon <- connectors){
+      inits = inits ++ convertCcon(ccon)
+      val actions: List[Action] = last_inits.map((n: (Int, ProcessName)) => new Action("a", n._1, TwoLine, Nothing))
+      manager = manager.addMultiAction(new MultiAction(actions))
+      for((n, p) <- last_inits){
+        starters = starters ++ List(Mcrl2Starter(n, if(starters.isEmpty) manager.getName else starters.last.getName, p))
+      }
+      for((_, sub) <- this.channels){
+        sub.reset()
+      }
+
+      our_nodes = our_nodes ++ nodes
+      our_starters = our_starters ++ starterNodes
+      last_inits= Nil
+      to_check= List[Mcrl2Def]()
+      missingVars= Map()
+      checkedVars = List()
+
+      nodes= List[Mcrl2Node]()
+      starterNodes= List[Mcrl2StarterNode]()
+
+    }
+    val list_of_channels = channels.values.map(f => f.items).foldRight(Nil: List[Mcrl2Channel])((a, b) => a ++ b)
+    val family = new Mcrl2FamilyModel(Util.getVars(list_of_channels ++ our_nodes ++ inits ++ starters ++ our_starters ++ List(manager) ), list_of_channels ++ our_nodes ++ our_starters ++ inits ++ starters ++ List(manager) , starters.last.getName)
+
+    starters= List()
+    channel_count = 0
+    starter_count = 0
+    var_count = 0
+    channels= Map()
+    manager= Mcrl2Manager(Nil)
+
+    last_inits = Nil
+    to_check = List[Mcrl2Def]()
+    missingVars = Map()
+
+    nodes = List[Mcrl2Node]()
+    starterNodes = List[Mcrl2StarterNode]()
+    starters = List()
+
+
+    family
   }
 
 }

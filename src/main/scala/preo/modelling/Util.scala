@@ -10,4 +10,5 @@ object Util {
     case head :: tail => head.getVars.toSet ++ getVars(tail)
     case Nil => Set()
   }
+
 }
