@@ -77,12 +77,6 @@ class TestFamily {
     val familyModel = Mcrl2FamilyModel.restApply(instances)
     val models = instances.map(x => Mcrl2Model(x))
 
-    println(familyModel)
-    println()
-    for(x <- models){
-      println(x)
-      println()
-    }
 
     testStarters(familyModel)
     testActions(familyModel, models)
