@@ -233,13 +233,13 @@ object Mcrl2Model{
     (List[Mcrl2Node], List[Mcrl2Channel], List[Mcrl2Node], List[Mcrl2Node]) = prim match{
     case CPrim("fifo", _, _, _) =>
       //nodes
-      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("fifo", channel_count, OneLine, In1))
-      val out_node = Mcrl2Node(channel_count+2, Action("fifo", channel_count, OneLine, Out1), Action.nullAction)
+      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("fifo", channel_count, OneLine, In(1)))
+      val out_node = Mcrl2Node(channel_count+2, Action("fifo", channel_count, OneLine, Out(1)), Action.nullAction)
 
 
       //channel
-      val firstAction = Action("fifo",channel_count, TwoLine, In1)
-      val secondAction = Action("fifo",channel_count, TwoLine, Out1)
+      val firstAction = Action("fifo",channel_count, TwoLine, In(1))
+      val secondAction = Action("fifo",channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("Fifo", channel_count, List(firstAction), List(secondAction),
         Seq(firstAction, secondAction), List(in_node), List(out_node))
@@ -251,13 +251,13 @@ object Mcrl2Model{
 
     case CPrim("fifofull", _, _, _) =>
       //nodes
-      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("fifofull", channel_count, OneLine, In1))
-      val out_node = Mcrl2Node(channel_count+2, Action("fifofull", channel_count, OneLine, Out1), Action.nullAction)
+      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("fifofull", channel_count, OneLine, In(1)))
+      val out_node = Mcrl2Node(channel_count+2, Action("fifofull", channel_count, OneLine, Out(1)), Action.nullAction)
 
 
       //channel
-      val firstAction = Action("fifofull",channel_count, TwoLine, In1)
-      val secondAction = Action("fifofull",channel_count, TwoLine, Out1)
+      val firstAction = Action("fifofull",channel_count, TwoLine, In(1))
+      val secondAction = Action("fifofull",channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("FifoFull", channel_count, List(firstAction), List(secondAction),
         Seq(secondAction, firstAction), List(in_node), List(out_node))
@@ -269,12 +269,12 @@ object Mcrl2Model{
 
     case CPrim("lossy", _, _, _ ) =>
       //nodes
-      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("lossy", channel_count, OneLine, In1))
-      val out_node = Mcrl2Node(channel_count+2, Action("lossy", channel_count, OneLine, Out1), Action.nullAction)
+      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("lossy", channel_count, OneLine, In(1)))
+      val out_node = Mcrl2Node(channel_count+2, Action("lossy", channel_count, OneLine, Out(1)), Action.nullAction)
 
       //channel
-      val firstAction = Action("lossy", channel_count, TwoLine, In1)
-      val secondAction = Action("lossy", channel_count, TwoLine, Out1)
+      val firstAction = Action("lossy", channel_count, TwoLine, In(1))
+      val secondAction = Action("lossy", channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("Lossy", channel_count, List(firstAction), List(secondAction),
         Choice(firstAction, MultiAction(firstAction, secondAction)), List(in_node), List(out_node))
@@ -287,15 +287,15 @@ object Mcrl2Model{
     case CPrim("merger", _, _,_) =>
       //nodes
 
-      val in_node1 = Mcrl2Node(channel_count+1, Action.nullAction, Action("merger", channel_count, OneLine, In1))
-      val in_node2 = Mcrl2Node(channel_count+2, Action.nullAction, Action("merger", channel_count, OneLine, In2))
-      val out_node = Mcrl2Node(channel_count+3, Action("merger", channel_count, OneLine, Out1), Action.nullAction)
+      val in_node1 = Mcrl2Node(channel_count+1, Action.nullAction, Action("merger", channel_count, OneLine, In(1)))
+      val in_node2 = Mcrl2Node(channel_count+2, Action.nullAction, Action("merger", channel_count, OneLine, In(2)))
+      val out_node = Mcrl2Node(channel_count+3, Action("merger", channel_count, OneLine, Out(1)), Action.nullAction)
 
 
       //channel
-      val firstAction = Action("merger", channel_count, TwoLine, In1)
-      val secondAction = Action("merger", channel_count, TwoLine, In2)
-      val thirdAction = Action("merger", channel_count, TwoLine, Out1)
+      val firstAction = Action("merger", channel_count, TwoLine, In(1))
+      val secondAction = Action("merger", channel_count, TwoLine, In(2))
+      val thirdAction = Action("merger", channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("Merger", channel_count, List(firstAction, secondAction), List(thirdAction),
         Choice(MultiAction(List(firstAction, thirdAction)), MultiAction(secondAction, thirdAction)),
@@ -308,14 +308,14 @@ object Mcrl2Model{
       (List(in_node1, in_node2), List(channel), Nil, List(out_node))
 
     case CPrim("dupl", _, _, _) =>
-      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("dupl", channel_count, OneLine, In1))
-      val out_node1 = Mcrl2Node(channel_count+2, Action("dupl", channel_count, OneLine, Out1), Action.nullAction)
-      val out_node2 = Mcrl2Node(channel_count+3, Action("dupl", channel_count, OneLine, Out2), Action.nullAction)
+      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action("dupl", channel_count, OneLine, In(1)))
+      val out_node1 = Mcrl2Node(channel_count+2, Action("dupl", channel_count, OneLine, Out(1)), Action.nullAction)
+      val out_node2 = Mcrl2Node(channel_count+3, Action("dupl", channel_count, OneLine, Out(2)), Action.nullAction)
 
       //channel
-      val firstAction = Action("dupl", channel_count, TwoLine, In1)
-      val secondAction = Action("dupl", channel_count, TwoLine, Out1)
-      val thirdAction = Action("dupl", channel_count, TwoLine, Out2)
+      val firstAction = Action("dupl", channel_count, TwoLine, In(1))
+      val secondAction = Action("dupl", channel_count, TwoLine, Out(1))
+      val thirdAction = Action("dupl", channel_count, TwoLine, Out(2))
 
       val channel = Mcrl2Channel("Dupl", channel_count, List(firstAction), List(secondAction, thirdAction),
         MultiAction(List(firstAction, secondAction, thirdAction)), List(in_node), List(out_node1, out_node2))
@@ -328,12 +328,12 @@ object Mcrl2Model{
 
     case CPrim("drain", _, _, _) =>
       //nodes
-      val in_node1 = Mcrl2Node(channel_count+1, Action.nullAction, Action("drain", channel_count, OneLine, In1))
-      val in_node2 = Mcrl2Node(channel_count+2, Action.nullAction, Action("drain", channel_count, OneLine, In2))
+      val in_node1 = Mcrl2Node(channel_count+1, Action.nullAction, Action("drain", channel_count, OneLine, In(1)))
+      val in_node2 = Mcrl2Node(channel_count+2, Action.nullAction, Action("drain", channel_count, OneLine, In(2)))
 
       //channel
-      val firstAction = Action("drain", channel_count, TwoLine, In1)
-      val secondAction = Action("drain", channel_count, TwoLine, In2)
+      val firstAction = Action("drain", channel_count, TwoLine, In(1))
+      val secondAction = Action("drain", channel_count, TwoLine, In(2))
       val channel = Mcrl2Channel("Drain", channel_count, List(firstAction, secondAction),Nil,
         MultiAction(List(firstAction, secondAction)), List(in_node1, in_node2), Nil)
       //updating
@@ -356,12 +356,12 @@ object Mcrl2Model{
 
     case CPrim(name, _, _, _) =>
       //nodes
-      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action(name, channel_count, OneLine, In1))
-      val out_node = Mcrl2Node(channel_count+2, Action(name, channel_count, OneLine, Out1), Action.nullAction)
+      val in_node = Mcrl2Node(channel_count+1, Action.nullAction, Action(name, channel_count, OneLine, In(1)))
+      val out_node = Mcrl2Node(channel_count+2, Action(name, channel_count, OneLine, Out(1)), Action.nullAction)
 
 
-      val firstAction = Action(name, channel_count, TwoLine, In1)
-      val secondAction = Action(name, channel_count, TwoLine, Out1)
+      val firstAction = Action(name, channel_count, TwoLine, In(1))
+      val secondAction = Action(name, channel_count, TwoLine, Out(1))
       val channel = Mcrl2Channel(number = channel_count, before = List(firstAction), after = List(secondAction),
         operator = MultiAction(firstAction, secondAction), prev = List(in_node), next = List(out_node))
       in_node.setNext(channel)
@@ -382,8 +382,8 @@ object Mcrl2Model{
       Nil
     }
     else {
-      val firstAction = Action("sync", channel_count, TwoLine, In1)
-      val secondAction = Action("sync", channel_count, TwoLine, Out1)
+      val firstAction = Action("sync", channel_count, TwoLine, In(1))
+      val secondAction = Action("sync", channel_count, TwoLine, Out(1))
       val channel = Mcrl2Channel(number = channel_count, before = List(firstAction), after = List(secondAction),
         operator = MultiAction(firstAction, secondAction), prev = List(), next = List())
       channel_count += 1

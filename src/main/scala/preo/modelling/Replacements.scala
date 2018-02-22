@@ -17,10 +17,13 @@ object Replacements {
       else a
   }
 
-  def replaceAct(a: Action, new_name: String, new_state: State): Action = a match{
-    case Action(_, number, group, _) => Action(new_name, number, group, new_state)
-  }
 
+  /**
+    * Replaces the actions in the given process with the respective replacements
+    * @param process the process whose actions need to be replaced
+    * @param replacements the mapping of the current actions and respective replacements
+    * @return a new process with actions changed
+    */
   def replaceActions(process: Mcrl2Process, replacements: Map[String, (String, State)]): Mcrl2Process = process match {
     case a@Action(name, number, group, state) => replaceAct(a, replacements)
     case p@ProcessName(name) => p
@@ -35,16 +38,37 @@ object Replacements {
     case _ => null
   }
 
+  /**
+    * Replaces the actions in the channel
+    * @param channel the channels whose actions we need to replace
+    * @param replacements the mapping of the current actions and their replacements
+    * @return a new channel with the actions replaced
+    */
   def replaceActions(channel: Mcrl2Channel, replacements: Map[String, (String, State)]) : Mcrl2Channel = {
     val new_befores = channel.before.map(a => replaceAct(a, replacements))
     val new_afters = channel.after.map(a => replaceAct(a, replacements))
     Mcrl2Channel(channel.name, channel.number, new_befores, new_afters, replaceActions(channel.operator, replacements), channel.prev, channel.next)
   }
 
+
+  /**
+    * Replaces the actions in the node
+    * @param node the channels whose actions we need to replace
+    * @param replacements the mapping of the current actions and their replacements
+    * @return a new node with the actions replaced
+    */
   def replaceActions(node: Mcrl2Node, replacements: Map[String, (String, State)]) : Mcrl2Node = node match {
     case Mcrl2Node(number, before, after, prev, next) => Mcrl2Node(number, replaceAct(before, replacements), replaceAct(after, replacements), prev, next)
   }
 
+  /**
+    * Replaces the actions in the channel and changes its name and number
+    * @param channel the channels whose actions we need to replace
+    * @param replacements the mapping of the current actions and their replacements
+    * @param new_name the new name of the channel
+    * @param new_number the new number of the channel
+    * @return a new channel with the actions and names replaced
+    */
   def replaceActionsWithName(channel: Mcrl2Channel, replacements: Map[String, (String, State)], new_name:String, new_number: Int) : Mcrl2Channel = {
     val new_befores = channel.before.map(a => replaceAct(a, replacements))
     val new_afters = channel.after.map(a => replaceAct(a, replacements))

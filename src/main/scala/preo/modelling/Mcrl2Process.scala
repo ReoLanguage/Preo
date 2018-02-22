@@ -17,14 +17,9 @@ case object TwoLine extends Group
 
 class State
 
-//todo: remove the objects (except Nothing)
-case object In1 extends State
-case object In2 extends State
 case class In(n: Int) extends State
 case class Middle(n: Int) extends State
 case class Out(n: Int) extends State
-case object Out1 extends State
-case object Out2 extends State
 case object Nothing extends State
 
 
@@ -46,11 +41,6 @@ case class Action(name: String, number: Int, group: Group, state: State) extends
       case NoLine => ""
     }
     val state_name = state match{
-
-      case In1 => "in1"
-      case In2 => "in2"
-      case Out1 => "out1"
-      case Out2 => "out2"
       case Nothing => ""
       case Middle(n) => "mid" + n.toString
       case In(n) => "in" + n.toString
@@ -61,10 +51,6 @@ case class Action(name: String, number: Int, group: Group, state: State) extends
 
   def identification: String = {
     val state_name = state match {
-      case In1 => "in1"
-      case In2 => "in2"
-      case Out1 => "out1"
-      case Out2 => "out2"
       case Nothing => ""
       case Middle(n) => "mid" + n.toString
       case In(n) => "in" + n.toString
