@@ -287,8 +287,8 @@ object Mcrl2FamilyModel{
       Nil
     }
     else {
-      val firstAction = Action("sync", channel_count, TwoLine, In1)
-      val secondAction = Action("sync", channel_count, TwoLine, Out1)
+      val firstAction = Action("sync", channel_count, TwoLine, In(1))
+      val secondAction = Action("sync", channel_count, TwoLine, Out(1))
       val channel = Mcrl2Channel(number = channel_count, before = List(firstAction), after = List(secondAction),
         operator = MultiAction(firstAction, secondAction), prev = List(), next = List())
 
@@ -308,8 +308,8 @@ object Mcrl2FamilyModel{
     case CPrim(name, CoreInterface(i), CoreInterface(j), _) =>
       val action_number = if (number == -1) channel_count else number
 
-      val in_nodes = (0 until i).toList.map(n => Mcrl2Node(channel_count+n, Action.nullAction, Action(name, action_number, OneLine,if (n == 0) In1 else In2)))
-      val out_nodes = (0 until j).toList.map(n => Mcrl2Node(channel_count+i+n, Action(name, action_number, OneLine,if (n == 0) Out1 else Out2) , Action.nullAction))
+      val in_nodes = (0 until i).toList.map(n => Mcrl2Node(channel_count+n, Action.nullAction, Action(name, action_number, OneLine,if (n == 0) In(1) else In(2))))
+      val out_nodes = (0 until j).toList.map(n => Mcrl2Node(channel_count+i+n, Action(name, action_number, OneLine,if (n == 0) Out(1) else Out(2)) , Action.nullAction))
       channel_count += i + j
       (in_nodes, out_nodes)
 
@@ -326,8 +326,8 @@ object Mcrl2FamilyModel{
     case CPrim("fifo", _ , _, _) =>
 
       //channel
-      val firstAction = Action("fifo",channel_count, TwoLine, In1)
-      val secondAction = Action("fifo",channel_count, TwoLine, Out1)
+      val firstAction = Action("fifo",channel_count, TwoLine, In(1))
+      val secondAction = Action("fifo",channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("Fifo", channel_count, List(firstAction), List(secondAction),
           Seq(firstAction, secondAction), Nil, Nil)
@@ -342,8 +342,8 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel),Nil, out_nodes)
 
     case CPrim("fifofull", _, _, _) =>
-      val firstAction = Action("fifofull",channel_count, TwoLine, In1)
-      val secondAction = Action("fifofull",channel_count, TwoLine, Out1)
+      val firstAction = Action("fifofull",channel_count, TwoLine, In(1))
+      val secondAction = Action("fifofull",channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("FifoFull", channel_count, List(firstAction), List(secondAction),
         Seq(secondAction, firstAction), Nil, Nil)
@@ -360,8 +360,8 @@ object Mcrl2FamilyModel{
 
 
     case CPrim("lossy", _, _, _ ) =>
-      val firstAction = Action("lossy",channel_count, TwoLine, In1)
-      val secondAction = Action("lossy",channel_count, TwoLine, Out1)
+      val firstAction = Action("lossy",channel_count, TwoLine, In(1))
+      val secondAction = Action("lossy",channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("Lossy", channel_count, List(firstAction), List(secondAction),
         Choice(firstAction, MultiAction(firstAction, secondAction)), Nil, Nil)
@@ -378,9 +378,9 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel), Nil, out_nodes)
 
     case CPrim("merger", _, _,_) =>
-      val firstAction1 = Action("merger",channel_count, TwoLine, In1)
-      val firstAction2 = Action("merger",channel_count, TwoLine, In2)
-      val secondAction = Action("merger",channel_count, TwoLine, Out1)
+      val firstAction1 = Action("merger",channel_count, TwoLine, In(1))
+      val firstAction2 = Action("merger",channel_count, TwoLine, In(2))
+      val secondAction = Action("merger",channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel("Merger", channel_count, List(firstAction1, firstAction2), List(secondAction),
         Choice(MultiAction(List(firstAction1, secondAction)),
@@ -397,9 +397,9 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel), Nil, out_nodes)
 
     case CPrim("dupl", _, _, _) =>
-      val firstAction = Action("dupl",channel_count, TwoLine, In1)
-      val secondAction1 = Action("dupl",channel_count, TwoLine, Out1)
-      val secondAction2 = Action("dupl",channel_count, TwoLine, Out2)
+      val firstAction = Action("dupl",channel_count, TwoLine, In(1))
+      val secondAction1 = Action("dupl",channel_count, TwoLine, Out(1))
+      val secondAction2 = Action("dupl",channel_count, TwoLine, Out(2))
 
       val channel = Mcrl2Channel("Dupl", channel_count, List(firstAction), List(secondAction1, secondAction2),
         MultiAction(List(firstAction, secondAction1, secondAction2)), Nil, Nil)
@@ -415,8 +415,8 @@ object Mcrl2FamilyModel{
       (in_nodes, List(channel), Nil, out_nodes)
 
     case CPrim("drain", _, _, _) =>
-      val firstAction1 = Action("drain",channel_count, TwoLine, In1)
-      val firstAction2 = Action("drain",channel_count, TwoLine, In2)
+      val firstAction1 = Action("drain",channel_count, TwoLine, In(1))
+      val firstAction2 = Action("drain",channel_count, TwoLine, In(2))
 
       val channel = Mcrl2Channel("Drain", channel_count, List(firstAction1, firstAction2),Nil,
         MultiAction(List(firstAction1, firstAction2)), Nil, Nil)
@@ -446,8 +446,8 @@ object Mcrl2FamilyModel{
       (Nil, Nil, Nil, List(out_node))
 
     case CPrim(name, _, _, _) =>
-      val firstAction = Action(name,channel_count, TwoLine, In1)
-      val secondAction = Action(name,channel_count, TwoLine, Out1)
+      val firstAction = Action(name,channel_count, TwoLine, In(1))
+      val secondAction = Action(name,channel_count, TwoLine, Out(1))
 
       val channel = Mcrl2Channel(name.head.toUpper.toString ++ name.tail, channel_count, List(firstAction), List(secondAction),
           MultiAction(firstAction, secondAction), Nil, Nil)
