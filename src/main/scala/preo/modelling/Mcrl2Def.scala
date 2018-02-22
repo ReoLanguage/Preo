@@ -115,6 +115,15 @@ case class Mcrl2Channel(name:String = "Channel", number: Int, before: List[Actio
     next = next.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
   }
 
+  override def equals(o: scala.Any): Boolean = {
+    if(o == null || o.getClass != this.getClass) false
+    else {
+      val c = o.asInstanceOf[Mcrl2Channel]
+      this.name == c.name && this.number == c.number
+    }
+  }
+
+  override def hashCode(): Int = (name, number).hashCode()
 }
 
 

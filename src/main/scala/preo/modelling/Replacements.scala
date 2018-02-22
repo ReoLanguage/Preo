@@ -45,4 +45,10 @@ object Replacements {
     case Mcrl2Node(number, before, after, prev, next) => Mcrl2Node(number, replaceAct(before, replacements), replaceAct(after, replacements), prev, next)
   }
 
+  def replaceActionsWithName(channel: Mcrl2Channel, replacements: Map[String, (String, State)], new_name:String, new_number: Int) : Mcrl2Channel = {
+    val new_befores = channel.before.map(a => replaceAct(a, replacements))
+    val new_afters = channel.after.map(a => replaceAct(a, replacements))
+    Mcrl2Channel(new_name, new_number, new_befores, new_afters, replaceActions(channel.operator, replacements), channel.prev, channel.next)
+  }
+
 }
