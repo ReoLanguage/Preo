@@ -16,7 +16,7 @@ trait Automata {
   def getInit: Int
 
   /** Returns the transitions to be displayed */
-  def getTrans: Set[(Int,Any,String,Int)] // from, label, id, to
+  def getTrans: Automata.Trans // set of (from, label, id, to)
 
 //  /**
 //    * Automata composition - combining every possible transition,
@@ -31,6 +31,11 @@ trait Automata {
 }
 
 object Automata {
+
+  /**
+    * Set of transitions (from:Int, label:Any, id:String, to:Int)
+    */
+  type Trans = Set[(Int,Any,String,Int)] // from, label, id, to
 
   private var seed = 0
 

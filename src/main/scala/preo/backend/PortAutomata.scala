@@ -1,6 +1,7 @@
 package preo.backend
 
 import preo.ast.CPrim
+import preo.backend.PortAutomata.Trans
 import preo.backend.ReoGraph.Edge
 import preo.common.{GenerationException, TypeCheckException}
 
@@ -11,9 +12,8 @@ import preo.common.{GenerationException, TypeCheckException}
   * @param trans Transitions - Relation between input and output states, with associated
   *              sets of actions and of edges (as in [[ReoGraph.Edge]]).
   */
-case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set[Edge]))])
+case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   extends Automata {
-
 
   /** Collects all states, seen as integers */
   override def getStates: Set[Int] = (for((x,(y,_,_)) <- trans) yield Set(x,y)).flatten
@@ -23,21 +23,33 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set
   override def getInit: Int = init
 
   /** Returns the transitions to be displayed */
-  override def getTrans: Set[(Int, Any, String, Int)] =
+  override def getTrans: Automata.Trans =
     for ((from, (to, fire, es)) <- trans)
-      yield (from, es.map(getName).filterNot(_ == "sync").mkString("."), (fire,es).hashCode().toString, to)
+      yield (from, es.map(getName(_,fire)).filterNot(_ == "sync").mkString("."), (fire,es).hashCode().toString, to)
 
-  private def getName(edge: Edge):String = edge.parents match {
-    case Nil => edge.prim.name
-    case ::(head, tl) => head
+  private def getName(edge: Edge,fire:Set[Int]):String = (edge.parents match {
+    case Nil     => edge.prim.name
+    case ""::_   => edge.prim.name
+    case head::_ => head
+  }) + getDir(edge,fire)
+  private def getDir(edge: Edge,fire:Set[Int]): String = {
+    val src = (edge.ins.toSet intersect fire).nonEmpty
+    val snk = (edge.outs.toSet intersect fire).nonEmpty
+    (src,snk) match {
+      case (true,false) => "↓"
+      case (false,true) => "↑"
+      case _ => "↕"
+    }
   }
 
   private def printPrim(edge: Edge):String = {
     s"""${edge.prim.name}-${edge.prim.i.ports}-${edge.prim.j.ports}-${edge.ins.mkString(".")}-${edge.outs.mkString(".")}"""
   }
 
-  private type Trans = Set[(Int,(Int,Set[Int],Set[Edge]))]
-
+  /**
+    * Remove unreachable states (traverse from initial state)
+    * @return automata without unreachable states
+    */
   private def cleanup: PortAutomata = {
     var missing = Set(init)
     var done = Set[Int]()
@@ -54,6 +66,7 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set
     PortAutomata(ports, init, ntrans)
   }
 
+  /** List transitions in a pretty-print. */
   def show: String =
     s"$init:\n"+trans.map(x=>s" - ${x._1}->${x._2._1} "+
       s"${x._2._2.mkString("[",",","]")} "+
@@ -63,6 +76,8 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set
 }
 
 object PortAutomata {
+
+  type Trans = Set[(Int,(Int,Set[Int],Set[Edge]))]
 
   /** How to build basic Port automata */
   implicit object PortAutomataBuilder extends AutomataBuilder[PortAutomata] {
