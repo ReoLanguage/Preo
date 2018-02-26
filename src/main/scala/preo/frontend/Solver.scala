@@ -1,13 +1,8 @@
 package preo.frontend
 
 import org.chocosolver.solver.constraints.Constraint
-import org.chocosolver.solver.search.strategy.strategy.IntStrategy
 import preo.common.TypeCheckException
-//import org.chocosolver.solver.constraints.IntConstraintFactory._
-//import org.chocosolver.solver.constraints.LogicalConstraintFactory._
-//import org.chocosolver.solver.search.loop.monitors.SearchMonitorFactory
-//import org.chocosolver.solver.search.strategy.IntStrategyFactory
-import org.chocosolver.solver.variables.{BoolVar, IntVar, IVariableFactory}
+import org.chocosolver.solver.variables.{BoolVar, IntVar}
 import org.chocosolver.solver.{Model, Solver => CSolver}
 import preo.ast._
 import preo.common.Utils
@@ -39,12 +34,14 @@ object Solver {
     * @param n number of desired solutions
     * @return (boolVars, intVars) after solverAux function applies
     */
-
   def getSolutions(n:Int, typ: Type): Map[String, List[Expr]] = {
+    // TODO: improve reuse - generate list of solutions instead of a single map of variables to their solutions.
+    // TODO: split into 2 methods: with random, and without random.
     if (typ.const == BVal(true) || typ.const == And(List()))
       return Map()
 
     var values = Map(): Map[String, List[Expr]]
+    val dice = new scala.util.Random(0)
 
     val solver = solveAux(typ.const)
     if(solver.solve()){
@@ -56,7 +53,8 @@ object Solver {
         values += (x -> List())
       var solved = true
       do{
-        if(Math.random <= 0.4){
+//        if(Math.random <= 0.4){
+        if(dice.nextFloat() <= 0.4){
           for((x, v) <- intVars){
             val valueX = values(x)
             values = values +  (x -> (valueX.take(i) ++ List(IVal(v.getValue)) ++ valueX.drop(i) ))
