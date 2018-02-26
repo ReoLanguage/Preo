@@ -17,7 +17,7 @@ case class ReoGraph(edges:List[ReoGraph.Edge], ins:List[Int], outs:List[Int]) {
 object ReoGraph {
   /** Represents a primitive of [[Prim]] from a list of input nodes to a list of output nodes.
     */
-  case class Edge(prim: CPrim, ins:List[Int], outs:List[Int])
+  case class Edge(prim: CPrim, ins:List[Int], outs:List[Int], parents:List[String])
 
   private var seed:Int = 0 // global variable
   private var prioritySeed:Int = 0 // measure to assign priority to edges
@@ -74,12 +74,12 @@ object ReoGraph {
     case p@CPrim(_, CoreInterface(pi), CoreInterface(pj), _) =>
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
-      ReoGraph(List(Edge(p,i,j)),i,j)
+      ReoGraph(List(Edge(p,i,j,Nil)),i,j)
     case CSubConnector(name, sub) =>
 //      prioritySeed += 1
       val g = toGraph(sub)
 //      prioritySeed -=1
-      g
+      addParent(name,g)
     case _ =>
       throw new TypeCheckException("Failed to compile a non-instantiated connector "+Show(prim))
   }
@@ -87,13 +87,18 @@ object ReoGraph {
   private def subst(l:List[Int],m:Map[Int,Int]):List[Int] =
     l.map(x => if (m contains x) m(x) else x)
   private def subst(edge:Edge,m:Map[Int,Int]):Edge =
-    Edge(edge.prim,subst(edge.ins,m),subst(edge.outs,m))
+    Edge(edge.prim,subst(edge.ins,m),subst(edge.outs,m),edge.parents)
   private def subst(g:ReoGraph, m:Map[Int,Int]): ReoGraph =
     ReoGraph(g.edges.map(subst(_,m)),subst(g.ins,m),subst(g.outs,m))
 
+  private def addParent(dad:String,g:ReoGraph): ReoGraph =
+    ReoGraph(g.edges.map(addParent(dad,_)),g.ins,g.outs)
+  private def addParent(dad:String,e:Edge): Edge =
+    Edge(e.prim,e.ins,e.outs,dad::e.parents)
+
   private def mkGrSyncs(i:Iterable[Int],j:Iterable[Int]): List[Edge] = {
     (for ((i,j) <- i.zip(j)) yield
-      Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j))).toList
+      Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j), Nil)).toList
   }
 
 
@@ -143,7 +148,7 @@ object ReoGraph {
     collectInsOuts(graph.edges)
   private def collectInsOuts(edges: List[Edge]): (Map[Int,Set[Edge]],Map[Int,Set[Edge]]) = edges match {
     case Nil => (Map(),Map())
-    case (e@Edge(_,eins,eouts)) :: rest =>
+    case (e@Edge(_,eins,eouts,_)) :: rest =>
       var (ins,outs) = collectInsOuts(rest)
       for (i <- eins)
         ins = ins.updated(i,ins.getOrElse(i,Set()) + e)
@@ -160,7 +165,7 @@ object ReoGraph {
     */
   private def dropSyncs(graph: ReoGraph): (List[Edge],Map[Int,Int]) = graph.edges match {
     case Nil => (graph.edges,Map())
-    case Edge(CPrim("sync",_,_,_),List(in),List(out))::tl
+    case Edge(CPrim("sync",_,_,_),List(in),List(out),_)::tl
       if (!graph.ins.contains(in)) && (!graph.outs.contains(out)) => // do not remove if connected to some boundary
       val (e,m) = dropSyncs(ReoGraph(tl,graph.ins,graph.outs))
       (e,m + (out -> in))
@@ -179,7 +184,7 @@ object ReoGraph {
   private def dropReplDupl(g:ReoGraph,inmap:Map[Int,Set[Edge]],outmap:Map[Int,Set[Edge]])
       : (List[Edge],Map[Int,Int]) = g.edges match {
     case Nil => (Nil,Map())
-    case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(_,_)))::tl =>
+    case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(_,_),_))::tl =>
       val (e,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       var syncs: List[Edge] = List()
       var binds: Map[Int,Int] = Map()
@@ -193,7 +198,7 @@ object ReoGraph {
         }
       }
       (e:::syncs,m++binds)
-    case Edge(CPrim("merger",_,_,_),ei@List(i1,i2),List(o1))::tl
+    case Edge(CPrim("merger",_,_,_),ei@List(i1,i2),List(o1),_)::tl
         if allHaveEdges(ei,outmap)=>
       val (e,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       val m2 = if (getEdge("dupl",i1,outmap).isDefined) m  else m  + (i1 -> o1)

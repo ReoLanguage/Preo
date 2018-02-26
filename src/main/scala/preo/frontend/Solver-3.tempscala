@@ -6,9 +6,11 @@ import org.chocosolver.solver.constraints.LogicalConstraintFactory._
 import org.chocosolver.solver.search.loop.monitors.SearchMonitorFactory
 import org.chocosolver.solver.search.strategy.IntStrategyFactory
 import org.chocosolver.solver.variables.{BoolVar, IntVar, VariableFactory}
-import org.chocosolver.solver.{Model, Solver => CSolver}
+import org.chocosolver.solver.{Solver => CSolver}
 import preo.ast._
-import preo.common.Utils
+import preo.common.{TypeCheckException, Utils}
+
+import scala.collection.immutable
 
 
 /**
@@ -31,6 +33,58 @@ object Solver {
 
 
   /**
+    * returns the number of solutions required or as many as possible
+    * @param typ type used to extract constraints and relevant vars
+    * @param n number of desired solutions
+    * @return (boolVars, intVars) after solverAux function applies
+    */
+
+  def getSolutions(n:Int, typ: Type): Map[String, List[Expr]] = {
+    if (typ.const == BVal(true) || typ.const == And(List()))
+      return Map()
+
+    var values = Map(): Map[String, List[Expr]]
+
+    val sol = solveAux(typ.const)
+    if(sol.isDefined){
+      var i = 0
+      //add the values to our map
+      for ((x, v) <- intVars)
+        values += (x -> List())
+      for ((x, v) <- boolVars)
+        values += (x -> List())
+      var solved = true
+      do{
+        if(Math.random <= 0.4){
+          for((x, v) <- intVars){
+            val valueX = values(x)
+            values = values +  (x -> (valueX.take(i) ++ List(IVal(v.getValue)) ++ valueX.drop(i) ))
+          }
+          for((x, v) <- boolVars){
+            val valueX = values(x)
+            values = values + (x -> (valueX.take(i) ++ List(BVal(v.getValue == 1)) ++ valueX.drop(i)) )
+          }
+          i += 1
+        }
+        else{
+          for((x, v) <- intVars){
+            values += (x -> (values(x) ++ List(IVal(v.getValue))))
+          }
+          for((x, v) <- boolVars){
+            values += (x -> (values(x) ++ List(BVal(v.getValue == 1))))
+          }
+        }
+        solved = sol.get.nextSolution()
+      }while(solved && i < n)
+      for((x, v) <- values){
+        values += (x -> v.take(n))
+      }
+      values
+    }
+    else null
+  }
+
+  /**
    * Solve a boolean constraint with integers using the Choco library.
     *
     * @param bExpr boolean constraint to be solved
@@ -43,6 +97,7 @@ object Solver {
       return Some(Substitution())
 
     val sol = solveAux(bExpr)
+
     // build reply (substitution) and return value
     if (sol.isDefined) {
       var res = Substitution()
@@ -132,12 +187,11 @@ object Solver {
     seed = 0
     boolVars = scala.collection.mutable.Map[String,BoolVar]()
     intVars  = scala.collection.mutable.Map[String,IntVar]()
-//..    solver = new CSolver()
-//..    SearchMonitorFactory.limitTime(solver,TIME_LIMIT)
-    val model: Model = new Model("bExpr")
+    solver = new CSolver()
+    SearchMonitorFactory.limitTime(solver,TIME_LIMIT)
 
-    val c = bexpr2choco(bExpr,model)
-//    solver.post(c)
+    val c = bexpr2choco(bExpr)
+    solver.post(c)
 
     // set strategy and finds solution
 //    if (intVars.isEmpty)
@@ -167,25 +221,25 @@ object Solver {
 //  private def genFreshPosIVar(): IntVar = genFreshIVar(MIN_INT,MAX_INT)
 
   // get a choco variable for a user-defined variable
-  private def getIVar(v:String,model:Model): IntVar = {
+  private def getIVar(v:String): IntVar = {
     if (intVars contains v) intVars(v)
     else {
-      val res = model.intVar(v,MIN_INT,MAX_INT)  //VariableFactory.bounded(v,MIN_INT,MAX_INT,solver)
+      val res = VariableFactory.bounded(v,MIN_INT,MAX_INT,solver)
       intVars(v) = res
       res
     }
   }
-  private def getIVar(exp:IExpr,model:Model): IntVar = exp match {
-    case IVal(n) => model.intVar(n) // VariableFactory.fixed(n,solver)
-    case Var(x) => getIVar(x,model)
-    case Add(e1, e2) => combineIExpr(e1,e2,"+",model)
-    case Sub(e1, e2) => combineIExpr(e1,e2,"-",model)
-    case Mul(e1, e2) => combineIExpr(e1,e2,"*",model)
-    case Div(e1, e2) => combineIExpr(e1,e2,"/",model)
+  private def getIVar(exp:IExpr): IntVar = exp match {
+    case IVal(n) => VariableFactory.fixed(n,solver)
+    case Var(x) => getIVar(x)
+    case Add(e1, e2) => combineIExpr(e1,e2,"+")
+    case Sub(e1, e2) => combineIExpr(e1,e2,"-")
+    case Mul(e1, e2) => combineIExpr(e1,e2,"*")
+    case Div(e1, e2) => combineIExpr(e1,e2,"/")
     case Sum(x, IVal(from), IVal(to), e) =>
       if (from < to){ // "from" did not reach "to" yet
         val e1 = Substitution(x,IVal(from)).apply(e)
-        getIVar(Add(e1,Sum(x,IVal(from+1),IVal(to),e)),model)
+        getIVar(Add(e1,Sum(x,IVal(from+1),IVal(to),e)))
       }
       else {
         val v = genFreshIVar(0,0)
@@ -195,12 +249,11 @@ object Solver {
       }
     case ITE(b, ifTrue, ifFalse) => // if b then v=intval1 else v=intval2; v
       val v = genFreshIVar()
-      val bv = bexpr2choco(b,model)
-      val ct = model.arithm(v,"=",getIVar(ifTrue,model))
-      val cf = model.arithm(v,"=",getIVar(ifFalse,model))
-//      val c =  ifThenElse_reifiable(bv,ct,cf)
-//      model.post(c)
-      model.ifThenElse(bv,ct,cf)
+      val bv = bexpr2choco(b)
+      val ct = arithm(v,"=",getIVar(ifTrue))
+      val cf = arithm(v,"=",getIVar(ifFalse))
+      val c =  ifThenElse_reifiable(bv,ct,cf)
+      solver.post(c)
       v
     case Sum(_, f, t, _) =>
       throw new UnhandledOperException(s"Case not handled - neither ${Show(f)} nor ${Show(t)} can have variables, in:\n  "+Show.apply(exp))
@@ -208,45 +261,41 @@ object Solver {
       throw new UnhandledOperException("Case not handled: "+Show.apply(exp))
   }
 
-  private def combineIExpr(e1:IExpr,e2:IExpr,op:String,model:Model): IntVar = (e1,e2) match {
+  private def combineIExpr(e1:IExpr,e2:IExpr,op:String): IntVar = (e1,e2) match {
     case (IVal(i1),IVal(i2)) => // i1 'op' i2
       val v = genFreshIVar()
-//      var c: Constraint = null
+      var c: Constraint = null
       op match {
-        case "+" => model.arithm(v, "=", i1+i2).post()
-        case "-" => model.arithm(v, "=", i1-i2).post()
-        case "*" => model.arithm(v, "=", i1*i2).post()
-        case "/" => model.arithm(v, "=", i1/i2).post()
+        case "+" => c = arithm(v, "=", i1+i2)
+        case "-" => c = arithm(v, "=", i1-i2)
+        case "*" => c = arithm(v, "=", i1*i2)
+        case "/" => c = arithm(v, "=", i1/i2)
         case _ => throw new UnhandledOperException("unexpected operator: "+op)
       }
-//      solver.post(c)
+      solver.post(c)
       v
     case (Var(x),IVal(i)) => // x 'op' i
       val v = genFreshIVar()
       op match {
         case "+" | "-" =>
-          model.arithm(v,"=",getIVar(x,model),op,i).post()
+          solver.post(arithm(v,"=",getIVar(x),op,i))
         case "*" =>
-          model.times(getIVar(x,model),i,v).post()
+          solver.post(times(getIVar(x),i,v))
         case "/" =>
-          model.div(getIVar(x,model), model.intVar(i),v)
-//          solver.post(eucl_div(getIVar(x),VariableFactory.fixed(i,solver),v))
+          solver.post(eucl_div(getIVar(x),VariableFactory.fixed(i,solver),v))
       }
       v
     case (IVal(i),Var(x)) => // i 'op' x (3-x --> -x + 3)
       val v = genFreshIVar()
       op match {
         case "+" =>
-          model.arithm(v,"=",getIVar(x,model),op,i))
+          solver.post(arithm(v,"=",getIVar(x),op,i))
         case "-" =>
-          val v2 = genFreshIVar()
-          model.arithm(v2,"=", getIVar(x,model))
-          model.arithm(v,"=", getIVar(x,model))
-          model.arithm(v,"=",  VariableFactory.minus(getIVar(x)),"+",i))
+          solver.post(arithm(v,"=",VariableFactory.minus(getIVar(x)),"+",i))
         case "*" =>
-          model.times(getIVar(x),i,v))
+          solver.post(times(getIVar(x),i,v))
         case "/" =>
-//          solver.post(eucl_div(VariableFactory.fixed(i,solver),getIVar(x),v))
+          solver.post(eucl_div(VariableFactory.fixed(i,solver),getIVar(x),v))
       }
       v
     case _ => // exp1 'op' exp2
@@ -270,33 +319,142 @@ object Solver {
     }
   }
 
-  def bexpr2choco(bExpr: Expr, model: Model): Constraint = bExpr match {
-    case BVal(b) => if (b) model.trueConstraint() else model.falseConstraint() // FALSE(solver)
-    case Var(x) => model.arithm(getBVar(x).intVar(),"=",1) //getBVar(x).extension() //??
-      //model.reification(getBVar(x),model.trueConstraint()) //reification_reifiable(getBVar(x),TRUE(solver))
-    case And(Nil) => model.trueConstraint() //TRUE(solver)
-    case And(e::es) => model.and(bexpr2choco(e,model),bexpr2choco(And(es),model))
-    case Or(e1, e2) => model.or(bexpr2choco(e1,model),bexpr2choco(e2,model))
-    case Not(e1) => model.not(bexpr2choco(e1,model))
-    case EQ(e1,e2) => comp(e1,e2,"=","=",_==_,model)
-    case GT(e1,e2) => comp(e1,e2,">","<",_>_,model)
-    case LT(e1,e2) => comp(e1,e2,"<",">",_<_,model)
-    case GE(e1,e2) => comp(e1,e2,">=","<=",_>=_,model)
-    case LE(e1,e2) => comp(e1,e2,"<=",">=",_<=_,model)
+  def bexpr2choco(bExpr: Expr): Constraint = bExpr match {
+    case BVal(b) => if (b) TRUE(solver) else FALSE(solver)
+    case Var(x) => reification_reifiable(getBVar(x),TRUE(solver))
+    case And(Nil) => TRUE(solver)
+    case And(e::es) => and(bexpr2choco(e),bexpr2choco(And(es)))
+    case Or(e1, e2) => or(bexpr2choco(e1),bexpr2choco(e2))
+    case Not(e1) => not(bexpr2choco(e1))
+    case EQ(e1,e2) => comp(e1,e2,"=","=",_==_)
+    case GT(e1,e2) => comp(e1,e2,">","<",_>_)
+    case LT(e1,e2) => comp(e1,e2,"<",">",_<_)
+    case GE(e1,e2) => comp(e1,e2,">=","<=",_>=_)
+    case LE(e1,e2) => comp(e1,e2,"<=",">=",_<=_)
     case AndN(_, f, t, _) =>
       throw new UnhandledOperException(s"Case not handled - neither ${Show(f)} nor ${Show(t)} can have variables, in:\n  "+Show.apply(bExpr))
     case _ =>
       throw new UnhandledOperException(s"Could not encode expression as a boolean expression (in Choco):\n  "+Show.apply(bExpr))
   }
 
-  private def comp(e1:IExpr,e2:IExpr,op:String,revop:String,test:(Int,Int)=>Boolean,model:Model): Constraint =
+  private def comp(e1:IExpr,e2:IExpr,op:String,revop:String,test:(Int,Int)=>Boolean): Constraint =
     (e1,e2) match {
-      case (IVal(i1), IVal(i2)) => if (test(i1,i2)) model.trueConstraint() else model.falseConstraint()
-      case (Var(x), IVal(i)) => model.arithm(getIVar(x),op,i)
-      case (IVal(i), exp) => model.arithm(getIVar(exp),revop,i)
-      case (exp1, exp2) => model.arithm(getIVar(exp1),op,getIVar(exp2))
+      case (IVal(i1), IVal(i2)) => if (test(i1,i2)) TRUE(solver) else FALSE(solver)
+      case (Var(x), IVal(i)) => arithm(getIVar(x),op,i)
+      case (IVal(i), exp) => arithm(getIVar(exp),revop,i)
+      case (exp1, exp2) => arithm(getIVar(exp1),op,getIVar(exp2))
     }
 
+  /// Guessing simple intervals
+  sealed abstract class Interval
+  case class Range(from:Option[Int],to:Option[Int]) extends Interval {
+    override def toString: String = s"(${myval(from)},${myval(to)})"
+    private def myval(v:Option[_]): String = v match {
+      case Some(x) => x.toString
+      case None => "inf"
+    }
+  }
+  case class Bools(bools:Set[Boolean]) extends Interval
+
+  def guessSol(bExpr: BExpr): (Substitution,BExpr) = {
+    val  g = varIntIntervals(bExpr)
+    val (x,rest) = g
+    var res = Substitution()
+    for ((v,i) <- x) i match {
+      case Range(Some(n), _) => res += (v,IVal(n))
+      case Range(_, Some(n)) => res += (v,IVal(n))
+      case Range(None, None) => res += (v,IVal(1))
+      case Bools(bs) => res += (v,BVal(bs.head)) // only non-empty options
+    }
+    (res,Simplify(rest))
+  }
+
+  /**
+    * Tries to infer a domain interval for each variable.
+    * It only considers some cases - untreated cases are kept in the second part of the return value.
+    * @param bEXpr
+    * @return Some(a,b) if it finds intervals in "a" and fails to treat cases in "b".
+    */
+  def varIntIntervals(bEXpr:BExpr): (Map[Var,Interval],BExpr) = bEXpr match {
+    case Var(x) => (Map(Var(x) -> Bools(Set(true))),BVal(true))
+    case Not(Var(x)) => (Map(Var(x) -> Bools(Set(false))),BVal(true))
+    case And(Nil) => (Map(),BVal(true))
+    case And(b::bs) =>
+      val (map1,rest1) = varIntIntervals(b)
+      val (map2,rest2) = varIntIntervals(And(bs))
+      val map3 = mergeMap(map1,map2)
+      (map3,And(List(rest1,rest2)))
+    case EQ(Var(x), IVal(n)) => mkRange(x,Some(n),Some(n))
+    case GT(Var(x), IVal(n)) => mkRange(x,Some(n+1),None)
+    case LT(Var(x), IVal(n)) => mkRange(x,None,Some(n-1))
+    case LE(Var(x), IVal(n)) => mkRange(x,None,Some(n))
+    case GE(Var(x), IVal(n)) => mkRange(x,Some(n),None)
+      //
+    case EQ(IVal(n), Var(x)) => varIntIntervals(EQ(Var(x),IVal(n)))
+    case GT(IVal(n), Var(x)) => varIntIntervals(GT(Var(x),IVal(n)))
+    case LT(IVal(n), Var(x)) => varIntIntervals(LT(Var(x),IVal(n)))
+    case LE(IVal(n), Var(x)) => varIntIntervals(LE(Var(x),IVal(n)))
+    case GE(IVal(n), Var(x)) => varIntIntervals(GE(Var(x),IVal(n)))
+    //
+    case GT(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(GT(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(LT(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+    case LT(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(LT(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(GT(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+    case LE(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(LE(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(GE(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+    case GE(Mul(IVal(n1),Var(x)),IVal(n)) =>
+      if (n1>0) varIntIntervals(GE(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+      else      varIntIntervals(LE(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+    case _ => (Map(),bEXpr)
+  }
+  private def mkRange(x:String,from:Option[Int],to:Option[Int]): (Map[Var,Interval],BExpr) =
+    (Map(Var(x) -> Range(from,to)),BVal(true))
+  private def mergeMap(m1:Map[Var,Interval],m2:Map[Var,Interval]) : Map[Var,Interval] =
+    m1.toList./:(m2)(insertPair)
+  private def insertPair(m:Map[Var,Interval],vi:(Var,Interval)): Map[Var,Interval] = {
+    var changed = false
+    var newmap = Map[Var,Interval]()
+    for ((v2,i2) <- m) {
+      if (vi._1 == v2) {
+        val i3 = mergeInterval(vi._2,i2,v2.x)
+        newmap += (v2 -> i3)
+        changed = true
+      }
+      else newmap += (v2 -> i2)
+    }
+    if (!changed) newmap += vi
+    newmap
+  }
+  private def mergeInterval(i1:Interval,i2:Interval,v:String): Interval = (i1,i2) match {
+    case (Range(r1,r2),Range(r3,r4)) =>
+      checkValidity(Range(myMax(r1,r3),myMin(r2,r4)),v)
+    case (Bools(s1),Bools(s2)) =>
+      val s3 = s1 intersect s2
+      if (s3.isEmpty) throw new TypeCheckException(s"Incompatible boolean domains for $v:" +
+        s"${s1.mkString("{",",","}")} and ${s2.mkString("{",",","}")}.")
+      else Bools(s3)
+    case _ => throw new TypeCheckException(s"Incompatible intervals for $v: $i1 and $i2.")
+  }
+
+  // None means -inf
+  private def myMax(r1:Option[Int],r2:Option[Int]): Option[Int] = (r1,r2) match {
+    case (None,_) => r2
+    case (_,None) => r1
+    case (Some(n1),Some(n2)) => Some(Math.max(n1,n2))
+  }
+  // None means +inf
+  private def myMin(r1:Option[Int],r2:Option[Int]): Option[Int] = (r1,r2) match {
+    case (None,_) => r2
+    case (_,None) => r1
+    case (Some(n1),Some(n2)) => Some(Math.min(n1,n2))
+  }
+  private def checkValidity(r:Range,v:String):Range = r match {
+    case Range(Some(n1),Some(n2)) if n1>n2 => throw new TypeCheckException(s"Incompatible domains: fails $n1 <= $v <= $n2")
+    case _ => r
+  }
 
 
 

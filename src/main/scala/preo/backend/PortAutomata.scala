@@ -12,7 +12,7 @@ import preo.common.{GenerationException, TypeCheckException}
   *              sets of actions and of edges (as in [[ReoGraph.Edge]]).
   */
 case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set[Edge]))])
-  extends Automata[PortAutomata] {
+  extends Automata {
 
 
   /** Collects all states, seen as integers */
@@ -25,56 +25,16 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Set[(Int,(Int,Set[Int],Set
   /** Returns the transitions to be displayed */
   override def getTrans: Set[(Int, Any, String, Int)] =
     for ((from, (to, fire, es)) <- trans)
-      yield (from, es.map(_.prim.name).filterNot(_ == "sync").mkString("."), (fire,es).hashCode().toString, to)
+      yield (from, es.map(getName).filterNot(_ == "sync").mkString("."), (fire,es).hashCode().toString, to)
+
+  private def getName(edge: Edge):String = edge.parents match {
+    case Nil => edge.prim.name
+    case ::(head, tl) => head
+  }
 
   private def printPrim(edge: Edge):String = {
     s"""${edge.prim.name}-${edge.prim.i.ports}-${edge.prim.j.ports}-${edge.ins.mkString(".")}-${edge.outs.mkString(".")}"""
   }
-
-  /**
-    * Automata composition - combining every possible transition,
-    * and including transitions that can occur in parallel.
-    * @param other automata to be composed
-    * @return composed automata
-    */
-  def ++(other:PortAutomata): PortAutomata = {
-    //     println(s"combining ${this.show}\nwith ${other.show}")
-    var seed = 0
-    val shared = other.ports intersect ports
-    var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
-    var newStates = Map[(Int,Int),Int]()
-    def mkState(i1:Int,i2:Int) = if (newStates.contains((i1,i2)))
-      newStates((i1,i2))
-    else {
-      seed +=1
-      newStates += (i1,i2) -> seed
-      seed
-    }
-    def ok(toFire:Set[Int]): Boolean = toFire.intersect(shared).isEmpty
-    def ok2(toFire1:Set[Int],toFire2:Set[Int]): Boolean =
-      toFire1.intersect(other.ports) == toFire2.intersect(ports)
-
-    // just 1
-    for ((from1,(to1,fire1,es1)) <- trans; p2 <- other.getStates)
-      if (ok(fire1))
-        restrans += mkState(from1,p2) -> (mkState(to1,p2),fire1,es1)
-    // just 2
-    for ((from2,(to2,fire2,es2)) <- other.trans; p1 <- getStates)
-      if (ok(fire2))
-        restrans += mkState(p1,from2) -> (mkState(p1,to2),fire2,es2)
-    // communication
-    for ((from1,(to1,fire1,es1)) <- trans; (from2,(to2,fire2,es2)) <- other.trans) {
-      if (ok2(fire1,fire2))
-        restrans += mkState(from1,from2) -> (mkState(to1,to2),fire1++fire2,es1++es2)
-    }
-    // println(s"ports: $newStates")
-    val a = PortAutomata(ports++other.ports,mkState(init,other.init),restrans)
-    //    println(s"got ${a.show}")
-    val a2 = a.cleanup
-    //    println(s"cleaned ${a2.show}")
-    a2
-  }
-
 
   private type Trans = Set[(Int,(Int,Set[Int],Set[Edge]))]
 
@@ -108,32 +68,78 @@ object PortAutomata {
   implicit object PortAutomataBuilder extends AutomataBuilder[PortAutomata] {
 
     def buildAutomata(e: Edge, seed: Int): (PortAutomata, Int) = e match {
-      case Edge(CPrim("sync", _, _, _), List(a), List(b)) =>
+      case Edge(CPrim("sync", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
-      case Edge(CPrim("id", _, _, _), List(a), List(b)) =>
+      case Edge(CPrim("id", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
-      case Edge(CPrim("lossy", _, _, _), List(a), List(b)) =>
+      case Edge(CPrim("lossy", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)), seed -> (seed, Set(a), Set(e)))), seed + 1)
-      case Edge(CPrim("fifo", _, _, _), List(a), List(b)) =>
+      case Edge(CPrim("fifo", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed - 1, Set(seed - 1 -> (seed, Set(a), Set(e)), seed -> (seed - 1, Set(b), Set(e)))), seed + 2)
-      case Edge(CPrim("fifofull", _, _, _), List(a), List(b)) =>
+      case Edge(CPrim("fifofull", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed - 1 -> (seed, Set(a), Set(e)), seed -> (seed - 1, Set(b), Set(e)))), seed + 2)
-      case Edge(CPrim("drain", _, _, _), List(a, b), List()) =>
+      case Edge(CPrim("drain", _, _, _), List(a, b), List(),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
-      case Edge(CPrim("merger", _, _, _), List(a, b), List(c)) =>
+      case Edge(CPrim("merger", _, _, _), List(a, b), List(c),_) =>
         (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, c), Set(e)), seed -> (seed, Set(b, c), Set(e)))), seed + 1)
-      case Edge(CPrim("dupl", _, _, _), List(a), List(b, c)) =>
+      case Edge(CPrim("dupl", _, _, _), List(a), List(b, c),_) =>
         (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, b, c), Set(e)))), seed + 1)
-      case Edge(CPrim("writer", _, _, _), List(), List(a)) =>
+      case Edge(CPrim("writer", _, _, _), List(), List(a),_) =>
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
-      case Edge(CPrim("reader", _, _, _), List(a), List()) =>
+      case Edge(CPrim("reader", _, _, _), List(a), List(),_) =>
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
 
-      case Edge(p, _, _) =>
+      case Edge(p, _, _,_) =>
         throw new GenerationException(s"Unknown port automata for primitive $p")
     }
 
     def emptyAutomata = PortAutomata(Set(), 0, Set())
+
+    /**
+      * Automata composition - combining every possible transition,
+      * and including transitions that can occur in parallel.
+      * @param a1 automata to be composed
+      * @param a2 automata to be composed
+      * @return composed automata
+      */
+    def join(a1:PortAutomata,a2:PortAutomata): PortAutomata = {
+      //     println(s"combining ${this.show}\nwith ${other.show}")
+      var seed = 0
+      val shared = a1.ports.intersect(a2.ports)
+      var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
+      var newStates = Map[(Int,Int),Int]()
+      def mkState(i1:Int,i2:Int) = if (newStates.contains((i1,i2)))
+        newStates((i1,i2))
+      else {
+        seed +=1
+        newStates += (i1,i2) -> seed
+        seed
+      }
+      def ok(toFire:Set[Int]): Boolean = toFire.intersect(shared).isEmpty
+      def ok2(toFire1:Set[Int],toFire2:Set[Int]): Boolean =
+        toFire1.intersect(a2.ports) == toFire2.intersect(a1.ports)
+
+      // just 1
+      for ((from1,(to1,fire1,es1)) <- a1.trans; p2 <- a2.getStates)
+        if (ok(fire1))
+          restrans += mkState(from1,p2) -> (mkState(to1,p2),fire1,es1)
+      // just 2
+      for ((from2,(to2,fire2,es2)) <- a2.trans; p1 <- a1.getStates)
+        if (ok(fire2))
+          restrans += mkState(p1,from2) -> (mkState(p1,to2),fire2,es2)
+      // communication
+      for ((from1,(to1,fire1,es1)) <- a1.trans; (from2,(to2,fire2,es2)) <- a2.trans) {
+        if (ok2(fire1,fire2))
+          restrans += mkState(from1,from2) -> (mkState(to1,to2),fire1++fire2,es1++es2)
+      }
+      // println(s"ports: $newStates")
+      val res1 = PortAutomata(a1.ports++a2.ports,mkState(a1.init,a2.init),restrans)
+      //    println(s"got ${a.show}")
+      val res2 = res1.cleanup
+      //    println(s"cleaned ${a2.show}")
+      res2
+    }
+
   }
 
 }

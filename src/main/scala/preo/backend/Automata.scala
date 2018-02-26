@@ -5,9 +5,8 @@ import preo.backend.ReoGraph._
 
 /**
   * Representation of an automata, aimed at being generated from a [[ReoGraph]].
-  * @tparam A is the specific automata typs
   */
-trait Automata[A <: Automata[A]] {
+trait Automata {
 
   /** Set of states of the automata, represented as integers */
   def getStates: Set[Int]
@@ -19,13 +18,13 @@ trait Automata[A <: Automata[A]] {
   /** Returns the transitions to be displayed */
   def getTrans: Set[(Int,Any,String,Int)] // from, label, id, to
 
-  /**
-    * Automata composition - combining every possible transition,
-    * and including transitions that can occur in parallel.
-    * @param other automata to be composed
-    * @return composed automata
-    */
-  def ++(other:A): A
+//  /**
+//    * Automata composition - combining every possible transition,
+//    * and including transitions that can occur in parallel.
+//    * @param other automata to be composed
+//    * @return composed automata
+//    */
+//  def ++(other:A): A
 
   /** An easier to read representation */
   def show: String
@@ -35,19 +34,19 @@ object Automata {
 
   private var seed = 0
 
-  def apply[A<:Automata[A]](str:String)
-                           (implicit builder: AutomataBuilder[A]): A = {
+  def apply[A<:Automata](str:String)
+                        (implicit builder: AutomataBuilder[A]): A = {
     val c = preo.DSL.parse(str)
     val cc = preo.DSL.reduce(c)
-    apply(cc)
+    apply(cc)(builder)
   }
 
-  def apply[A<:Automata[A]](cc:CoreConnector)
-                           (implicit builder: AutomataBuilder[A]): A = {
+  def apply[A<:Automata](cc:CoreConnector)
+                        (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
     val gr = ReoGraph.toGraphWithoutSimpl(cc)
 //    println("about to create automata from\n"+gr)
-    buildAutomata[A](gr)
+    buildAutomata[A](gr)(builder)
   }
 
 
@@ -56,8 +55,8 @@ object Automata {
     * @param g graph to be converted into an automaton
     * @return
     */
-  private def buildAutomata[A<:Automata[A]](g: ReoGraph)
-                                           (implicit builder:AutomataBuilder[A]): A = {
+  private def buildAutomata[A<:Automata](g: ReoGraph)
+                                        (implicit builder:AutomataBuilder[A]): A = {
     val (ins,outs) = collectInsOuts(g)
     def getNeighbours(e:Edge): List[Edge] =
       (for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
@@ -83,7 +82,7 @@ object Automata {
           val prim = builder.buildAutomata(prev,seed)
           seed = prim._2
 //          println(s"next: ${prev.prim.name} ${prev.ins} ${prev.outs} ${prev.priority}")
-          aut = aut ++ prim._1 // update automata with "prev"
+          aut = builder.join(aut , prim._1) // update automata with "prev"
           missing -= prev // add "prev" to known edges
         }
         if (missing.nonEmpty) {
@@ -91,7 +90,7 @@ object Automata {
 //          println(s"next: ${prev.prim.name} ${prev.ins} ${prev.outs} ${prev.priority}")
           val prim = builder.buildAutomata(prev,seed)
           seed = prim._2
-          aut = aut ++ prim._1
+          aut = builder.join (aut , prim._1)
           next = getNeighbours(prev)
           missing = missing.tail
         }
@@ -103,7 +102,16 @@ object Automata {
   }
 }
 
-trait AutomataBuilder[A<:Automata[A]] {
+trait AutomataBuilder[A<:Automata] {
   def buildAutomata(e:Edge,seed:Int): (A,Int)
   def emptyAutomata: A
+  /**
+    * Automata composition - combining every possible transition,
+    * and including transitions that can occur in parallel.
+    * @param a1 1st automaton to be composed
+    * @param a2 1st automaton to be composed
+    * @return composed automata
+    */
+  def join(a1:A,a2:A): A
+
 }
