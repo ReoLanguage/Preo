@@ -40,48 +40,49 @@ object Solver {
     * @return (boolVars, intVars) after solverAux function applies
     */
 
-  def getSolutions(n:Int, typ: Type): List[Map[String, List[Expr]]] = {
+  def getSolutions(n:Int, typ: Type): Map[String, List[Expr]] = {
     if (typ.const == BVal(true) || typ.const == And(List()))
-      return List(Map())
+      return Map()
 
-    var res = List[Map[String, List[Expr]]]()
-    var counter = n
+    var values = Map(): Map[String, List[Expr]]
 
     val solver = solveAux(typ.const)
-    while (solver.solve() && counter >= 0) {
-      var values = Map(): Map[String, List[Expr]]
+    if(solver.solve()){
+      var i = 0
       //add the values to our map
       for ((x, v) <- intVars)
         values += (x -> List())
       for ((x, v) <- boolVars)
         values += (x -> List())
-
-      if(Math.random <= 0.4){
-        for((x, v) <- intVars){
-          val valueX = values(x)
-          values = values +  (x -> (valueX.take(n-counter) ++ List(IVal(v.getValue)) ++ valueX.drop(n-counter) ))
+      var solved = true
+      do{
+        if(Math.random <= 0.4){
+          for((x, v) <- intVars){
+            val valueX = values(x)
+            values = values +  (x -> (valueX.take(i) ++ List(IVal(v.getValue)) ++ valueX.drop(i) ))
+          }
+          for((x, v) <- boolVars){
+            val valueX = values(x)
+            values = values + (x -> (valueX.take(i) ++ List(BVal(v.getValue == 1)) ++ valueX.drop(i)) )
+          }
+          i += 1
         }
-        for((x, v) <- boolVars){
-          val valueX = values(x)
-          values = values + (x -> (valueX.take(n-counter) ++ List(BVal(v.getValue == 1)) ++ valueX.drop(n-counter)) )
+        else{
+          for((x, v) <- intVars){
+            values += (x -> (values(x) ++ List(IVal(v.getValue))))
+          }
+          for((x, v) <- boolVars){
+            values += (x -> (values(x) ++ List(BVal(v.getValue == 1))))
+          }
         }
-        counter -= 1
-      }
-      else{
-        for((x, v) <- intVars){
-          values += (x -> (values(x) ++ List(IVal(v.getValue))))
-        }
-        for((x, v) <- boolVars){
-          values += (x -> (values(x) ++ List(BVal(v.getValue == 1))))
-        }
-      }
-
+        solved = solver.solve() // solve again!
+      }while(solved && i < n)
       for((x, v) <- values){
         values += (x -> v.take(n))
       }
-      res ::= values
+      values
     }
-    res
+    else null
   }
 
   /**
