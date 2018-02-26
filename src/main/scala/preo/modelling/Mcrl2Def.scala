@@ -60,6 +60,11 @@ case class Mcrl2Node(number: Int, before: Action, after: Action, var prev: Mcrl2
     * @return the new node.
     */
   def ++(other: Mcrl2Node): Mcrl2Node = Mcrl2Node(number, before, other.after, prev, other.next)
+
+  def replace(replacements: Map[String, Mcrl2Channel]): Unit = {
+    prev = if (prev != null && replacements.get(prev.getName.toString).isDefined) replacements(prev.getName.toString) else prev
+    next = if (next != null && replacements.get(next.getName.toString).isDefined) replacements(next.getName.toString) else next
+  }
 }
 
 
@@ -109,6 +114,16 @@ case class Mcrl2Channel(name:String = "Channel", number: Int, before: List[Actio
     prev = prev.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
     next = next.map(node =>if (replacements.get(node.getName.toString).isDefined) replacements(node.getName.toString) else node)
   }
+
+  override def equals(o: scala.Any): Boolean = {
+    if(o == null || o.getClass != this.getClass) false
+    else {
+      val c = o.asInstanceOf[Mcrl2Channel]
+      this.name == c.name && this.number == c.number
+    }
+  }
+
+  override def hashCode(): Int = (name, number).hashCode()
 }
 
 
@@ -127,7 +142,10 @@ case class Mcrl2Init(number: Int, var_name:String, var_number: Int,var_state:Sta
     val action3 = Action(var_name, var_number, TwoLine, var_state)
     val basicProc = procs.tail.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
     val operator =  Block(List(action2, action3), Comm((action2, action3, action1), basicProc))
-    operator
+    var_state match{
+      case Middle(_) => Hide(List(action1), operator)
+      case _ => operator
+    }
   }
 
   override def toString: String = s"Init$number = ${operator.toString}"

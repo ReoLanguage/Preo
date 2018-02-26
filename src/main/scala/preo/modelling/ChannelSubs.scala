@@ -23,4 +23,13 @@ class ChannelSubs(name: String,var items: List[Mcrl2Channel]) {
   }
 
   def put(item: Mcrl2Channel): Unit = if(item.name == name) {next = items.length+1; items ++= List(item)} else throw new WrongNameException(s"Expected $name, got ${item.name}")
+
+
+  //todo: check if this can exist
+  def remove(item: String): Unit = {
+    val current = getNext()
+    next -= 1
+    items = items.filter(c => c.getName.toString != item)
+    if(next >= item.length || (current.getName.toString != item  && items.drop(this.next).head != current)) next -= 1
+  }
 }

@@ -23,8 +23,8 @@ class TestDef {
 
   @Test
   def testChannel(): Unit ={
-    val action1 = Action("X", 1, OneLine, In1)
-    val action2 = Action("X", 2, TwoLine, In2)
+    val action1 = Action("X", 1, OneLine, In(1))
+    val action2 = Action("X", 2, TwoLine, In(2))
     val channel = Mcrl2Channel("Fifo", 2, List(action1), List(action2), Seq(action1, action2))
     assertEquals(channel.toString, s"Fifo2 = (${Seq(action1, action2).toString}) . Fifo2")
     assertEquals(channel.getName.toString, "Fifo2")
@@ -34,8 +34,8 @@ class TestDef {
 
   @Test
   def testInit(): Unit ={
-    val init1 = Mcrl2Init(1, "X",  3, In1,  ProcessName("Fifo1"), ProcessName("Node1"))
-    val init2 = Mcrl2Init(2, "X", 4, In2, ProcessName("Node2"), init1.getName)
+    val init1 = Mcrl2Init(1, "X",  3, In(1),  ProcessName("Fifo1"), ProcessName("Node1"))
+    val init2 = Mcrl2Init(2, "X", 4, In(2), ProcessName("Node2"), init1.getName)
     assertEquals(init1.getVars.length, 1)
     assertEquals(init2.getVars.length, 1)
     assertEquals(init1.getName.toString, "Init1")
@@ -54,12 +54,12 @@ class TestDef {
 
   @Test
   def testMcrl2Manager(): Unit = {
-    val action1 = Action("X", 1, TwoLine, In1)
-    val action2 = Action("X", 2, OneLine, In2)
-    val action3 = Action("X", 3, NoLine, Out1)
-    val action4 = Action("X", 4, TwoLine, Out2)
+    val action1 = Action("X", 1, TwoLine, In(1))
+    val action2 = Action("X", 2, OneLine, In(2))
+    val action3 = Action("X", 3, NoLine, Out(1))
+    val action4 = Action("X", 4, TwoLine, Out(2))
     val action5 = Action("X", 5, OneLine, Nothing)
-    val action6 = Action("X", 6, NoLine, In1)
+    val action6 = Action("X", 6, NoLine, In(1))
     val m1 = MultiAction(action1, action2)
     val m2 = MultiAction(action3, action4, action5)
     val m3 = MultiAction(action6)
