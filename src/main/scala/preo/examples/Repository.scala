@@ -48,11 +48,11 @@ object Repository {
         sym(2*(n:IExpr)*(n-1),2*(n:IExpr))
     ))
   /** alternates between the output of a value on each of its n outputs */
-  val alternateOut =
+  val fifoloop =
     lam(n,Tr(n, sym(n-1,1) & ((fifofull & dupl) * ((fifo & dupl)^(n-1))) & unzip(n) ))
   /** alternate flow between n flows [[http://reo.project.cwi.nl/webreo/generated/sequencer/frameset.htm]] */
-  val sequencer = lam(n, (((dupl^n) & unzip(n)) *
-    Tr(n, sym(n-1,1) & ((fifofull & dupl) * ((fifo & dupl)^(n-1))) & unzip(n) ) ) &
+  val sequencer = lam(n,
+    (((dupl^n) & unzip(n)) * fifoloop(n) ) &
     ((id^n) * (zip(n) & (drain^n))))
   /** sequencer with only inputs (alternates which input is ready) **/
   val sequencerIn = lam(n, ((id^n) *

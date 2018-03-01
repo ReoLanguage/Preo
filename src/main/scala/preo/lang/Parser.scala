@@ -24,7 +24,6 @@ object Parser extends RegexParsers {
   def parse(c:String): ParseResult[Connector] = parseAll(prog,c)
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
 
-
   override def skipWhitespace = true
   override val whiteSpace: Regex = "[ \t\r\f\n]+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
@@ -49,6 +48,8 @@ object Parser extends RegexParsers {
     case "unzip"    => SubConnector(s,Repository.unzip)
     case "exrouter" => SubConnector(s,Repository.exrouter)
     case "exrouters"=> SubConnector(s,Repository.nexrouter)
+    case "fifoloop" => SubConnector(s,Repository.fifoloop)
+    case "sequencer"=> SubConnector(s,Repository.sequencer)
     case _          => str2conn(s)
   }
 
