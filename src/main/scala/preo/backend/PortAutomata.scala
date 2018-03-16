@@ -25,11 +25,18 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   /** Returns the transitions to be displayed */
   override def getTrans: Automata.Trans =
     for ((from, (to, fire, es)) <- trans)
-      yield (from, es.map(getName(_,fire)).filterNot(_ == "sync").mkString("."), (fire,es).hashCode().toString, to)
+      yield (
+          from
+        , es.map(getName(_,fire))
+            .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
+            .foldRight[Set[String]](Set())(cleanDir)
+            .mkString(".")
+        , (fire,es).hashCode().toString
+        , to)
 
   private def getName(edge: Edge,fire:Set[Int]):String = (edge.parents match {
-    case Nil     => edge.prim.name
-    case ""::_   => edge.prim.name
+    case Nil     => primName(edge.prim)
+    case ""::_   => primName(edge.prim)
     case head::_ => head
   }) + getDir(edge,fire)
   private def getDir(edge: Edge,fire:Set[Int]): String = {
@@ -40,6 +47,19 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
       case (false,true) => "↑"
       case _ => "↕"
     }
+  }
+  private def primName(prim: CPrim): String = (prim.name,prim.extra) match {
+    case ("writer",Some(s:String)) => s"wr($s)"
+    case ("reader",Some(s:String)) => s"rd($s)"
+    case (n,Some(s:String)) => s"$n($s)"
+    case (n,_) => n
+  }
+  private def cleanDir(s:String,rest:Set[String]): Set[String] = (s.init,s.last) match {
+    case (name,'↓') if rest.contains(name + '↑') || rest.contains(name + '↕') =>
+      rest - (name+'↓') - (name+'↑') + (name+'↕')
+    case (name,'↑') if rest.contains(name + '↓') || rest.contains(name + '↕') =>
+      rest - (name+'↓') - (name+'↑') + (name+'↕')
+    case _ => rest + s
   }
 
   private def printPrim(edge: Edge):String = {

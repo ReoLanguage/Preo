@@ -27,6 +27,7 @@ object Parser extends RegexParsers {
   override def skipWhitespace = true
   override val whiteSpace: Regex = "[ \t\r\f\n]+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
+  val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
   /** Parses basic primitives */
   def inferPrim(s:String): Connector = s match {
@@ -127,6 +128,8 @@ object Parser extends RegexParsers {
   def elemP: Parser[Connector] =
     "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~c~_ => Trace(ie,c) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
+    "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some(name))} |
+    "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some(name))} |
     bexpr~"?"~connP~"+"~connP        ^^ { case b~_~c1~_~c2 => (b ? c1) + c2 }    |
     litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
 
