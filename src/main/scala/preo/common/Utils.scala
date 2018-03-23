@@ -76,6 +76,40 @@ object Utils {
     */
   def freeVars(i:Interface): Set[Var] = freeVars(interfaceSem(i))
 
+  /**
+    * Variables declared in a connector
+    * @param c connector
+    * @return set of variables declared in lambdas and quantified exponentials
+    */
+  def declaredVars(c:Connector): Set[Var] = c match {
+    case Abs(x, _, c1)  => declaredVars(c1) + x
+    case ExpX(x, _, c1) => declaredVars(c1) + x
+    case Seq(c1, c2)    => declaredVars(c1) ++ declaredVars(c2)
+    case Par(c1, c2)    => declaredVars(c1) ++ declaredVars(c2)
+    case Trace(i, c1)   => declaredVars(c1)
+    case SubConnector(_, c1) => declaredVars(c1)
+    case Exp(_, c1)     => declaredVars(c1)
+    case Choice(_, c1, c2) => declaredVars(c1) ++ declaredVars(c2)
+    case App(c1, _)     => declaredVars(c1)
+    case Restr(c1, _) => declaredVars(c1)
+    case _ => Set()
+  }
+
+  def usedVars(c:Connector): Set[Var] = c match {
+    case Abs(_, _, c1)  => usedVars(c1)
+    case ExpX(_, a, c1) => freeVars(a) ++ usedVars(c1)
+    case Seq(c1, c2)    => usedVars(c1) ++ usedVars(c2)
+    case Par(c1, c2)    => usedVars(c1) ++ usedVars(c2)
+    case Trace(i, c1)   => freeVars(i) ++ usedVars(c1)
+    case SubConnector(_, c1) => usedVars(c1)
+    case Exp(a, c1)     => freeVars(a) ++ usedVars(c1)
+    case Choice(b, c1, c2) => freeVars(b) ++ usedVars(c1) ++ usedVars(c2)
+    case App(c1, e)     => freeVars(e) ++ usedVars(c1)
+    case Restr(c1, phi) => freeVars(phi) ++ usedVars(c1)
+    case Prim(_,i,j,_) => freeVars(i) ++ freeVars(j)
+    case Symmetry(i,j) => freeVars(i) ++ freeVars(j)
+    case Id(i) => freeVars(i)
+  }
 
   /**
    * Interprets an interface as an integer expression

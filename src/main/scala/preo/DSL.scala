@@ -403,15 +403,21 @@ object DSL {
     * @param c connector to type check
     * @return
     */
-  def typeCheck(c:Connector): Boolean = try {
-    typeOf(c)
-    true
+  def typeCheck(c:Connector): Option[Type] = try {
+    Some(typeOf(c))
   }
   catch {
-    case _:TypeCheckException => false
+    case _:TypeCheckException => None
     case NonFatal(e) => throw e
 //    case e: Throwable => throw e
   }
+
+  def checkVerbose(c:Connector): Type = Deconstructor.check(c,typeCheck)
+  def checkVerbose(s:String): Type = checkVerbose(parse(s))
+
+
+  def unsafeCheckVerbose(c:Connector): Type = Deconstructor.check(c,unsafeTypeCheck)
+  def unsafeCheckVerbose(s:String): Type = unsafeCheckVerbose(parse(s))
 
   /**
     * Unsafe version of [[typeCheck()]], using [[unsafeTypeOf()]] that
@@ -420,12 +426,11 @@ object DSL {
     * @param c connector to type check
     * @return
     */
-  def unsafeTypeCheck(c:Connector): Boolean = try {
-    unsafeTypeOf(c)
-    true
+  def unsafeTypeCheck(c:Connector): Option[Type] = try {
+    Some(unsafeTypeOf(c)._1)
   }
   catch {
-    case _:TypeCheckException => false
+    case _:TypeCheckException => None
     case NonFatal(e) => throw e
     //    case e: Throwable => throw e
   }
@@ -457,5 +462,49 @@ object DSL {
     * @return rediced connector
     */
   def unsafeReduce(c:Connector):CoreConnector = Eval.unsafeReduce(c)
+
+//  def stepwiseTyping(c:Connector,typing: Connector => (Type,BExpr),ctx: List[Var]): (Type,BExpr) = c match {
+//    case Seq(c1, c2) =>
+//      stepwiseTyping(c1,typing,ctx) // try to type c1
+//      stepwiseTyping(c2,typing,ctx) // try to type c2
+//      updateError(s"Failed to type sequence:\n  - ${Show(c1)}  ;\n  - ${Show(c2)}",c,typing)
+//    case Par(c1, c2) =>
+//      stepwiseTyping(c1,typing,ctx) // try to type c1
+//      stepwiseTyping(c2,typing,ctx) // try to type c2
+//      updateError(s"Failed to type parallel composition:\n  - ${Show(c1)}  ;\n  - ${Show(c2)}",c,typing)
+//    case Trace(i, c) =>
+//      stepwiseTyping(c,typing,ctx) // try to type c
+//      updateError(s"Failed to type trace content:\n  - ${Show(c)}",c,typing)
+//    case Exp(a, c) =>
+//      stepwiseTyping(c,typing,ctx) // try to type c
+//      updateError(s"Failed to type exponential:\n  - ${Show(c)}",c,typing)
+//    case ExpX(x, a, c2) =>
+//      addVar(x,c,c2,typing,ctx)
+////      updateError(s"Failed to type exponential:\n  - ${Show(c)}",
+////        lam(x.x:I,c),stepwiseTyping(_,typing)) // try to type c for any
+//      updateError(s"Failed to type exponential:\n  - ${Show(c)}",c,typing)
+//    case Choice(b, c1, c2) =>
+//      stepwiseTyping(c1,typing) // try to type c1
+//      stepwiseTyping(c2,typing) // try to type c2
+//      updateError(s"Failed to type choice:\n  - ${Show(b)} ?\n  - ${Show(c1)}  +\n  - ${Show(c2)}",c,typing)
+//    case Abs(x, et, c) =>
+//      stepwiseTyping(c,typing) // try to type c
+//      updateError(s"Failed to type lambda:\n  - ${Show(c)}",c,typing)
+//    case App(c, a) =>
+//      stepwiseTyping(c,typing) // try to type c
+//      updateError(s"Failed to type lambda application:\n  - ${Show(c)}",c,typing)
+//    case Restr(c, phi) =>
+//    case Id(i) =>
+//    case Symmetry(i, j) =>
+//    case Prim(name, i, j, extra) =>
+//    case SubConnector(name, c1) =>
+//  }
+//
+//  private def updateError(str: String, c: Connector, typing: Connector => (Type, BExpr)) =
+//    try  typing(c)
+//    catch {
+//      case e: TypeCheckException => throw new TypeCheckException(str + "\n" + e.getMessage)
+//      case e: Throwable => throw e
+//    }
 
 }
