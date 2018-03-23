@@ -41,7 +41,7 @@ class TestReduce extends FlatSpec {
   private def testInstOK(con:Connector,str:String) = {
     val c = Eval.instantiate(con)
     s"Connector ${Show(con)}" should s"instantiate to $str" in {
-      assert(typeCheck(c))
+      assert(typeCheck(c).isDefined)
       assertResult(str)(Show(c))
     }
   }

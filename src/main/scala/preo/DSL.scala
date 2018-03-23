@@ -412,11 +412,34 @@ object DSL {
 //    case e: Throwable => throw e
   }
 
+  /**
+    * Typechecks every subconnector, to pinpoint the source of a type error.
+    * @param c connector to be type-checked
+    * @return the type of the connector, or throws a descriptive error.
+    */
   def checkVerbose(c:Connector): Type = Deconstructor.check(c,typeCheck)
+
+  /**
+    * Same as [[checkVerbose(c:Connector)]], but parses an input string first
+    * @param s string with the connector to be parsed and type checked
+    * @return the type, or throws a descriptive error
+    */
   def checkVerbose(s:String): Type = checkVerbose(parse(s))
 
 
+  /**
+    * Typechecks every subconnector without using an SMT solver, to pinpoint the source of a type error.
+    * @param c connector to be type-checked
+    * @return the type of the connector, or throws a descriptive error.
+    */
   def unsafeCheckVerbose(c:Connector): Type = Deconstructor.check(c,unsafeTypeCheck)
+
+
+  /**
+    * Same as [[unsafeCheckVerbose(c:Connector)]], but parses an input string first
+    * @param s string with the connector to be parsed and type checked
+    * @return the type, or throws a descriptive error
+    */
   def unsafeCheckVerbose(s:String): Type = unsafeCheckVerbose(parse(s))
 
   /**

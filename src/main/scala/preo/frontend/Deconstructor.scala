@@ -5,14 +5,17 @@ import preo.common.TypeCheckException
 //import preo.common.Utils.usedVars
 
 object Deconstructor {
-//  case class Context(vars:List[Var])
 
-//  def subConnectors(c:Connector): List[]
-
+  /**
+    * Apply a type-checker to every subconnector, to pinpoint more precisely the source of a type error.
+    * @param con connector to be typechecked
+    * @param checker type-checking function
+    * @return type of the connector, if no error is found - othewise throw a descriptive type error.
+    */
   def check(con:Connector,checker:Connector=>Option[Type]): Type = checker(con) match {
     case Some(t) => t
     case None =>
-      check(Set(),List(),con,checker)
+      check(Set(),List(),con,checker) // should throw an error
       Type(Arguments(),Port(IVal(0)),Port(IVal(0)),BVal(true))
   }
 
