@@ -41,11 +41,11 @@ object Deconstructor {
 
   private def check(ctx:Set[Var],trace: List[Connector], con:Connector, checker:Connector=>Option[Type]): Unit = con match {
     case Seq(c1,c2) =>
-      check(ctx,con::trace, c1,checker)
+      check(ctx,con::trace,c1,checker)
       check(ctx,con::trace,c2,checker)
       fullCheck(ctx,trace,con,List(c1,c2),checker)
     case Par(c1,c2) =>
-      check(ctx,con::trace, c1,checker)
+      check(ctx,con::trace,c1,checker)
       check(ctx,con::trace,c2,checker)
       fullCheck(ctx,trace,con,List(c1,c2),checker)
     case Trace(_,c) =>
@@ -66,14 +66,13 @@ object Deconstructor {
     case Abs(x,_,c1) =>
       check(ctx+x,con::trace,c1,checker)
       fullCheck(ctx+x,trace,con,List(c1),checker)
-    case App(c1,_) =>
+    case App(c1,e) =>
       check(ctx,con::trace,c1,checker)
+      // checkExpr(ctx,con::trace,e,checker)
       fullCheck(ctx,trace,con,List(c1),checker)
     case Restr(c1,_) =>
       check(ctx,con::trace,c1,checker)
       fullCheck(ctx,trace,con,List(c1),checker)
     case _ => {}
   }
-
-
 }

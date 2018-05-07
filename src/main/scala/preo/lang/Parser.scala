@@ -67,7 +67,7 @@ object Parser extends RegexParsers {
     }
 
   def whereP: Parser[Connector=>Connector] =
-    identifier~"="~connP~opt(","~whereP) ^^ {
+    identifier~"="~prog~opt(","~whereP) ^^ {
       case s~_~co2~Some(_~w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2))
       case s~_~co2~None      => (co:Connector) => Substitution.replacePrim(s,  co ,SubConnector(s, co2))
     }
@@ -104,9 +104,19 @@ object Parser extends RegexParsers {
     }
 
   def appl: Parser[Connector] =
-    pow~rep(ilit) ^^ {
-      case co~es => es.foldLeft(co)((co2,e)=>co2(e))
+    // pow~rep(ilit) ^^ {
+    //   case co~es => es.foldLeft(co)((co2,e)=>co2(e))
+    // }  
+    // pow~rep(blit) ^^ {
+    //   case co~es => es.foldLeft(co)((co2,e)=>co2(e))
+    // }
+    pow~rep(expr) ^^ {
+      case co~es => es.foldLeft(co)(
+        (co2,e)=>co2(e)
+      )
     }
+
+
 
   def pow: Parser[Connector] =
     elemP~opt("^"~exponP) ^^ {
@@ -142,7 +152,11 @@ object Parser extends RegexParsers {
   // expression //
   ////////////////
 
-  def expr = iexpr | bexpr
+  def expr: Parser[Expr] = // redundancy to give priority to true/false over variable "true"/"false"
+    "true" ^^ {_=>BVal(true)} |
+    "false"^^ {_=>BVal(false)}|
+    "(" ~ expr ~ ")" ^^ {case _ ~ e ~ _ => e } |
+    iexpr | bexpr
 
   // boolean expressions
 
