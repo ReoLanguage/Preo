@@ -433,8 +433,10 @@ object Eval {
     val type4 = Simplify(type_3)
     // 5 - solve constraints
     var solutions = Solver.getSolutions(3, type4)
+
+
     if(solutions != null) {
-      val n = if(solutions.size > 0) solutions(solutions.keys.head).length else 3
+      val n = if (solutions.size > 0) solutions(solutions.keys.head).length else 3
       var connectors = List() : List[Connector]
       var i = 0
 
@@ -465,6 +467,7 @@ object Eval {
     else{
       throw new TypeCheckException("Solver failed")
     }
+//    List()
   }
 
   private def addDefaults(expr: Expr,etype:ExprType): Expr = expr match {

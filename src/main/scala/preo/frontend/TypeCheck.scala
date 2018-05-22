@@ -21,12 +21,12 @@ object TypeCheck {
     }
 
     /** checks if a variable is in the context. */
-    def contains(variable:String) =
+    def contains(variable:String): Boolean =
       (ints contains variable) || (bools contains variable) || (conns contains variable)
     /** checks if a variable is in the context. */
-    def apply(v:Var) = (ints contains v.x) || (bools contains v.x)
+    def apply(v:Var): Boolean = (ints contains v.x) || (bools contains v.x)
     /** Check if 2 contexts are disjoint */
-    def disjoint(other:Context) =
+    def disjoint(other:Context): Boolean =
       (ints  & other.ints)  == Set() &
       (bools & other.bools) == Set() &
       (conns.keySet & other.conns.keySet) == Set()
@@ -34,7 +34,7 @@ object TypeCheck {
 //      if (disjoint(other)) build(ints++other.ints, bools++other.bools)
 //        else throw new TypeCheckException(s"Non-disjoint contexts:\n - $this\n and\n - $other")
     def addInt(v:String): Context = {
-      assert(!(ints(v)), s"Context already contains int variable $v (vars: $ints)")
+      assert(!ints(v), s"Context already contains int variable $v (vars: $ints)")
       build(ints + v, bools, conns)
     }
     def addBool(v:String): Context = {
@@ -48,9 +48,9 @@ object TypeCheck {
     }
 
     /** Number of variables. */
-    def size = ints.size + bools.size + conns.size
+    def size: Int = ints.size + bools.size + conns.size
 
-    override def toString =
+    override def toString: String =
       "["+bools.map(_+":Bool").mkString(",") +
         (if (bools.nonEmpty) ",") +
          ints.map(_+":Int").mkString(",") +
@@ -81,7 +81,7 @@ object TypeCheck {
   private def nonNeg(i1:Interface,i2:Interface): BExpr =
     nonNeg(i1) & nonNeg(i2)
 
-  private def check(gamma:Context, con:Connector): Type = con match {
+  private def check(gamma:Context, con:Connector, postVisit:Connector => Unit = _=>{}): Type =con match {
     case Seq(c1, c2) =>
       val t1@Type(args1,i1,j1,phi1,isG1) = check(gamma,c1)
       val Type(args2,i2,j2,phi2,isG2) = alphaEquiv(t1,check(gamma,c2))
@@ -151,7 +151,7 @@ object TypeCheck {
           val s = Substitution(x, a)
           Type(Arguments(xs),s(i),s(j),s(phi),isG)
         case (Var(x),et)::_ =>
-          throw new TypeCheckException(s"application: expected '${if (isInt) "Int" else "Bool"}', found $x : ${et}.")
+          throw new TypeCheckException(s"application: expected '${if (isInt) "Int" else "Bool"}', found $x : $et.")
       }
     case Restr(c,phi) =>
       check(gamma,phi)

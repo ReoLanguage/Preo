@@ -5,34 +5,39 @@ import preo.ast._
 object Show {
   def apply(con:CoreConnector): String = apply(con.toConnector)
 
-  def apply(con: Connector): String = con match {
-    case Seq(c1, c2)    => s"${showP(c1)} ; ${showP(c2)}"
-    case Par(c1, c2)    => s"${showP(c1)} ⊗ ${showP(c2)}"
+  def apply(con:Connector): String = show(con,isShort = false)
+  def short(con:Connector): String = show(con,isShort = true)
+
+  def show(con: Connector, isShort:Boolean): String = con match {
+    case Seq(c1, c2)    => s"${showP(c1,isShort)} ; ${showP(c2,isShort)}"
+    case Par(c1, c2)    => s"${showP(c1,isShort)} ⊗ ${showP(c2,isShort)}"
     case Id(Port(IVal(1))) => "id"
     case Id(Port(IVal(0))) => "nil"
     case Id(x)          => s"Id(${apply(x)})"
     case Symmetry(i, j) => s"sym(${apply(i)},${apply(j)})"
-    case Trace(i, c)    => s"Tr(${apply(i)})(${apply(c)})"
+    case Trace(i, c)    => s"Tr(${apply(i)})(${show(c,isShort)})"
     case Prim(name,_,_,_) => name
-    case Exp(a, c)  => s"${showP(c)}^${showP(a)}"
-    case ExpX(x, a, c)  => s"${showP(c)}^{${apply(x:IExpr)}<--${apply(a)}}"
-    case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1)} ⊕ ${showP(c2)}"
+    case Exp(a, c)  => s"${showP(c,isShort)}^${showP(a)}"
+    case ExpX(x, a, c)  => s"${showP(c,isShort)}^{${apply(x:IExpr)}<--${apply(a)}}"
+    case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1,isShort)} ⊕ ${showP(c2,isShort)}"
                              //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
 
-    case Abs(x,et, c)  => s"\\${apply(x)}:${apply(et)}${showAP(c)}"
-    case App(c, a)     => s"${showP(c)}(${apply(a)})"
-    case Restr(c,b)     => s"${showP(c)} | ${showP(b)}"
-    case SubConnector(name, c, _) => if (name=="") showP(c) else name + s"{${showP(c)}}"
+    case Abs(x,et, c)  => s"\\${apply(x)}:${apply(et)}${showAP(c,isShort)}"
+    case App(c, a)     => s"${showP(c,isShort)}(${apply(a)})"
+    case Restr(c,b)     => s"${showP(c,isShort)} | ${showP(b)}"
+    case SubConnector(name, c, _) if  isShort => if (name=="") showP(c,isShort) else name
+    case SubConnector(name, c, _) if !isShort => (if (name=="") "" else name) + s"{${show(c,isShort)}}"
   }
-  private def showP(con:Connector): String = con match {
-    case Seq(_,_) | Par(_,_) | Choice(_,_,_) | Abs(_,_,_) |
-         Exp(_,_) | ExpX(_,_,_) | Restr(_,_) => s"(${apply(con)})"
 
-    case _ => apply(con)
+  private def showP(con:Connector,isShort:Boolean): String = con match {
+    case Seq(_,_) | Par(_,_) | Choice(_,_,_) | Abs(_,_,_) |
+         Exp(_,_) | ExpX(_,_,_) | Restr(_,_) => s"(${show(con,isShort)})"
+
+    case _ => show(con,isShort)
   }
-  private def showAP(con:Connector): String = con match {
-    case Abs(x,et,c) => s" ${apply(x)}:${apply(et)}${showAP(c)}"
-    case _ => s".${showP(con)}"
+  private def showAP(con:Connector,isShort:Boolean): String = con match {
+    case Abs(x,et,c) => s" ${apply(x)}:${apply(et)}${showAP(c,isShort)}"
+    case _ => s".${showP(con,isShort)}"
   }
 
   def apply(itf: Interface): String = itf match {
@@ -97,6 +102,22 @@ object Show {
   def showVar(v:Var) = v match {
     case Var(x) => x
   }
+
+//  def short(con:Connector): String = con match {
+//    case Seq(c1, c2) =>
+//    case Par(c1, c2) =>
+//    case Id(i) =>
+//    case Symmetry(i, j) =>
+//    case Trace(i, c) =>
+//    case Prim(name, i, j, extra) =>
+//    case SubConnector(name, c1) =>
+//    case Exp(a, c) =>
+//    case ExpX(x, a, c) =>
+//    case Choice(b, c1, c2) =>
+//    case Abs(x, et, c) =>
+//    case App(c, a) =>
+//    case Restr(c, phi) =>
+//  }
 
   def apply(typ:Type): String =
     (if (typ.isGeneral) "" else "© ") +

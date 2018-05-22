@@ -24,10 +24,10 @@ object Parser extends RegexParsers {
   def parse(c:String): ParseResult[Connector] = parseAll(prog,c)
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
 
-
   override def skipWhitespace = true
   override val whiteSpace: Regex = "[ \t\r\f\n]+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
+  val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
   /** Parses basic primitives */
   def inferPrim(s:String): Connector = s match {
@@ -35,6 +35,7 @@ object Parser extends RegexParsers {
     case "fifofull" => fifofull
     case "drain"    => drain
     case "id"       => id
+    case "ids"      => lam(n,id^n)
     case "dupl"     => dupl
     case "lossy"    => lossy
     case "merger"   => merger
@@ -48,6 +49,8 @@ object Parser extends RegexParsers {
     case "unzip"    => SubConnector(s,Repository.unzip, Nil)
     case "exrouter" => SubConnector(s,Repository.exrouter, Nil)
     case "exrouters"=> SubConnector(s,Repository.nexrouter, Nil)
+    case "fifoloop" => SubConnector(s,Repository.fifoloop, Nil)
+    case "sequencer"=> SubConnector(s,Repository.sequencer, Nil)
     case _          => str2conn(s)
   }
 
@@ -106,9 +109,19 @@ object Parser extends RegexParsers {
     }
 
   def appl: Parser[Connector] =
-    pow~rep(ilit) ^^ {
-      case co~es => es.foldLeft(co)((co2,e)=>co2(e))
+    // pow~rep(ilit) ^^ {
+    //   case co~es => es.foldLeft(co)((co2,e)=>co2(e))
+    // }  
+    // pow~rep(blit) ^^ {
+    //   case co~es => es.foldLeft(co)((co2,e)=>co2(e))
+    // }
+    pow~rep(expr) ^^ {
+      case co~es => es.foldLeft(co)(
+        (co2,e)=>co2(e)
+      )
     }
+
+
 
   def pow: Parser[Connector] =
     elemP~opt("^"~exponP) ^^ {
@@ -130,6 +143,8 @@ object Parser extends RegexParsers {
   def elemP: Parser[Connector] =
     "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~c~_ => Trace(ie,c) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
+    "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some(name))} |
+    "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some(name))} |
     bexpr~"?"~connP~"+"~connP        ^^ { case b~_~c1~_~c2 => (b ? c1) + c2 }    |
     litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
 
@@ -142,7 +157,12 @@ object Parser extends RegexParsers {
   // expression //
   ////////////////
 
-  def expr: Parser[Expr] = iexpr | bexpr
+
+  def expr: Parser[Expr] = // redundancy to give priority to true/false over variable "true"/"false"
+    "true" ^^ {_=>BVal(true)} |
+    "false"^^ {_=>BVal(false)}|
+    "(" ~ expr ~ ")" ^^ {case _ ~ e ~ _ => e } |
+    iexpr | bexpr
 
   // boolean expressions
 

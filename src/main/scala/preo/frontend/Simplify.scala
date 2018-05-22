@@ -348,8 +348,8 @@ object Simplify {
     * @param con connector to be simplified
     * @return simplified connector
     */
-  def apply(con:Connector): Connector  = simplifyWithTypeChk(con,DSL.typeCheck)
-  def unsafe(con:Connector): Connector = simplifyWithTypeChk(con,DSL.unsafeTypeCheck)
+  def apply(con:Connector): Connector  = simplifyWithTypeChk(con,DSL.typeCheck(_).isDefined)
+  def unsafe(con:Connector): Connector = simplifyWithTypeChk(con,DSL.unsafeTypeCheck(_).isDefined)
 
   private def simplifyWithTypeChk(con:Connector,tcheck: Connector=>Boolean): Connector = con match {
     case Seq(c1,c2) => (simplifyWithTypeChk(c1,tcheck),simplifyWithTypeChk(c2,tcheck)) match {
