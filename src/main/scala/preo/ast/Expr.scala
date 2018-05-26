@@ -1,7 +1,6 @@
 package preo.ast
 
-case class Var(x:String) extends IExpr with BExpr {
-}
+case class Var(x:String) extends Expr with IExpr with BExpr
 
 //case class SomeVar(x:String) extends Expr with Var // can have any type
 

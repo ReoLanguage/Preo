@@ -131,7 +131,7 @@ object Parser extends RegexParsers {
 
   def exponP: Parser[Connector=>Connector] =
     ilit~opt("<--"~ilit) ^? ({
-      case Var(v) ~ (Some(_ ~ e)) => (_: Connector).:^(Var(v), e)
+      case Var(v) ~ Some(_ ~ e) => (_: Connector).:^(Var(v), e)
       case ie ~ None => (_: Connector) ^ ie
     }, {
       case ie1 ~ Some(_ ~ ie2) => s"${Show(ie1)} should be a variable, in '${Show(ie1)} <-- ${Show(ie2)}'."
@@ -159,14 +159,17 @@ object Parser extends RegexParsers {
 
 
   def expr: Parser[Expr] = // redundancy to give priority to true/false over variable "true"/"false"
-    "true" ^^ {_=>BVal(true)} |
-    "false"^^ {_=>BVal(false)}|
     "(" ~ expr ~ ")" ^^ {case _ ~ e ~ _ => e } |
-    identifier ^^ Var |
+    identifierOrBool |
     iexpr | bexpr
 
-  // boolean expressions
+  def identifierOrBool: Parser[Expr] =
+    identifier ^^ {
+      case "true" => BVal(true)
+      case "false" => BVal(false)
+      case x => Var(x)}
 
+  // boolean expressions
   def bexpr: Parser[BExpr] =
     disjP ~ opt("&"~bexpr) ^^ {
       case e1~Some(_~e2) => e1 & e2
@@ -194,27 +197,32 @@ object Parser extends RegexParsers {
     "==" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 === e2 }
 
   def blit: Parser[BExpr] =
-    booleanVal |
+//    booleanVal |
     "!" ~ bexpr ^^ {case _ ~ e => Not(e)}       |
     identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
-    identifier ^^ Var                            |
+    identifierOrBool ^? ({
+      case be: BExpr => be
+    },
+      ie => s"Integer not expected: $ie")       |
     "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
 
-  def booleanVal: Parser[BVal] =
-    "true"     ^^ {_=>BVal(true)}               |
-    "false"    ^^ {_=>BVal(false)}
 
   // integer expressions
   def iexpr: Parser[IExpr] =
     ilit ~ ibop ~ iexpr ^^ {case l ~ op ~ r => op(l,r)} |
       ilit
   def ilit: Parser[IExpr] =
-    intVal                                       |
-      identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
-      identifier ^^ Var                           |
-      "(" ~ iexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
+    intVal                                      |
+    identifierOrBool ~ opt(":"~"I") ^? ({
+      case (ie:IExpr)~_ => ie
+    },{
+      case be~_ => s"Boolean not expected: $be"
+    }) |
+//  identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
+//    identifier ^^ Var                           |
+    "(" ~ iexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
   def intVal: Parser[IVal] =
-    """[0-9]+""".r ^^ { (s:String) => IVal(s.toInt) }
+    """[0-9]+""".r ^^ { s:String => IVal(s.toInt) }
   def ibop: Parser[(IExpr,IExpr)=>IExpr] =
     "+"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 + e2 } |
       "-"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 - e2 } |

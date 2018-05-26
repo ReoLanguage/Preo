@@ -51,18 +51,19 @@ object Show {
     case _ => s"(${apply(itf)})"
   }
 
-  def apply(v:Var): String = v.x
+//  def apply(v:Var): String = v.x
   def apply(exprType: ExprType) = exprType match {
     case IntType => "I"
     case BoolType => "B"
   }
 
   def apply(exp: Expr): String = exp match {
-    case e: IExpr => apply(e)
-    case e: BExpr => apply(e)
+    case Var(x) =>  x
+    case e: IExpr => applyie(e)
+    case e: BExpr => applybe(e)
   }
 
-  def apply(exp: IExpr): String = exp match {
+  def applyie(exp: IExpr): String = exp match {
     case IVal(n) => n.toString
     case Var(x) => x
     case Add(e1,e2) => s"${showP(e1)} + ${showP(e2)}"
@@ -79,7 +80,7 @@ object Show {
   }
 
 
-  def apply(exp: BExpr): String = exp match {
+  def applybe(exp: BExpr): String = exp match {
     case BVal(b)     => b.toString
     case Var(x)     => x
     case EQ(e1, e2)  => s"${showP(e1)} == ${showP(e2)}"
@@ -99,9 +100,9 @@ object Show {
     case _ => s"(${apply(exp)})"
   }
 
-  def showVar(v:Var) = v match {
-    case Var(x) => x
-  }
+//  def showVar(v:Var) = v match {
+//    case Var(x) => x
+//  }
 
 //  def short(con:Connector): String = con match {
 //    case Seq(c1, c2) =>
@@ -140,7 +141,7 @@ object Show {
     case Trace(i, c)    => s"Tr(${apply(i)},${source(c)})"
     case Prim(name,_,_,_) => name
     case Exp(a, c)  => s"${showSP(c)}^${showP(a)}"
-    case ExpX(x, a, c)  => s"(${showSP(c)}^(${showVar(x)}<--${showP(a)}))"
+    case ExpX(x, a, c)  => s"(${showSP(c)}^(${apply(x)}<--${showP(a)}))"
     case Choice(b, c1, c2) => s"${showP(b)} ? ${showSP(c1)} + ${showSP(c2)}"
     //s"if ${showP(b)} then ${showP(c1)} else ${showP(c2)}"
 
