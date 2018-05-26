@@ -2,7 +2,6 @@ package preo.lang
 
 import preo.DSL._
 import preo.ast._
-import preo.common.TypeCheckException
 import preo.examples.Repository
 import preo.frontend.{Show, Substitution}
 
@@ -27,6 +26,7 @@ object Parser extends RegexParsers {
   override def skipWhitespace = true
   override val whiteSpace: Regex = "[ \t\r\f\n]+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
+  val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
   /** Parses basic primitives */
@@ -92,8 +92,8 @@ object Parser extends RegexParsers {
     ":" ~ "I"  ~ lamCont ^^ { case _~ _ ~ cont => (v:String,et:ExprType) => cont(v,et) }      |  // IntType is the default
     ":" ~ "B"  ~ lamCont ^^ { case _~ _ ~ cont => (v:String,_:ExprType) => cont(v,BoolType) } |  // IntType is the default
     "." ~ connP ~ opt("|"~bexpr) ^^ {
-      case _ ~ c ~ Some(_~e)  => lam(_:String,_:ExprType,c | e)
-      case _ ~ c ~ None       => lam(_:String,_:ExprType,c )
+      case _ ~ con ~ Some(_~e)  => lam(_:String,_:ExprType,con | e)
+      case _ ~ con ~ None       => lam(_:String,_:ExprType,con )
     }
 
   def seq: Parser[Connector] =
@@ -141,15 +141,15 @@ object Parser extends RegexParsers {
     "("~exponP~")" ^^ { case _~e~_ => e }
 
   def elemP: Parser[Connector] =
-    "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~c~_ => Trace(ie,c) }   |
+    "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~con~_ => Trace(ie,con) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
     "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some(name))} |
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some(name))} |
-    bexpr~"?"~connP~"+"~connP        ^^ { case b~_~c1~_~c2 => (b ? c1) + c2 }    |
+    bexpr~"?"~connP~"+"~connP        ^^ { case e~_~c1~_~c2 => (e ? c1) + c2 }    |
     litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
 
   def litP: Parser[Connector] =
-    "("~connP~")" ^^ { case _~c~_ => c } |
+    "("~connP~")" ^^ { case _~con~_ => con } |
     identifier ^^ inferPrim
 
 
@@ -162,6 +162,7 @@ object Parser extends RegexParsers {
     "true" ^^ {_=>BVal(true)} |
     "false"^^ {_=>BVal(false)}|
     "(" ~ expr ~ ")" ^^ {case _ ~ e ~ _ => e } |
+    identifier ^^ Var |
     iexpr | bexpr
 
   // boolean expressions
@@ -225,7 +226,7 @@ object Parser extends RegexParsers {
   ///////////////
 
   def annotate: Parser[List[Annotation]] =
-    "["~identifier~opt(":"~expr)~opt(","~annotate)~"]" ^^ {
+    "["~identifierCap~opt(":"~expr)~opt(","~annotate)~"]" ^^ {
       case _~s~Some(_~exp)~Some(_~anotation)~_ => Annotation(s, Some(exp)) :: anotation
       case _~s~Some(_~exp)~None~_ => Annotation(s, Some(exp)) :: Nil
       case _~s~None~None~_      => Annotation(s, None) :: Nil
