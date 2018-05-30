@@ -28,9 +28,6 @@ case object Mixed  extends NodeType {def dual = Mixed }
 
 object Graph {
 
-
-
-
   def apply(c:CoreConnector): Graph = {
 //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
     val g = ReoGraph(c)

@@ -102,6 +102,10 @@ object ReoGraph {
       Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j), Nil)).toList
   }
 
+  private def mkSync(i:Int,j:Int): Edge =
+    Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j), Nil)
+
+
 
   /**
     * Simplifies a graph, by:
@@ -111,14 +115,21 @@ object ReoGraph {
     * @return reduced graph
     */
   def simplifyGraph(g: ReoGraph): ReoGraph = {
+    // remove useless Sync channels
     val (es,remap) = dropSyncs(g)
     val g2 = applyRemap(ReoGraph(es,g.ins,g.outs),remap)
+    // remove replicators and mergers when possible
     val (inmap,outmap) = collectInsOuts(g2)
     val (es2,remap2) = dropReplDupl(g2,inmap,outmap)
     val g3 = applyRemap(ReoGraph(es2,g2.ins,g2.outs),remap2)
-    val g4 = applyRemap(ReoGraph(g3.edges,g3.ins,g3.outs),remap2)
-    val g5 = applyRemap(ReoGraph(g4.edges,g4.ins,g4.outs),remap2)
-    g5
+    val g4 = applyRemap(g3,remap2)
+    val g5 = applyRemap(g4,remap2)
+//    val g4 = applyRemap(ReoGraph(g3.edges,g3.ins,g3.outs),remap2)
+//    val g5 = applyRemap(ReoGraph(g4.edges,g4.ins,g4.outs),remap2)
+    // add syncs to border mergers and replicators
+    val g6 = fixLoops(g5)
+    val g7 = addBorderSyncs(g6)
+    g6
   }
 
   /**
@@ -208,6 +219,57 @@ object ReoGraph {
     case e::tl =>
       val (es,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       (e::es,m)
+  }
+
+  private def fixLoops(graph: ReoGraph): ReoGraph = {
+    val (inmap,outmap) = collectInsOuts(graph)
+    var res = graph
+    for ((p,es) <- inmap; e <- es) {
+      // found a direct loop
+      if (e.outs contains p) {
+        val e1 = mkSync(p,seed)
+        val e2 = Edge(e.prim,e.ins.map(x=>if(x==p)seed else p),e.outs.map(x=>if(x==p)seed+1 else p),e.parents)
+        val e3 = mkSync(seed+1,p)
+        res = ReoGraph(e1::e2::e3:: res.edges.filterNot(_==e),res.ins,res.outs)
+        seed += 2
+      }
+      // found a 2-way loop
+      for (pj <- e.outs; ej <- inmap.getOrElse(pj,Set()); if pj!=p)
+        if (ej.outs contains p) {
+          val e1 = Edge(e.prim,e.ins,e.outs.map(x=>if(x==pj)seed else p),e.parents)
+          val e2 = mkSync(seed,pj)
+          res = ReoGraph(e1::e2:: res.edges.filterNot(_==e),res.ins,res.outs)
+          seed += 1
+        }
+    }
+    res
+  }
+
+  /**
+    * Add extra Sync channels when having mergers or dupls in the borders
+    * @param graph
+    * @return
+    */
+  private def addBorderSyncs(graph: ReoGraph): ReoGraph = {
+    val (inmap,outmap) = collectInsOuts(graph)
+    var res = graph
+    for (in <- graph.ins) {
+      if ((inmap contains in) &&
+          (inmap(in).size > 1 || inmap(in).exists(_.prim.name=="dupl"))) {
+        val e = mkSync(seed,in)
+        res = ReoGraph(e :: res.edges, res.ins.filterNot(_==in), res.outs)
+        seed += 1
+      }
+    }
+    for (out <- graph.outs) {
+      if ((outmap contains out) &&
+          (outmap(out).size > 1 || outmap(out).exists(_.prim.name=="merger"))) {
+        val e = mkSync(out,seed)
+        res = ReoGraph(e :: res.edges, res.ins, res.outs.filterNot(_==out))
+        seed += 1
+      }
+    }
+    res
   }
 
   private def allHaveEdges(ports: List[Int], m: Map[Int, Set[ReoGraph.Edge]]): Boolean =
