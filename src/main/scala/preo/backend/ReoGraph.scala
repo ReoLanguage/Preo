@@ -267,7 +267,7 @@ object ReoGraph {
       if ((inmap contains in) &&
           (inmap(in).size > 1 || inmap(in).exists(_.prim.name=="dupl"))) {
         val e = mkSync(seed,in)
-        res = ReoGraph(e :: res.edges, res.ins.filterNot(_==in), res.outs)
+        res = ReoGraph(e :: res.edges, seed :: res.ins.filterNot(_==in), res.outs)
         seed += 1
       }
     }
@@ -275,7 +275,7 @@ object ReoGraph {
       if ((outmap contains out) &&
           (outmap(out).size > 1 || outmap(out).exists(_.prim.name=="merger"))) {
         val e = mkSync(out,seed)
-        res = ReoGraph(e :: res.edges, res.ins, res.outs.filterNot(_==out))
+        res = ReoGraph(e :: res.edges, res.ins, seed :: res.outs.filterNot(_==out))
         seed += 1
       }
     }
