@@ -124,12 +124,10 @@ object ReoGraph {
     val g3 = applyRemap(ReoGraph(es2,g2.ins,g2.outs),remap2)
     val g4 = applyRemap(g3,remap2)
     val g5 = applyRemap(g4,remap2)
-//    val g4 = applyRemap(ReoGraph(g3.edges,g3.ins,g3.outs),remap2)
-//    val g5 = applyRemap(ReoGraph(g4.edges,g4.ins,g4.outs),remap2)
     // add syncs to border mergers and replicators
     val g6 = fixLoops(g5)
     val g7 = addBorderSyncs(g6)
-    g6
+    g7
   }
 
   /**
@@ -230,17 +228,29 @@ object ReoGraph {
         val e1 = mkSync(p,seed)
         val e2 = Edge(e.prim,e.ins.map(x=>if(x==p)seed else p),e.outs.map(x=>if(x==p)seed+1 else p),e.parents)
         val e3 = mkSync(seed+1,p)
-        res = ReoGraph(e1::e2::e3:: res.edges.filterNot(_==e),res.ins,res.outs)
+        res = ReoGraph(e1::e2::e3:: res.edges.diff(List(e)),res.ins,res.outs)
         seed += 2
       }
       // found a 2-way loop
-      for (pj <- e.outs; ej <- inmap.getOrElse(pj,Set()); if pj!=p)
-        if (ej.outs contains p) {
+      for ( pj <- e.outs;
+            ej <- inmap.getOrElse(pj,Set())
+            if pj!=p && ej.outs.contains(p)) {
           val e1 = Edge(e.prim,e.ins,e.outs.map(x=>if(x==pj)seed else p),e.parents)
           val e2 = mkSync(seed,pj)
-          res = ReoGraph(e1::e2:: res.edges.filterNot(_==e),res.ins,res.outs)
+          res = ReoGraph(e1::e2:: res.edges.diff(List(e)),res.ins,res.outs)
           seed += 1
         }
+      // found 2 edges going to the same place
+      for ( pj <- e.outs;
+            ej <- outmap.getOrElse(pj,Set())
+            if (ej!=e || res.edges.count(_==e)>1) && ej.ins.contains(p)) {
+        for (_ <- 1 to res.edges.count(_==e)) {
+          val e1 = Edge(e.prim, e.ins, e.outs.map(x => if (x == pj) seed else p), e.parents)
+          val e2 = mkSync(seed, pj)
+          res = ReoGraph(e1 :: e2 :: res.edges.diff(List(e)), res.ins, res.outs)
+          seed += 1
+        }
+      }
     }
     res
   }
