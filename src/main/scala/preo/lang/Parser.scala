@@ -69,7 +69,7 @@ object Parser extends RegexParsers {
     }
 
   def whereP: Parser[Connector=>Connector] =
-      opt(annotate)~identifier~"="~connP~opt(","~whereP) ^^ {
+      opt(annotate)~identifier~"="~prog~opt(","~whereP) ^^ {
         case Some(annotation)~s~_~co2~Some(_~w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, annotation))
         case Some(annotation)~s~_~co2~None => (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2, annotation))
         case None~s~_~co2~Some(_~w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, Nil))
