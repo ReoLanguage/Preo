@@ -3,16 +3,23 @@ package preo.modelling
 abstract class Mcrl2Process{
   def vars: List[Action]
 
+  def toString: String
 }
 
 
+abstract class Group{
+  def coGroup: Group
+}
 
-
-class Group
-
-case object NoLine extends Group
-case object OneLine extends Group
-case object TwoLine extends Group
+case object NoLine extends Group{
+  def coGroup: Group = NoLine
+}
+case object OneLine extends Group{
+  def coGroup: Group = TwoLine
+}
+case object TwoLine extends Group{
+  def coGroup: Group = OneLine
+}
 
 
 class State
@@ -49,6 +56,7 @@ case class Action(name: String, number: Int, group: Group, state: State) extends
     s"$name${if (number!= -1) number else ""}$state_name$group_name"
   }
 
+  //todo: usage of this. Can it be deleted?
   def identification: String = {
     val state_name = state match {
       case Nothing => ""
@@ -66,28 +74,32 @@ case class Action(name: String, number: Int, group: Group, state: State) extends
     else if(o.getClass != this.getClass)
       false
     else
-      this.number == o.asInstanceOf[Action].get_number && this.group == o.asInstanceOf[Action].group && this.name ==o.asInstanceOf[Action].name && this.state == o.asInstanceOf[Action].state
+      this.number == o.asInstanceOf[Action].number && this.group == o.asInstanceOf[Action].group && this.name ==o.asInstanceOf[Action].name && this.state == o.asInstanceOf[Action].state
+
 
   def sameType(a: Action): Boolean =
-    this.number == a.get_number && this.name == a.name && this.state == a.state
-
-  def get_number: Int = number
+    this.number == a.number && this.name == a.name && this.state == a.state
 
   override def vars: List[Action] = List(this)
 
+  def coAction: Action = Action(name, number, group.coGroup, state)
 }
 
 object Action{
-  def apply(number: Int, group: Group): Action = new Action("X", number, group, Nothing)
+//  def apply(number: Int, group: Group): Action = new Action("X", number, group, Nothing)
 
   /**
     * An action that will print Null
     */
   def nullAction: Action = new Action("Null", -1, NoLine, Nothing)
+
+  def nodeAction(name: String, number: Int, state:State): Action = new Action(name, number, OneLine, state)
+
+  def channelAction(name: String, number: Int, state:State): Action = new Action(name, number, TwoLine, state)
 }
 
 /**
-  * A process name is just a name of a process (usefull when we have a Mcrl2Process aglomeration)
+  * A process name is just a name of a process (useful when we have a Mcrl2Process agglomeration)
   * @param name the name of the process this represents
   */
 case class ProcessName(name: String) extends Mcrl2Process{

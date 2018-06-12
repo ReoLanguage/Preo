@@ -1,6 +1,6 @@
 package preo.modelling
 
-
+//todo: maybe standardize stuff
 /**
   * Defines the Procs in Mcrl2.
   */
@@ -16,6 +16,11 @@ object Mcrl2Def{
     case Nil => ""
   }
 }
+
+//todo: create an abstract class to encapsulate the channel and node processes
+abstract class Mcrl2ReoDef(var prev: List[Mcrl2ReoDef],var next: List[Mcrl2ReoDef]) extends Mcrl2Def
+
+
 
 /**
   * Defines a Node in Mcrl2.
@@ -172,6 +177,10 @@ object Mcrl2Init{
     Mcrl2Init(number,var_name, var_number, var_state, List(name1, name2))
   }
 }
+
+
+
+
 
 
 /**

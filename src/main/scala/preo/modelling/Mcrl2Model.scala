@@ -8,6 +8,8 @@ import preo.ast.{CSeq, CSymmetry, CPar, CPrim, CSubConnector, CTrace, CId, CoreC
   * @param proc The processes of this model
   * @param init The init process
   */
+//todo: maybe split proc into 3 components. This way we don't have to split it later
+//todo: hold the previous tought
 class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
   override def toString: String = {
     val acts = Mcrl2Def.toString(act.toList)
@@ -49,22 +51,22 @@ class Mcrl2Model(act: Set[Action], proc: List[Mcrl2Def], init: Mcrl2Process) {
   /**
     * Gets the nodes which have as a left action the Null action
     */
-  def getStarterNodes: List[Mcrl2Node] = proc.filter(p => p.isInstanceOf[Mcrl2Node] && p.asInstanceOf[Mcrl2Node].getBefore.equals(Action.nullAction)).asInstanceOf[List[Mcrl2Node]]
-
-  /**
-    * returns the actions
-    */
-  def getActions: Set[Action] = act
-
-  /**
-    * returns all the processes
-    */
-  def getProc: List[Mcrl2Def] = proc
-
-  /**
-    * returns the init process
-    */
-  def getInit[A <: Mcrl2Process]: Mcrl2Process = init
+//  def getStarterNodes: List[Mcrl2Node] = proc.filter(p => p.isInstanceOf[Mcrl2Node] && p.asInstanceOf[Mcrl2Node].getBefore.equals(Action.nullAction)).asInstanceOf[List[Mcrl2Node]]
+//
+//  /**
+//    * returns the actions
+//    */
+//  def getActions: Set[Action] = act
+//
+//  /**
+//    * returns all the processes
+//    */
+//  def getProc: List[Mcrl2Def] = proc
+//
+//  /**
+//    * returns the init process
+//    */
+//  def getInit[A <: Mcrl2Process]: Mcrl2Process = init
 
   //testing usefull stuff
   /**
@@ -430,7 +432,7 @@ object Mcrl2Model{
     * this list is usefull to know if we have used all the vars in the init processes
     * @param action the action to remove
     */
-  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.get_number !=  action.get_number || x.state != action.state)
+  private def notMissing(action: Action): Unit = missingVars = missingVars.filter(x=> x.number !=  action.number || x.state != action.state)
 
   /**
     * The blockers are inits that we create when all the processes have been used but some vars are still
