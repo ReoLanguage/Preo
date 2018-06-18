@@ -1,5 +1,7 @@
 package preo.modelling
 
+import preo.ast.{Connector, Expr}
+
 abstract class Family[A]{
   def instanciate(n: A): (Set[Action], Set[Mcrl2Def], Set[ProcessName])
 }
@@ -9,7 +11,9 @@ abstract class Family[A]{
 //what does it store
 //how do we instanciate
 
-class ExpFamily(act: Set[Action]) extends Family[Int]
+class ExpFamily(exp: Expr, con: Connector) extends Family[Int]{
+
+}
 
 //Like this?
 class OptFamily[A] extends Family[A]

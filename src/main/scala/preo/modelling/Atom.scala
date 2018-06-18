@@ -1,10 +1,10 @@
 package preo.modelling
 
-abstract class Atom extends Operation{
-  override def toString: String
-
-  def getActions: Set[Action]
-}
+abstract class Atom extends Operation//{
+//  override def toString: String
+//
+//  def getActions: Set[Action]
+//}
 
 abstract class Group{
   def coGroup: Group
