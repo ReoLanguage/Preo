@@ -60,7 +60,7 @@ case class Comm(actions: (Action, Action, Action), in: Operation) extends Operat
   * @param in process where the actions are allowed
   */
 case class Allow(actions: List[Action], in: Operation) extends Operation{
-  override def toString: String = s"""allow({${Mcrl2Def.toString(actions)}}, ${in.toString})"""
+  override def toString: String = s"""allow({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet
 }
@@ -71,7 +71,7 @@ case class Allow(actions: List[Action], in: Operation) extends Operation{
   * @param in the process where the actions are blocked
   */
 case class Block(actions: List[Action], in: Operation) extends Operation{
-  override def toString: String = s"""block({${Mcrl2Def.toString(actions)}}, ${in.toString})"""
+  override def toString: String = s"""block({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet
 }
@@ -82,7 +82,7 @@ case class Block(actions: List[Action], in: Operation) extends Operation{
   * @param in the process where the actions are hidden
   */
 case class Hide(actions: List[Action], in: Operation) extends Operation{
-  override def toString: String = s"""hide({${Mcrl2Def.toString(actions)}}, ${in.toString})"""
+  override def toString: String = s"""hide({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet
 }
