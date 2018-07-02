@@ -8,6 +8,8 @@ import scala.util.Random.{nextBoolean, nextInt}
 /**
  * Created by jose on 18/05/15.
  */
+//todo: (c^2) false {c = \b:B. b? fifo + lossy}
+//c^2 =/= c*c for functions
 object Eval {
 
   /**
