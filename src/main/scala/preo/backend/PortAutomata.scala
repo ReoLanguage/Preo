@@ -38,7 +38,9 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
     case Nil     => primName(edge.prim)
     case ""::_   => primName(edge.prim)
     case head::_ => head
-  }) + getDir(edge,fire)
+  }) + getDir(edge,fire) //+
+  //  s"[${edge.ins.toSet.intersect(fire).mkString("|")}->${edge.outs.toSet.intersect(fire).mkString("|")}]"
+  //  fire.mkString("|")
   private def getDir(edge: Edge,fire:Set[Int]): String = {
     val src = (edge.ins.toSet intersect fire).nonEmpty
     val snk = (edge.outs.toSet intersect fire).nonEmpty
