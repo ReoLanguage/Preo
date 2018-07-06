@@ -26,7 +26,7 @@ class Model(procs: List[Process], init: Operation) {
     val actions: String = toString(procs.flatMap(p => p.getActions))
     var processes = ""
     for(p <- procs) processes += s"${p.toString};<br>\n"
-    val initProc = Hide(List(Action.nullAction), init)
+    val initProc = init
     s"""
        |act <br>
        |  $actions;<br>
@@ -76,7 +76,10 @@ object Model {
     val (ins, names_in, procs, names_out, outs) = conToChannels(ccon)
 
     val inits = (names_in ++ names_out).toSet
-    val init: Operation = inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.modelling.Par(a, b))
+    val init: Operation =
+      if(inits.isEmpty) ProcessName("deadlock")
+      else
+        inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.modelling.Par(a, b))
     new Model(procs, init)
   }
 
