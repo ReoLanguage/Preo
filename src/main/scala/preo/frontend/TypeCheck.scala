@@ -11,52 +11,56 @@ object TypeCheck {
 
   // set of variables with their types
   private class Context {
-    protected val ints: Set[String]  = Set()
-    protected val bools: Set[String] = Set()
-    protected val conns: Map[String,(IExpr,IExpr)] = Map()
-    private def build(i:Set[String],b:Set[String],c:Map[String,(IExpr,IExpr)]) = new Context {
-      override val ints = i
-      override val bools = b
-      override val conns = c
+    private type Ctx = Map[String,ExprType]
+    protected val vars: Ctx = Map()
+//    protected val ints: Set[String]  = Set()
+//    protected val bools: Set[String] = Set()
+    private def build(i:Set[String],b:Set[String]) = new Context {
+      override val vars: Ctx = i.map(_->IntType).toMap ++ b.map(_->BoolType).toMap
+//      override val bools = b
+//      override val conns = c
     }
 
     /** checks if a variable is in the context. */
-    def contains(variable:String): Boolean =
-      (ints contains variable) || (bools contains variable) || (conns contains variable)
+    def contains(variable:String): Boolean = vars contains variable
     /** checks if a variable is in the context. */
-    def apply(v:Var): Boolean = (ints contains v.x) || (bools contains v.x)
+    def apply(v:Var): Boolean = contains (v.x)
+    /** checks if a variable is in the context with a given type. */
+    def apply(v:Var,et:ExprType):Boolean = vars.get(v.x).contains(et)
     /** Check if 2 contexts are disjoint */
     def disjoint(other:Context): Boolean =
-      (ints  & other.ints)  == Set() &
-      (bools & other.bools) == Set() &
-      (conns.keySet & other.conns.keySet) == Set()
+      (vars.keySet  & other.vars.keySet)  == Set()
 //    def ++(other:Context): Context =
 //      if (disjoint(other)) build(ints++other.ints, bools++other.bools)
 //        else throw new TypeCheckException(s"Non-disjoint contexts:\n - $this\n and\n - $other")
     def addInt(v:String): Context = {
-      assert(!ints(v), s"Context already contains int variable $v (vars: $ints)")
-      build(ints + v, bools, conns)
+//      assert(!ints(v), s"Context already contains int variable $v (vars: $ints)")
+      addVar(Var(v),IntType)
     }
     def addBool(v:String): Context = {
-      assert(!bools(v), s"Context already contains bool variable $v (vars: $bools)")
-      build(ints, bools + v, conns)
+//      assert(!bools(v), s"Context already contains bool variable $v (vars: $bools)")
+      addVar(Var(v),BoolType)
     }
 
-    def addVar(v:Var,et: ExprType): Context = et match {
-      case IntType  => addInt(v.x)
-      case BoolType => addBool(v.x)
+    def addVar(v:Var,et: ExprType): Context = {
+      val mv = vars
+      new Context {
+        override val vars: Ctx = mv + (v.x -> et)
+      }
     }
+
 
     /** Number of variables. */
-    def size: Int = ints.size + bools.size + conns.size
+    def size: Int = vars.size
 
     override def toString: String =
-      "["+bools.map(_+":Bool").mkString(",") +
-        (if (bools.nonEmpty) ",") +
-         ints.map(_+":Int").mkString(",") +
-        (if (conns.nonEmpty) ",") +
-        conns.map(_+":Conn").mkString(",") +
-    "]"
+      vars.map(et=>et._1+":"+Show(et._2)).mkString("[",",","]")
+//      "["+bools.map(_+":Bool").mkString(",") +
+//        (if (bools.nonEmpty) ",") +
+//         ints.map(_+":Int").mkString(",") +
+//        (if (conns.nonEmpty) ",") +
+//        conns.map(_+":Conn").mkString(",") +
+//    "]"
   }
 
 
@@ -107,18 +111,18 @@ object TypeCheck {
                        nonNeg(x,y) &
                        phi, isG)
     case Prim(name,i,j,_) =>
-      check(gamma,interfaceSem(i))
-      check(gamma,interfaceSem(j))
+      check(gamma,interfaceSem(i),IntType)
+      check(gamma,interfaceSem(j),IntType)
       Type(Arguments(), i, j, nonNeg(i,j), isGeneral=true)
     case Exp(a, c) =>
-      check(gamma,a)
+      check(gamma,a,IntType)
       val Type(args,i,j,phi,isG) = check(gamma,c)
       Type(args, Repl(i,a), Repl(j,a), nonNeg(a) & phi,isG)
     // ExpX is a TRICKY CASE - add complex constraint!
     //  - c^(x<a) imposes a>=0
     //  - c^(x<a) imposes, for each constr. b of c, that "And_{v<a} b.[v/x]"
     case ExpX(x, a, c) =>
-      check(gamma,a)
+      check(gamma,a,IntType)
       val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,IntType,c) //check(gamma.addVar(x),c)
                       // phi may contain "x" - need to replace it by all its possible values.
       val phi2 = AndN(newx,IVal(0),a,phi)
@@ -133,7 +137,7 @@ object TypeCheck {
     case Choice(b, c1, c2) =>
       val Type(args1,i1,j1,phi1,isG1) = check(gamma,c1)
       val Type(args2,i2,j2,phi2,isG2) = check(gamma,c2)
-      check(gamma,b)
+      check(gamma,b,BoolType)
       Type(args1++args2, Cond(b,i1,i2), Cond(b,j1,j2), phi1 & phi2,isG1 && isG2)
     case Abs(x,et, c) =>
       val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,et,c) //check(gamma.addVar(x),c)
@@ -154,7 +158,7 @@ object TypeCheck {
           throw new TypeCheckException(s"application: expected '${if (isInt) "Int" else "Bool"}', found $x : $et.")
       }
     case Restr(c,phi) =>
-      check(gamma,phi)
+      check(gamma,phi,BoolType)
       val Type(args,i,j,psi,isG) = check(gamma,c)
       Type(args,i,j,psi & phi,isG)
   }
@@ -165,29 +169,37 @@ object TypeCheck {
     case _: BExpr => false
   }
 
-  def check(gamma:Context,a:Expr):Unit = a match {
 
-    case v@Var(x)   => if (!gamma(v)) throw new TypeCheckException(s"$x not in the context ($gamma)")
+  private def isInt(e:Expr,t:ExprType): Unit =
+    if (t!=IntType) throw new TypeCheckException(s"${Show(e)} is not type Int")
+  private def isBool(e:Expr,t:ExprType): Unit =
+    if (t!=BoolType) throw new TypeCheckException(s"${Show(e)} is not type Bool")
 
-    case IVal(_)     =>
-    case Add(e1, e2) => check(gamma,e1); check(gamma,e2)
-    case Sub(e1, e2) => check(gamma,e1); check(gamma,e2)
-    case Mul(e1, e2) => check(gamma,e1); check(gamma,e2)
-    case Div(e1, e2) => check(gamma,e1); check(gamma,e2)
-    case Sum(x,from,to,e) => check(gamma,from) ; check(gamma,to) ; checkAndAddVar(gamma,x,IntType,e) //check(gamma.addVar(x),e)
-    case ITE(b,ift,iff)   => check(gamma,b) ; check(gamma,ift) ; check(gamma,iff)
+  def check(gamma:Context,a:Expr,t:ExprType):Unit = a match {
 
-    case BVal(_)     =>
-    case EQ(e1, e2)  => check(gamma,e1); check(gamma,e2)
-    case GT(e1, e2)  => check(gamma,e1); check(gamma,e2)
-    case LT(e1, e2)  => check(gamma,e1); check(gamma,e2)
-    case GE(e1, e2)  => check(gamma,e1); check(gamma,e2)
-    case LE(e1, e2)  => check(gamma,e1); check(gamma,e2)
+    case v@Var(x)   => if (!gamma(v,t)) throw new TypeCheckException(s"$x:${Show(t)} not in the context $gamma")
+
+    case IVal(_)     => isInt(a,t)
+    case Add(e1, e2) => isInt(a,t); check(gamma,e1,t); check(gamma,e2,t)
+    case Sub(e1, e2) => isInt(a,t); check(gamma,e1,t); check(gamma,e2,t)
+    case Mul(e1, e2) => isInt(a,t); check(gamma,e1,t); check(gamma,e2,t)
+    case Div(e1, e2) => isInt(a,t); check(gamma,e1,t); check(gamma,e2,t)
+    case Sum(x,from,to,e) =>
+      isInt(a,t);  check(gamma,from,t) ; check(gamma,to,t) ; checkAndAddVar(gamma,x,IntType,e) //check(gamma.addVar(x),e)
+    case ITE(b,ift,iff)   => isInt(a,t); check(gamma,b,BoolType) ; check(gamma,ift,t) ; check(gamma,iff,t)
+
+    case BVal(_)     => isBool(a,t)
+    case EQ(e1, e2)  => isBool(a,t); check(gamma,e1,IntType); check(gamma,e2,IntType)
+    case GT(e1, e2)  => isBool(a,t); check(gamma,e1,IntType); check(gamma,e2,IntType)
+    case LT(e1, e2)  => isBool(a,t); check(gamma,e1,IntType); check(gamma,e2,IntType)
+    case GE(e1, e2)  => isBool(a,t); check(gamma,e1,IntType); check(gamma,e2,IntType)
+    case LE(e1, e2)  => isBool(a,t); check(gamma,e1,IntType); check(gamma,e2,IntType)
     case And(Nil)    =>
-    case And(e::es)  => check(gamma,e); check(gamma,And(es))
-    case Or(e1, e2)  => check(gamma,e1); check(gamma,e2)
-    case Not(e1)     => check(gamma,e1)
-    case AndN(x,from,to,e) => check(gamma,from) ; check(gamma,to) ; checkAndAddVar(gamma,x,IntType,e) //check(gamma.addVar(x),e)
+    case And(e::es)  => isBool(a,t); check(gamma,e,t); check(gamma,And(es),t)
+    case Or(e1, e2)  => isBool(a,t); check(gamma,e1,t); check(gamma,e2,t)
+    case Not(e1)     => isBool(a,t); check(gamma,e1,t)
+    case AndN(x,from,to,e) =>
+      isBool(a,t); check(gamma,from,IntType) ; check(gamma,to,IntType) ; checkAndAddVar(gamma,x,IntType,e) //check(gamma.addVar(x),e)
   }
 
 
@@ -212,13 +224,9 @@ object TypeCheck {
   private def checkAndAddVar(gamma:Context,x:Var,et:ExprType,e:Expr): Unit = {
     if (gamma contains x.x) {
       val y = Var(fresh(x))
-      e match {
-        case e2:IExpr => check(gamma.addVar(y,et),Substitution(x,y)(e2))
-        case e2:BExpr => check(gamma.addVar(y,et),Substitution(x,y)(e2))
-        case _ =>
-      }
+      check(gamma.addVar(y,et),Substitution(x,y)(e),et)
     }
     else
-    check(gamma.addVar(x,et), e)
+      check(gamma.addVar(x,et), e,et)
   }
 }

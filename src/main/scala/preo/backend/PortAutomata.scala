@@ -3,7 +3,8 @@ package preo.backend
 import preo.ast.CPrim
 import preo.backend.PortAutomata.Trans
 import preo.backend.ReoGraph.Edge
-import preo.common.{GenerationException, TypeCheckException}
+import preo.common.{GenerationException, TimeoutException, TypeCheckException}
+import preo.frontend.Show
 
 /**
   * Representation of an automata, aimed at being generated from a [[ReoGraph]].
@@ -94,6 +95,9 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
       s"${x._2._2.mkString("[",",","]")} "+
       s"${x._2._3.map(_.prim.name).mkString("(",",",")")}").mkString("\n")
 
+  def smallShow: String = {
+    trans.flatMap(_._2._3).map(_.prim.name).mkString("Aut(",",",")")
+  }
 
 }
 
@@ -139,9 +143,12 @@ object PortAutomata {
       * @param a2 automata to be composed
       * @return composed automata
       */
-    def join(a1:PortAutomata,a2:PortAutomata): PortAutomata = {
+    def join(a1:PortAutomata,a2:PortAutomata): PortAutomata = join(a1,a2,10000)
+
+    def join(a1:PortAutomata,a2:PortAutomata,timeout:Int): PortAutomata = {
       //     println(s"combining ${this.show}\nwith ${other.show}")
       var seed = 0
+      var steps = 0
       val shared = a1.ports.intersect(a2.ports)
       var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
       var newStates = Map[(Int,Int),Int]()
@@ -152,9 +159,19 @@ object PortAutomata {
         newStates += (i1,i2) -> seed
         seed
       }
-      def ok(toFire:Set[Int]): Boolean = toFire.intersect(shared).isEmpty
-      def ok2(toFire1:Set[Int],toFire2:Set[Int]): Boolean =
+      def tick(): Unit =  {
+        steps+=1
+        if (steps>timeout) throw new
+            TimeoutException(s"When composing automata:\n - ${a1.smallShow}\n - ${a2.smallShow}")
+      }
+      def ok(toFire:Set[Int]): Boolean = {
+        tick()
+        toFire.intersect(shared).isEmpty
+      }
+      def ok2(toFire1:Set[Int],toFire2:Set[Int]): Boolean = {
+        tick()
         toFire1.intersect(a2.ports) == toFire2.intersect(a1.ports)
+      }
 
       // just 1
       for ((from1,(to1,fire1,es1)) <- a1.trans; p2 <- a2.getStates)
