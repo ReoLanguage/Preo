@@ -1,7 +1,8 @@
-package preo.modelling
+package preo.mcrl2
 
 import org.junit.Test
 import org.junit.Assert._
+import preo.frontend.mcrl2._
 
 class TestProcess{
 

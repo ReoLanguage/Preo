@@ -1,6 +1,6 @@
 package preo.frontend
 
-import preo.ast._
+import preo.ast.{_}
 import preo.common.Utils
 
 import scala.collection.immutable.Nil

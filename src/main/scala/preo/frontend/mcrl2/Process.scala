@@ -1,4 +1,4 @@
-package preo.modelling
+package preo.frontend.mcrl2
 
 abstract class Process {
   def getName: ProcessName

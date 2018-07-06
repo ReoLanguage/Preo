@@ -1,4 +1,4 @@
-package preo.modelling
+package preo.frontend.mcrl2
 
 import preo.ast._
 
@@ -79,7 +79,7 @@ object Model {
     val init: Operation =
       if(inits.isEmpty) ProcessName("delta")
       else
-        inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.modelling.Par(a, b))
+        inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.frontend.mcrl2.Par(a, b))
     new Model(procs, init)
   }
 
@@ -177,7 +177,7 @@ object Model {
       val outAction = Action("fifo", Out(1), Some(channel_count))
 
       val channel = Channel("Fifo", Some(channel_count), List(inAction), List(outAction),
-        preo.modelling.Seq(inAction, outAction))
+        preo.frontend.mcrl2.Seq(inAction, outAction))
       channel_count += 1
       channel
 
@@ -187,7 +187,7 @@ object Model {
       val outAction = Action("fifofull", Out(1), Some(channel_count))
 
       val channel = Channel("FifoFull", Some(channel_count), List(inAction), List(outAction),
-        preo.modelling.Seq(outAction, inAction))
+        preo.frontend.mcrl2.Seq(outAction, inAction))
       //updating
       channel_count += 1
       channel
@@ -198,7 +198,7 @@ object Model {
       val outAction = Action("lossy", Out(1), Some(channel_count))
 
       val channel = Channel("Lossy", Some(channel_count), List(inAction), List(outAction),
-        preo.modelling.Choice(inAction, MultiAction(inAction, outAction)))
+        preo.frontend.mcrl2.Choice(inAction, MultiAction(inAction, outAction)))
       //updating
       channel_count += 1
       channel
@@ -210,7 +210,7 @@ object Model {
       val outAction = Action("merger", Out(1), Some(channel_count))
 
       val channel = Channel("Merger", Some(channel_count), List(inAction1, inAction2), List(outAction),
-        preo.modelling.Choice(MultiAction(List(inAction1, outAction)), MultiAction(inAction2, outAction)))
+        preo.frontend.mcrl2.Choice(MultiAction(List(inAction1, outAction)), MultiAction(inAction2, outAction)))
       //updating
       channel_count += 1
       channel

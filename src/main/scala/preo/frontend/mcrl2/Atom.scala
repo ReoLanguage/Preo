@@ -1,4 +1,4 @@
-package preo.modelling
+package preo.frontend.mcrl2
 
 abstract class Atom extends Operation
 

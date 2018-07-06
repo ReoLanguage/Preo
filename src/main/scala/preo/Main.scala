@@ -3,7 +3,7 @@ package preo
 import preo.DSL._
 import preo.backend.{Graph, ReoGraph, Springy}
 import preo.frontend.Eval
-import preo.modelling.{Model}//, Mcrl2Program, Mcrl2FamilyModel}
+import preo.frontend.mcrl2.{Model}//, Mcrl2Program, Mcrl2FamilyModel}
 
 object Main extends App {
 
