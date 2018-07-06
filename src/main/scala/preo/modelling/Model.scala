@@ -77,7 +77,7 @@ object Model {
 
     val inits = (names_in ++ names_out).toSet
     val init: Operation =
-      if(inits.isEmpty) ProcessName("deadlock")
+      if(inits.isEmpty) ProcessName("delta")
       else
         inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.modelling.Par(a, b))
     new Model(procs, init)
