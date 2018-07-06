@@ -60,9 +60,6 @@ object Model {
   var init_count = 1
   var act_count = 1
   var channel_count = 1
-  var last_init: Operation = _
-  var to_check: List[Process] = List[Process]()
-  var missingActions: List[Action] = List[Action]()
 
   /**
     * Converts the CoreConnector into an instance of the Mcrl2Model

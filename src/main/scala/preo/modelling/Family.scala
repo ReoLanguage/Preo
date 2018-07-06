@@ -1,17 +1,17 @@
-//package preo.modelling
-//
-//import preo.ast.{Connector, Expr, Var}
-//
-//abstract class Family[A]{
-//  def instanciate(n: A): (Set[Action], Set[Mcrl2Def], Set[ProcessName])
-//}
-//
+package preo.modelling
+
+import preo.ast.{Connector, Expr, IExpr, Var}
+
+abstract class Family{
+  def instanciate(n: Expr, processCount: Int): (List[Action], List[ProcessName], List[Process], List[ProcessName], List[Action])
+}
+
 ////what does a family receive
 ////what are the common methods
 ////what does it store
 ////how do we instanciate
 //
-//class IFamily(v: Var, c: Connector) extends Family[Int]
+//class IFamily(v: Var, c: Connector) extends Family
 //
 //class BFamily(v: Var, c: Connector) extends Family[Boolean]
 //
