@@ -58,7 +58,6 @@ class Model(procs: List[Process], init: Operation) {
 object Model {
 
   var init_count = 1
-  var act_count = 1
   var channel_count = 1
 
   /**
@@ -80,6 +79,10 @@ object Model {
       if(inits.isEmpty) ProcessName("delta")
       else
         inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.frontend.mcrl2.Par(a, b))
+
+    init_count = 1
+    channel_count = 1
+
     new Model(procs, init)
   }
 
@@ -141,24 +144,26 @@ object Model {
 
       (ins, namesIn, channels, namesOut, outs)
 
-    case CSubConnector(name, c, _) => {
+    case CSubConnector(name, c, _) =>
       val (in, namesIn, procs, namesOut, out) = conToChannels(c)
       var count = 1
-      procs.foreach(proc => proc.getActions.foreach(a => {a.state = Middle(count); a.name = name; count+= 1}))
+      procs.foreach(proc => proc.getActions.foreach(a => {if(a.state != Sync){a.state = Middle(count); a.name = name; count+= 1}}))
       count = 1
-      in.foreach(a =>{ a.state = In(count); a.name = name; count += 1})
+      //no action of the form "p[0..9]+sync" with state Sync should have a name change
+      in.foreach(a =>{if(a.state != Sync){a.state = In(count); a.name = name; count += 1}})
       count = 1
-      out.foreach(a =>{ a.state = Out(count); a.name = name; count += 1})
+      //no action of the form "p[0..9]+sync" with state Sync should have a name change
+      out.foreach(a =>{ if(a.state != Sync){a.state = Out(count); a.name = name; count += 1}})
       procs.foreach{
         case i@Init(_, _, _, _, _) => i.toHide = true
         case _ => ()
       }
       (in, namesIn, procs, namesOut, out)
-    }
-    case x@CPrim(_, _, _, _) => {
+
+    case x@CPrim(_, _, _, _) =>
       val channel = primToChannel(x)
       (channel.before, channel.before.map(_ => channel.getName), List(channel), channel.after.map(_ => channel.getName), channel.after)
-    }
+
     case _ => (Nil, Nil, Nil, Nil, Nil)
   }
 

@@ -279,7 +279,7 @@ object Eval {
     case c2 => throw new TypeCheckException("Failed to reduce connector " + Show(c2))
   }
 
-  private def reduce(i: Interface): CoreInterface = i match {
+  def reduce(i: Interface): CoreInterface = i match {
     case Tensor(i, j) => CoreInterface(reduce(i).ports + reduce(j).ports)
     case Port(IVal(n)) => CoreInterface(n)
     case _ => throw new TypeCheckException("Failed to reduce interface " + Show(i))

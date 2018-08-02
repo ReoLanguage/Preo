@@ -9,6 +9,7 @@ class State
 case class In(n: Int) extends State
 case class Middle(n: Int) extends State
 case class Out(n: Int) extends State
+case object Sync extends State
 case object Nothing extends State
 
 
@@ -28,6 +29,7 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
       case Middle(n) => "mid" + n.toString
       case In(n) => "in" + n.toString
       case Out(n) => "out" + n.toString
+      case Sync => "sync"
     }
     s"$name${if(number.isDefined) number.get else ""}$state_name"
   }
@@ -42,8 +44,6 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
       this.number == o.asInstanceOf[Action].number &&
         this.name ==o.asInstanceOf[Action].name && this.state == o.asInstanceOf[Action].state
 
-  def toNumberedAction(n: Int): Action = Action(name, state, Some(n))
-
   //joins actions in our new nodeless model
   def join(a: Action): Action = Action(this.toString + a.toString, Nothing, None)
 
@@ -54,7 +54,18 @@ object Action{
     * An action that will print Null
     */
   def nullAction: Action = Action("Null", Nothing)
+
+  def controllerAction(number: Int): Action = Action("X", Sync, Some(number))
+
+  def syncAction(number: Int): Action = Action("X", Nothing, Some(number))
+
 }
+
+
+
+
+
+
 
 /**
   * A process name is just a name of a process (useful when we have a Mcrl2Process agglomeration)

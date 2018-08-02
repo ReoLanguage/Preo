@@ -25,12 +25,10 @@ object Process{
   * @param before the actions on the left side (should be 1 or 2)
   * @param after the actions on the right side (should be 1 or 2)
   * @param operator the operator that defines the channel. This should include the before and after actions
-  * @param prev the previous nodes (as many as the length of before)
-  * @param next the next nodes (as many as the length of after)
   */
 //todo: do we need prev and next?
 case class Channel(name:String = "Channel", number: Option[Int],var before: List[Action],var after: List[Action],
-                        operator: Operation, var prev: List[Channel] = Nil,var next: List[Channel]= Nil)
+                        operator: Operation)
   extends Process{
 
   if(operator == null){
@@ -41,10 +39,6 @@ case class Channel(name:String = "Channel", number: Option[Int],var before: List
   override def toString: String = s"$name${if(number.isDefined) number.get else ""} = (${operator.toString}) . $name${if(number.isDefined) number.get else ""}"
 
   def getName:ProcessName = ProcessName(s"$name${if(number.isDefined) number.get else ""}")
-
-  def addPrev(new_prev: Channel): Unit = this.prev ++= List(new_prev)
-
-  def addNext(new_next: Channel): Unit = this.next ++= List(new_next)
 
   def getActions: Set[Action] = before.toSet ++ after.toSet
 
@@ -59,23 +53,20 @@ case class Channel(name:String = "Channel", number: Option[Int],var before: List
 
   override def hashCode(): Int = (name, number).hashCode()
 
-  def toNumberedChannel(n: Int): Channel = Channel(name, Some(n), before, after, operator, prev, next)
+  def toNumberedChannel(n: Int): Channel = Channel(name, Some(n), before, after, operator)
 }
 
 
 /**
   * The init processes (for making communication between nodes and channels in mcrl2)
   * @param number the identification number of the init
-  * @param var_name the name of the actions to communicate
-  * @param var_number the number identification of the actions
-  * @param var_state the state of the actions (with in1, in2, out1, out2 or nothing)
   * @param procs the processes that will be integrated in the init (should be 1 or 2)
   */
 case class Init(number: Option[Int], action1 :Action, action2: Action, procs: List[ProcessName],var toHide: Boolean) extends Process{
   def operator: Operation = {
     val sync_action = action1 join action2
     val basicProc = procs.tail.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
-    val operator =  Block(List(action1, action2), Comm((action1, action2, sync_action), basicProc))
+    val operator =  Block(List(action1, action2), Comm(List(action1, action2), sync_action, basicProc))
 
     if(toHide) Hide(List(sync_action), operator)
     else operator
@@ -90,4 +81,42 @@ case class Init(number: Option[Int], action1 :Action, action2: Action, procs: Li
   def toNumberedInit(n: Int): Init = Init(Some(n), action1, action2, procs, toHide)
 }
 
+case class EntryNode(number:Int, action: Action, proc: ProcessName) extends Process{
+  private val operator: Operation = Seq(action, proc)
 
+  override def toString: String = s"EntryNode$number = ${operator.toString}"
+
+  def getActions: Set[Action] = Set(action)
+
+  def getName: ProcessName= ProcessName(s"EntryNode$number")
+
+}
+
+
+case class Starter(number: Int, syncActions: List[Action], resultingAction: Action, procs: List[ProcessName]) extends Process{
+  def operator: Operation = {
+    val basicProc = procs.tail.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
+    val operator =  Hide(List(resultingAction), Block(syncActions, Comm(syncActions, resultingAction, basicProc)))
+    operator
+  }
+
+  override def toString: String = s"Starter$number = ${operator.toString}"
+
+  def getActions: Set[Action] = Set(resultingAction)
+
+  def getName: ProcessName= ProcessName(s"Starter$number")
+}
+
+
+case class Manager(actions: List[MultiAction]) extends Process{
+  override def getName: ProcessName = ProcessName("Manager")
+
+  override def getActions: Set[Action] = actions.flatMap(m => m.getActions).toSet
+
+  override def toString: String =
+    if(actions.isEmpty) "Manager = delta"
+    else{
+      val operation = actions.tail.foldRight(actions.head: Operation)((m, res) => Par(res, m)).toString
+      s"Manager = $operation"
+    }
+}
