@@ -26,7 +26,6 @@ object Process{
   * @param after the actions on the right side (should be 1 or 2)
   * @param operator the operator that defines the channel. This should include the before and after actions
   */
-//todo: do we need prev and next?
 case class Channel(name:String = "Channel", number: Option[Int],var before: List[Action],var after: List[Action],
                         operator: Operation)
   extends Process{
@@ -90,33 +89,4 @@ case class EntryNode(number:Int, action: Action, proc: ProcessName) extends Proc
 
   def getName: ProcessName= ProcessName(s"EntryNode$number")
 
-}
-
-
-case class Starter(number: Int, syncActions: List[Action], resultingAction: Action, procs: List[ProcessName]) extends Process{
-  def operator: Operation = {
-    val basicProc = procs.tail.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
-    val operator =  Hide(List(resultingAction), Block(syncActions, Comm(syncActions, resultingAction, basicProc)))
-    operator
-  }
-
-  override def toString: String = s"Starter$number = ${operator.toString}"
-
-  def getActions: Set[Action] = Set(resultingAction)
-
-  def getName: ProcessName= ProcessName(s"Starter$number")
-}
-
-
-case class Manager(actions: List[MultiAction]) extends Process{
-  override def getName: ProcessName = ProcessName("Manager")
-
-  override def getActions: Set[Action] = actions.flatMap(m => m.getActions).toSet
-
-  override def toString: String =
-    if(actions.isEmpty) "Manager = delta"
-    else{
-      val operation = actions.tail.foldRight(actions.head: Operation)((m, res) => Par(res, m)).toString
-      s"Manager = $operation"
-    }
 }
