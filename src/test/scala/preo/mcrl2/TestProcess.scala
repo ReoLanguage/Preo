@@ -24,7 +24,7 @@ class TestProcess{
     assertEquals(init1.getActions.size, 1)
     assertEquals(init2.getActions.size, 1)
     assertEquals(init1.getName.toString, "Init1")
-    assertEquals(init2.toString, s"Init2 = ${init2.operator.toString}")
+    assertEquals(init2.toString, s"Init2 = ${init2.getOperation.toString}")
     assertTrue(init2.toString.contains("Init1"))
   }
 //

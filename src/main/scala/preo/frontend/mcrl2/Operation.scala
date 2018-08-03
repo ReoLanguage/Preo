@@ -54,16 +54,16 @@ case class Comm(syncActions: List[Action], resultingAction: Action, in: Operatio
   override def getActions: Set[Action] =  in.getActions ++ syncActions.toSet ++ Set(resultingAction)
 }
 
-/**
-  * The allow operator in mcrl2
-  * @param actions actions allowed
-  * @param in process where the actions are allowed
-  */
-case class Allow(actions: List[Action], in: Operation) extends Operation{
-  override def toString: String = s"""allow({${Process.toString(actions)}}, ${in.toString})"""
-
-  override def getActions: Set[Action] = in.getActions ++ actions.toSet
-}
+///**
+//  * The allow operator in mcrl2
+//  * @param actions actions allowed
+//  * @param in process where the actions are allowed
+//  */
+//case class Allow(actions: List[Action], in: Operation) extends Operation{
+//  override def toString: String = s"""allow({${Process.toString(actions)}}, ${in.toString})"""
+//
+//  override def getActions: Set[Action] = in.getActions ++ actions.toSet
+//}
 
 /**
   * the block operator in mcrl2

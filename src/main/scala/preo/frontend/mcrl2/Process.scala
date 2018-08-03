@@ -4,6 +4,7 @@ abstract class Process {
   def getName: ProcessName
   def getActions: Set[Action]
   override def toString: String
+  def getOperation: Operation
 }
 
 
@@ -26,6 +27,7 @@ object Process{
   * @param after the actions on the right side (should be 1 or 2)
   * @param operator the operator that defines the channel. This should include the before and after actions
   */
+//todo: do we need prev and next?
 case class Channel(name:String = "Channel", number: Option[Int],var before: List[Action],var after: List[Action],
                         operator: Operation)
   extends Process{
@@ -52,7 +54,7 @@ case class Channel(name:String = "Channel", number: Option[Int],var before: List
 
   override def hashCode(): Int = (name, number).hashCode()
 
-  def toNumberedChannel(n: Int): Channel = Channel(name, Some(n), before, after, operator)
+  override def getOperation: Operation = operator
 }
 
 
@@ -62,31 +64,38 @@ case class Channel(name:String = "Channel", number: Option[Int],var before: List
   * @param procs the processes that will be integrated in the init (should be 1 or 2)
   */
 case class Init(number: Option[Int], action1 :Action, action2: Action, procs: List[ProcessName],var toHide: Boolean) extends Process{
-  def operator: Operation = {
+  def getOperation: Operation = {
     val sync_action = action1 join action2
-    val basicProc = procs.tail.foldRight(procs.head)((base, p) => ProcessName(Par(base, p).toString))
+    val basicProc = procs.tail.foldRight(procs.head : Operation)((base, p) => Par(base, p))
     val operator =  Block(List(action1, action2), Comm(List(action1, action2), sync_action, basicProc))
 
     if(toHide) Hide(List(sync_action), operator)
     else operator
   }
 
-  override def toString: String = s"Init${if(number.isDefined) number.get else ""} = ${operator.toString}"
+  override def toString: String = s"Init${if(number.isDefined) number.get else ""} = ${getOperation.toString}"
 
   def getActions: Set[Action] = Set(action1 join action2)
 
   def getName: ProcessName= ProcessName(s"Init${if(number.isDefined) number.get else ""}")
 
   def toNumberedInit(n: Int): Init = Init(Some(n), action1, action2, procs, toHide)
+
+  override def equals(o: scala.Any): Boolean = {
+    if(o == null || o.getClass != this.getClass) false
+    else {
+      val c = o.asInstanceOf[Init]
+      this.number == c.number && action1 == c.action1 && action2 == c.action2 && procs == c.procs
+    }
+  }
 }
 
 case class EntryNode(number:Int, action: Action, proc: ProcessName) extends Process{
-  private val operator: Operation = Seq(action, proc)
+  def getOperation: Operation = Seq(action, proc)
 
-  override def toString: String = s"EntryNode$number = ${operator.toString}"
+  override def toString: String = s"EntryNode$number = ${getOperation.toString}"
 
   def getActions: Set[Action] = Set(action)
 
   def getName: ProcessName= ProcessName(s"EntryNode$number")
-
 }

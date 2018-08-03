@@ -2,7 +2,7 @@ package preo.frontend.mcrl2
 
 import preo.ast._
 
-class Model(procs: List[Process], init: Operation) {
+class Model(val procs: List[Process],val init: Operation) {
   override def toString: String = {
     val actions: String = toString(procs.flatMap(p => p.getActions))
     var processes: String = ""
@@ -51,8 +51,35 @@ class Model(procs: List[Process], init: Operation) {
   def getInits: List[Process] = procs.filter(p => p.isInstanceOf[Init])
 
   def getActions: Set[Action] = procs.flatMap(p => p.getActions).toSet
-}
 
+  def getMultiActions: List[Set[Action]] = {
+    val procs_map = procs.foldRight(Map(): Map[String, Process])((p, m) => m.updated(p.getName.toString, p))
+    getMultiActions(init, procs_map).filter(s => s.nonEmpty)
+  }
+
+  def getMultiActions(op: Operation, procs_map: Map[String, Process]): List[Set[Action]] = op match{
+    case a@Action(_, _, _) => List(Set(a))
+    case MultiAction(actions) => List(actions.toSet)
+    case ProcessName(name) => getMultiActions(procs_map(name).getOperation, procs_map)
+    case preo.frontend.mcrl2.Seq(before, after) => getMultiActions(before, procs_map) ++ getMultiActions(after, procs_map)
+    case preo.frontend.mcrl2.Choice(left, right) => getMultiActions(left, procs_map) ++ getMultiActions(right, procs_map)
+    case preo.frontend.mcrl2.Par(left, right) => {
+      val mleft = getMultiActions(left, procs_map)
+      val mright = getMultiActions(right, procs_map)
+      mleft ++ mright ++ mleft.flatMap(ml => mright.map(mr => ml ++ mr))
+    }
+    case Comm(syncActions, resultingAction, operation) => {
+      val m = getMultiActions(operation, procs_map)
+      val syncActionsSet = syncActions.toSet
+      m.map(f =>
+        if(syncActionsSet.subsetOf(f)) (f -- syncActionsSet) ++ Set(resultingAction)
+        else f
+      )
+    }
+    case Block(actions, operation) => getMultiActions(operation, procs_map).filter(f => f.intersect(actions.toSet).isEmpty)
+    case Hide(actions, operation) => getMultiActions(operation, procs_map).map(f => f -- actions.toSet)
+  }
+}
 
 
 object Model {
