@@ -83,7 +83,7 @@ class Model(val procs: List[Process],val init: Operation) {
     case Hide(actions, operation) => getMultiActions(operation, procs_map).map(f => f -- actions.toSet)
   }
 
-  def storeInFile: Int = {
+  def storeInFile: Unit = {
     val id = Thread.currentThread().getId
     val file = new File(s"/tmp/model_$id.mcrl2")
     file.setExecutable(true)
