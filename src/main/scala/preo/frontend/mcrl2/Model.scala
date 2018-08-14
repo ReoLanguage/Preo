@@ -1,6 +1,9 @@
 package preo.frontend.mcrl2
 
 import preo.ast._
+import sys.process._
+import java.io._
+
 
 class Model(val procs: List[Process],val init: Operation) {
   override def toString: String = {
@@ -79,6 +82,27 @@ class Model(val procs: List[Process],val init: Operation) {
     case Block(actions, operation) => getMultiActions(operation, procs_map).filter(f => f.intersect(actions.toSet).isEmpty)
     case Hide(actions, operation) => getMultiActions(operation, procs_map).map(f => f -- actions.toSet)
   }
+
+  def storeInFile: Int = {
+    val id = Thread.currentThread().getId
+    val file = new File(s"/tmp/model_$id.mcrl2")
+    file.setExecutable(true)
+    val pw = new PrintWriter(file)
+    pw.write(toString)
+    pw.close()
+  }
+
+  def generateLPS: Int = {
+    val id = Thread.currentThread().getId
+    s"mcrl22lps /tmp/model_$id.mcrl2 /tmp/model_$id.lps" !
+  }
+
+  def generateLTS: Int = {
+    val id = Thread.currentThread().getId
+    generateLPS
+    s"lps2lts /tmp/model_$id.lps /tmp/model_$id.lts" !
+  }
+
 }
 
 

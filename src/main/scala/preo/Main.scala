@@ -16,7 +16,9 @@ object Main extends App {
       val conn = parse(scala.io.StdIn.readLine())
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
-      println(Model(Eval.reduce(conn)).getMultiActions)
+      val model = Model(Eval.reduce(conn))
+      println(model.generateLPS)
+//      println(Model(Eval.reduce(conn)))
 
     //      println(ReoGraph.toGraph(Eval.reduce(conn)))
 //      println(Mcrl2Program(Eval.reduce(conn)))
