@@ -1,9 +1,9 @@
 package preo
 
 import preo.DSL._
-import preo.backend.{Graph, ReoGraph, Springy}
+//import preo.backend.{Graph, ReoGraph, Springy}
 import preo.frontend.Eval
-import preo.frontend.mcrl2.{Model}//, Mcrl2Program, Mcrl2FamilyModel}
+//import preo.frontend.mcrl2.Model//, Mcrl2Program, Mcrl2FamilyModel}
 
 object Main extends App {
 
@@ -16,8 +16,8 @@ object Main extends App {
       val conn = parse(scala.io.StdIn.readLine())
       println("connector: "+conn)
       println("reduced: "+Eval.reduce(conn))
-      val model = Model(Eval.reduce(conn))
-      println(model.generateLPS)
+//      val model = Model(Eval.reduce(conn))
+//      println(model.generateLPS)
 //      println(Model(Eval.reduce(conn)))
 
     //      println(ReoGraph.toGraph(Eval.reduce(conn)))

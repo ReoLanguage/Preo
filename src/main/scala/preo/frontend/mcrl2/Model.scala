@@ -1,8 +1,7 @@
 package preo.frontend.mcrl2
 
 import preo.ast._
-import sys.process._
-import java.io._
+
 
 
 class Model(val procs: List[Process],val init: Operation) {
@@ -83,25 +82,25 @@ class Model(val procs: List[Process],val init: Operation) {
     case Hide(actions, operation) => getMultiActions(operation, procs_map).map(f => f -- actions.toSet)
   }
 
-  def storeInFile: Unit = {
-    val id = Thread.currentThread().getId
-    val file = new File(s"/tmp/model_$id.mcrl2")
-    file.setExecutable(true)
-    val pw = new PrintWriter(file)
-    pw.write(toString)
-    pw.close()
-  }
-
-  def generateLPS: Int = {
-    val id = Thread.currentThread().getId
-    s"mcrl22lps /tmp/model_$id.mcrl2 /tmp/model_$id.lps" !
-  }
-
-  def generateLTS: Int = {
-    val id = Thread.currentThread().getId
-    generateLPS
-    s"lps2lts /tmp/model_$id.lps /tmp/model_$id.lts" !
-  }
+//  def storeInFile: Unit = {
+//    val id = Thread.currentThread().getId
+//    val file = new File(s"/tmp/model_$id.mcrl2")
+//    file.setExecutable(true)
+//    val pw = new PrintWriter(file)
+//    pw.write(toString)
+//    pw.close()
+//  }
+//
+//  def generateLPS: Int = {
+//    val id = Thread.currentThread().getId
+//    s"${mcrl2path}mcrl22lps /tmp/model_$id.mcrl2 /tmp/model_$id.lps".!
+//  }
+//
+//  def generateLTS: Int = {
+//    val id = Thread.currentThread().getId
+//    generateLPS
+//    s"${mcrl2path}lps2lts /tmp/model_$id.lps /tmp/model_$id.lts".!
+//  }
 
 }
 

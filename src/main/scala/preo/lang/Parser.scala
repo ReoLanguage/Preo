@@ -61,18 +61,18 @@ object Parser extends RegexParsers {
   ///////////////
 
   def prog: Parser[Connector] =
-    opt(annotate)~connP~opt("{"~whereP~"}")  ^^ {
-      case Some(annotation) ~ co ~ Some(_~p~_) => SubConnector("", p(co), annotation)
+    opt(annotate)~connP~opt("{"~>whereP<~"}")  ^^ {
+      case Some(annotation) ~ co ~ Some(p) => SubConnector("", p(co), annotation)
       case Some(annotation) ~co ~ None => SubConnector("", co, annotation)
-      case None~ co ~ Some(_~p~_) => p(co)
+      case None~ co ~ Some(p) => p(co)
       case None~ co ~ None => co
     }
 
   def whereP: Parser[Connector=>Connector] =
-      opt(annotate)~identifier~"="~prog~opt(","~whereP) ^^ {
-        case Some(annotation)~s~_~co2~Some(_~w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, annotation))
+      opt(annotate)~identifier~"="~prog~opt(","~>whereP) ^^ {
+        case Some(annotation)~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, annotation))
         case Some(annotation)~s~_~co2~None => (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2, annotation))
-        case None~s~_~co2~Some(_~w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, Nil))
+        case None~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, Nil))
         case None~s~_~co2~None      => (co:Connector) => Substitution.replacePrim(s,  co ,SubConnector(s, co2, Nil))
     }
 
@@ -84,27 +84,27 @@ object Parser extends RegexParsers {
   def connP: Parser[Connector] = lamP
 
   def lamP: Parser[Connector] =
-    "\\"~identifier~lamCont ^^ { case _~ s ~ cont => cont(s,IntType)}  |
+    "\\"~>identifier~lamCont ^^ { case s ~ cont => cont(s,IntType)}  |
     seq
 
   def lamCont: Parser[(String,ExprType)=>Connector] =
     identifier ~ lamCont ^^ { case v ~ f  => lam(_:String,_:ExprType,f(v,IntType)) }          |
-    ":" ~ "I"  ~ lamCont ^^ { case _~ _ ~ cont => (v:String,et:ExprType) => cont(v,et) }      |  // IntType is the default
-    ":" ~ "B"  ~ lamCont ^^ { case _~ _ ~ cont => (v:String,_:ExprType) => cont(v,BoolType) } |  // IntType is the default
-    "." ~ connP ~ opt("|"~bexpr) ^^ {
-      case _ ~ con ~ Some(_~e)  => lam(_:String,_:ExprType,con | e)
-      case _ ~ con ~ None       => lam(_:String,_:ExprType,con )
+    ":" ~ "I"  ~> lamCont ^^ (cont => (v: String, et: ExprType) => cont(v, et)) |  // IntType is the default
+    ":" ~ "B"  ~> lamCont ^^ (cont => (v: String, _: ExprType) => cont(v, BoolType)) |  // IntType is the default
+    "." ~> connP ~ opt("|"~>bexpr) ^^ {
+      case con ~ Some(e)  => lam(_:String,_:ExprType,con | e)
+      case con ~ None     => lam(_:String,_:ExprType,con )
     }
 
   def seq: Parser[Connector] =
-    prod~opt(";"~seq) ^^ {
-      case co ~ Some(_~p) => co & p
+    prod~opt(";"~>seq) ^^ {
+      case co ~ Some(p) => co & p
       case co ~ None => co
     }
 
   def prod: Parser[Connector] =
-    appl~opt("*"~prod) ^^ {
-      case co ~ Some(_~p) => co * p
+    appl~opt("*"~>prod) ^^ {
+      case co ~ Some(p) => co * p
       case co ~ None => co
     }
 
@@ -124,21 +124,21 @@ object Parser extends RegexParsers {
 
 
   def pow: Parser[Connector] =
-    elemP~opt("^"~exponP) ^^ {
-      case e~Some(_~a) => a(e)
+    elemP~opt("^"~>exponP) ^^ {
+      case e~Some(a) => a(e)
       case e~None => e
     }
 
   def exponP: Parser[Connector=>Connector] =
-    ilit~opt("<--"~ilit) ^? ({
-      case Var(v) ~ Some(_ ~ e) => (_: Connector).:^(Var(v), e)
+    ilit~opt("<--"~>ilit) ^? ({
+      case Var(v) ~ Some(e) => (_: Connector).:^(Var(v), e)
       case ie ~ None => (_: Connector) ^ ie
     }, {
-      case ie1 ~ Some(_ ~ ie2) => s"${Show(ie1)} should be a variable, in '${Show(ie1)} <-- ${Show(ie2)}'."
+      case ie1 ~ Some(ie2) => s"${Show(ie1)} should be a variable, in '${Show(ie1)} <-- ${Show(ie2)}'."
       case s => s"unknown exponent: '$s'."
     }
       ) |
-    "("~exponP~")" ^^ { case _~e~_ => e }
+    "("~>exponP<~")"
 
   def elemP: Parser[Connector] =
     bexpr~"?"~connP~"+"~connP        ^^ { case e~_~c1~_~c2 => (e ? c1) + c2 }    |
@@ -149,7 +149,7 @@ object Parser extends RegexParsers {
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
     "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some(name))} |
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some(name))} |
-    "("~connP~")" ^^ { case _~con~_ => con } |
+    "("~>connP<~")" |
     identifier ^^ inferPrim
 
 
@@ -159,7 +159,7 @@ object Parser extends RegexParsers {
 
 
   def expr: Parser[Expr] = // redundancy to give priority to true/false over variable "true"/"false"
-    "(" ~ expr ~ ")" ^^ {case _ ~ e ~ _ => e } |
+    "(" ~> expr <~ ")" |
     identifierOrBool |
     iexpr | bexpr
 
@@ -171,40 +171,40 @@ object Parser extends RegexParsers {
 
   // boolean expressions
   def bexpr: Parser[BExpr] =
-    disjP ~ opt("&"~bexpr) ^^ {
-      case e1~Some(_~e2) => e1 & e2
-      case e1~None       => e1
+    disjP ~ opt("&"~>bexpr) ^^ {
+      case e1~Some(e2) => e1 & e2
+      case e1~None     => e1
     }
   def disjP: Parser[BExpr] =
-    equivP ~ opt("|"~disjP) ^^ {
-      case e1~Some(_~e2) => e1 | e2
-      case e1~None       => e1
+    equivP ~ opt("|"~>disjP) ^^ {
+      case e1~Some(e2) => e1 | e2
+      case e1~None     => e1
     }
   def equivP: Parser[BExpr] =
-    compP ~ opt("<->"~equivP) ^^ {
-      case e1~Some(_~e2) => e1 | e2
-      case e1~None       => e1
+    compP ~ opt("<->"~>equivP) ^^ {
+      case e1~Some(e2) => e1 | e2
+      case e1~None     => e1
     } |
-    "("~equivP~")" ^^ { case _~e~_ => e }
+    "("~>equivP<~")"
   def compP: Parser[BExpr] =
     ilit ~ bcontP ^^ { case e ~ co => co(e) } |
     blit
   def bcontP: Parser[IExpr=>BExpr] =
-    "<=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 <= e2 } |
-    ">=" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 >= e2 } |
-    "<"  ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 < e2 }  |
-    ">"  ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 > e2 }  |
-    "==" ~ ilit ^^ { case _~e2 => (e1:IExpr) => e1 === e2 }
+    "<=" ~> ilit ^^ (e2 => (e1: IExpr) => e1 <= e2) |
+    ">=" ~> ilit ^^ (e2 => (e1: IExpr) => e1 >= e2) |
+    "<"  ~> ilit ^^ (e2 => (e1: IExpr) => e1 < e2)  |
+    ">"  ~> ilit ^^ (e2 => (e1: IExpr) => e1 > e2)  |
+    "==" ~> ilit ^^ (e2 => (e1: IExpr) => e1 === e2)
 
   def blit: Parser[BExpr] =
 //    booleanVal |
-    "!" ~ bexpr ^^ {case _ ~ e => Not(e)}       |
-    identifier~":"~"B" ^^ {case s~_~_=>Var(s) } |
+    "!" ~> bexpr ^^ Not          |
+    identifier<~(":"~"B") ^^ Var |
     identifierOrBool ^? ({
       case be: BExpr => be
     },
       ie => s"Integer not expected: $ie")       |
-    "(" ~ bexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
+    "(" ~> bexpr <~ ")"
 
 
   // integer expressions
@@ -220,23 +220,23 @@ object Parser extends RegexParsers {
     }) |
 //  identifier~":"~"I" ^^ {case s~_~_=>Var(s) } |
 //    identifier ^^ Var                           |
-    "(" ~ iexpr ~ ")" ^^ {case _ ~ e ~ _ => e }
+    "(" ~> iexpr <~ ")"
   def intVal: Parser[IVal] =
     """[0-9]+""".r ^^ { s:String => IVal(s.toInt) }
   def ibop: Parser[(IExpr,IExpr)=>IExpr] =
     "+"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 + e2 } |
-      "-"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 - e2 } |
-      "*"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 * e2 } |
-      "/"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 / e2 }
+    "-"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 - e2 } |
+    "*"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 * e2 } |
+    "/"  ^^ {_ => (e1:IExpr,e2:IExpr) => e1 / e2 }
 
   ///////////////
   // Connector //
   ///////////////
 
   def annotate: Parser[List[Annotation]] =
-    "["~identifierCap~opt(":"~expr)~opt(","~annotate)~"]" ^^ {
-      case _~s~Some(_~exp)~Some(_~anotation)~_ => Annotation(s, Some(exp)) :: anotation
-      case _~s~Some(_~exp)~None~_ => Annotation(s, Some(exp)) :: Nil
+    "["~identifierCap~opt(":"~>expr)~opt(","~>annotate)~"]" ^^ {
+      case _~s~Some(exp)~Some(anotation)~_ => Annotation(s, Some(exp)) :: anotation
+      case _~s~Some(exp)~None~_ => Annotation(s, Some(exp)) :: Nil
       case _~s~None~None~_      => Annotation(s, None) :: Nil
     }
 

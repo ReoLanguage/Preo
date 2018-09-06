@@ -31,7 +31,7 @@ object Graph {
   def apply(c:CoreConnector): Graph = {
 //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
     val g = ReoGraph(c)
-    var seed:Int = (g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs)).max
+    var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
     var edges  = List[ReoChannel]()
