@@ -42,11 +42,13 @@ class Model(val procs: List[Process],val init: Operation) {
       """.stripMargin
   }
 
-  private def toString(act: List[Action]): String = act match{
-    case x :: y:: rest => x.toString + ", " + toString(y :: rest)
-    case x:: Nil => x.toString
-    case Nil => ""
-  }
+  private def toString(act: List[Action]): String = 
+    act.mkString(", ")
+  // act match{
+  //   case x :: y:: rest => x.toString + ", " + toString(y :: rest)
+  //   case x:: Nil => x.toString
+  //   case Nil => ""
+  // }
 
   def getChannels: List[Process] = procs.filter(p => p.isInstanceOf[Channel])
 

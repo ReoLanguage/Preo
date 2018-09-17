@@ -108,7 +108,7 @@ object TypeCheck {
       val y = Port(Var(fresh())) // gen unique name
       Type(args, x, y, EQ(interfaceSem(x * i), interfaceSem(i1)) &
                        EQ(interfaceSem(y * i), interfaceSem(j1)) &
-                       nonNeg(x,y) &
+                       nonNeg(x,y) & nonNeg(interfaceSem(i)) &
                        phi, isG)
     case Prim(name,i,j,_) =>
       check(gamma,interfaceSem(i),IntType)
