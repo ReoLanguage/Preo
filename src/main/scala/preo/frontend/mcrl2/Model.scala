@@ -2,6 +2,8 @@ package preo.frontend.mcrl2
 
 import preo.ast._
 
+import scala.collection.mutable
+
 
 
 class Model(val procs: List[Process],val init: Operation) {
@@ -61,7 +63,7 @@ class Model(val procs: List[Process],val init: Operation) {
     getMultiActions(init, procs_map).filter(s => s.nonEmpty)
   }
 
-  def getMultiActions(op: Operation, procs_map: Map[String, Process]): List[Set[Action]] = op match{
+  private def getMultiActions(op: Operation, procs_map: Map[String, Process]): List[Set[Action]] = op match{
     case a@Action(_, _, _) => List(Set(a))
     case MultiAction(actions) => List(actions.toSet)
     case ProcessName(name) => getMultiActions(procs_map(name).getOperation, procs_map)
@@ -83,6 +85,44 @@ class Model(val procs: List[Process],val init: Operation) {
     case Block(actions, operation) => getMultiActions(operation, procs_map).filter(f => f.intersect(actions.toSet).isEmpty)
     case Hide(actions, operation) => getMultiActions(operation, procs_map).map(f => f -- actions.toSet)
   }
+
+  /**
+    * For each base name (e.g., "lossy"), return the set of all multiactions where it can occur
+    * @return
+    */
+  def getMultiActionsMap: mutable.Map[String,Set[Set[Action]]] = {
+    val res = mutable.Map[String,Set[Set[Action]]]()
+    for (ma <- getMultiActions) {
+      mergeMAs(res,getMultiActionsMap(ma))
+    }
+    res
+  }
+
+  /**
+    * For a given multiaction, maps all base names to the given multiaction.
+    * @param ma given multiaction (set of actions)
+    * @return
+    */
+  private def getMultiActionsMap(ma: Set[Action]): Map[String,Set[Action]] = {
+    var res = Map[String,Set[Action]]()
+    for (a <- ma) {
+      val names = a.name.split("_",4)
+      res += (names.head -> ma)
+      if (names.size > 3)
+        res += names(2) -> ma
+//      for (name <- names)
+//        res += (name -> ma)
+    }
+    res
+  }
+
+  private def mergeMAs(m: mutable.Map[String, Set[Set[Action]]], newnames: Map[String, Set[Action]]): Unit = {
+    for ((n,ma) <- newnames) {
+      m(n) = m.getOrElse(n,Set()) + ma
+    }
+  }
+
+
 
 //  def storeInFile: Unit = {
 //    val id = Thread.currentThread().getId

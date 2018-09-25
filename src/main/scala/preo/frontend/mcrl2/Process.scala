@@ -10,11 +10,12 @@ abstract class Process {
 
 
 object Process{
-  def toString(act: List[Action]): String = act match{
-    case x :: y:: rest => x.toString + ", " + toString(y :: rest)
-    case x:: Nil => x.toString
-    case Nil => ""
-  }
+  def toString(act: List[Action]): String = act.mkString(", ")
+//    act match{
+//    case x :: y:: rest => x.toString + ", " + toString(y :: rest)
+//    case x:: Nil => x.toString
+//    case Nil => ""
+//  }
 }
 
 

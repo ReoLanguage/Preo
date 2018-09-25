@@ -26,12 +26,12 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
   override def toString: String = {
     val state_name = state match{
       case Nothing => ""
-      case Middle(n) => "mid" + n.toString
-      case In(n) => "in" + n.toString
-      case Out(n) => "out" + n.toString
+      case Middle(n) => "m" + n.toString
+      case In(n) => "i" + n.toString
+      case Out(n) => "o" + n.toString
       case Sync => "sync"
     }
-    s"$name${if(number.isDefined) number.get else ""}$state_name"
+    s"${name}${if(number.isDefined) "_"+number.get else ""}$state_name"
   }
 
 
@@ -45,7 +45,7 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
         this.name ==o.asInstanceOf[Action].name && this.state == o.asInstanceOf[Action].state
 
   //joins actions in our new nodeless model
-  def join(a: Action): Action = Action(this.toString + a.toString, Nothing, None)
+  def join(a: Action): Action = Action(this.toString +"_"+ a.toString, Nothing, None)
 
 }
 
