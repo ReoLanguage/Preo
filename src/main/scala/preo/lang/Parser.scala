@@ -24,7 +24,7 @@ object Parser extends RegexParsers {
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
 
   override def skipWhitespace = true
-  override val whiteSpace: Regex = "[ \t\r\f\n]+".r
+  override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*\n)+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
@@ -51,6 +51,8 @@ object Parser extends RegexParsers {
     case "exrouters"=> SubConnector(s,Repository.nexrouter, Nil)
     case "fifoloop" => SubConnector(s,Repository.fifoloop, Nil)
     case "sequencer"=> SubConnector(s,Repository.sequencer, Nil)
+    case "barrier"  => SubConnector(s,Repository.barrier, Nil)
+    case "barriers" => SubConnector(s,Repository.barriers, Nil)
     case _          => str2conn(s)
   }
 
