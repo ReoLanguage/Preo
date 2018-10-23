@@ -1,6 +1,9 @@
 package preo.frontend.mcrl2
 
-abstract class Operation {
+/**
+  * A process expression can be a sequence, a choice, a parallem, a communication, or an atomic action (Atom)
+  */
+abstract class ProcessExpr {
   override def toString: String
 
   def getActions: Set[Action]
@@ -11,7 +14,7 @@ abstract class Operation {
   * @param before before process
   * @param after after process
   */
-case class Seq(before: Operation, after: Operation) extends Operation{
+case class Seq(before: ProcessExpr, after: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${before.toString}) . (${after.toString})"
 
   override def getActions: Set[Action] = before.getActions ++ after.getActions
@@ -23,7 +26,7 @@ case class Seq(before: Operation, after: Operation) extends Operation{
   * @param left left process
   * @param right right process
   */
-case class Choice(left: Operation, right: Operation) extends Operation{
+case class Choice(left: ProcessExpr, right: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${left.toString}) + (${right.toString})"
 
   override def getActions: Set[Action] = left.getActions ++ right.getActions
@@ -35,7 +38,7 @@ case class Choice(left: Operation, right: Operation) extends Operation{
   * @param left left process
   * @param right right process
   */
-case class Par(left: Operation, right:Operation) extends Operation{
+case class Par(left: ProcessExpr, right:ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${left.toString}) || (${right.toString})"
 
   override def getActions: Set[Action] = left.getActions ++ right.getActions
@@ -43,10 +46,10 @@ case class Par(left: Operation, right:Operation) extends Operation{
 
 /**
   * creates a communication operator with the 3 actions in the tuple in the process
-  * @param actions the actions to communicate
+  * @param syncActions the actions to communicate
   * @param in the process where the communication will happen
   */
-case class Comm(syncActions: List[Action], resultingAction: Action, in: Operation) extends Operation{
+case class Comm(syncActions: List[Action], resultingAction: Action, in: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"""comm({${multiAction} -> $resultingAction}, ${in.toString})"""
 
   def multiAction: MultiAction = MultiAction(syncActions)
@@ -70,7 +73,7 @@ case class Comm(syncActions: List[Action], resultingAction: Action, in: Operatio
   * @param actions the blocked actions
   * @param in the process where the actions are blocked
   */
-case class Block(actions: List[Action], in: Operation) extends Operation{
+case class Block(actions: List[Action], in: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"""block({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet
@@ -81,7 +84,7 @@ case class Block(actions: List[Action], in: Operation) extends Operation{
   * @param actions the actions to be hidden
   * @param in the process where the actions are hidden
   */
-case class Hide(actions: List[Action], in: Operation) extends Operation{
+case class Hide(actions: List[Action], in: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"""hide({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet

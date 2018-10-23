@@ -49,7 +49,7 @@ object Automata {
   def apply[A<:Automata](cc:CoreConnector)
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
-    val gr = ReoGraph.toGraphWithoutSimpl(cc)
+    val gr = ReoGraph.toGraphOneToOne(cc,hideClosed = false)
 //    println("about to create automata from\n"+gr)
     buildAutomata[A](gr)(builder)
   }

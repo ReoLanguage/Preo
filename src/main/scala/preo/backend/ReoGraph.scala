@@ -28,15 +28,21 @@ object ReoGraph {
     * @param prim connector to be converted to a graph
     * @return graph representation
     */
-  def apply(prim:CoreConnector): ReoGraph = {
+  def apply(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
     seed=0
     //    reduceGraph(toGraph(prim))
-    simplifyGraph(toGraph(prim))
+    simplifyGraph(toGraph(prim,hideClosed))
   }
 
-  def toGraphWithoutSimpl(prim:CoreConnector): ReoGraph = {
+  /**
+    * Calculates a graph representation of a Core connector, where each node has at most one in and 1 out to-1.
+    *
+    * @param prim connector to be converted to a graph
+    * @return graph representation
+    */
+  def toGraphOneToOne(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
     seed=0
-    toGraph(prim)
+    toGraph(prim,hideClosed)
   }
 
   /**
@@ -45,12 +51,13 @@ object ReoGraph {
     * @param prim connector to be converted to a graph
     * @return graph representation
     */
-  def toGraph(prim:CoreConnector): ReoGraph = prim match {
+  private def toGraph(prim:CoreConnector,hideClosed:Boolean): ReoGraph = prim match {
     case CSeq(c1, c2) =>
-      val (g1,g2) = (toGraph(c1),toGraph(c2))
+      val (g1,g2) = (toGraph(c1,hideClosed),toGraph(c2,hideClosed))
       val g2b = subst(g2, g2.ins.zip(g1.outs).toMap )
       ReoGraph(g1.edges++g2b.edges, g1.ins,g2b.outs)
-    case CPar(c1, c2) => toGraph(c1) ++ toGraph(c2)
+    case CPar(c1, c2) =>
+      toGraph(c1,hideClosed) ++ toGraph(c2,hideClosed)
     case CId(CoreInterface(v)) =>  //mkGrSyncs(v)
       val i = seed until seed+v
       val j = seed+v until seed+2*v
@@ -64,7 +71,7 @@ object ReoGraph {
       seed += (i+j)
       ReoGraph(mkGrSyncs(ins,outs1),ins.toList,outs2.toList)
     case CTrace(CoreInterface(i), c) =>
-      val gc = toGraph(c)
+      val gc = toGraph(c,hideClosed)
       val ins =  gc.ins.takeRight(i)
       val outs = gc.outs.takeRight(i)
       val loop = mkGrSyncs(outs,ins)
@@ -75,10 +82,14 @@ object ReoGraph {
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j,Nil)),i,j)
-    case CSubConnector(name, sub, _) =>
-
+    case CSubConnector(name, sub, ann)
+        if hideClosed && (ann exists (_.name.equalsIgnoreCase("close"))) =>
+      val (t,_) = preo.DSL.unsafeTypeOf(sub.toConnector)
+      toGraph(CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),Some("box")),hideClosed)
+//      toGraph(CPrim(s"[$name]",preo.frontend.Eval.reduce(preo.frontend.Simplify(t.i)),preo.frontend.Eval.reduce(preo.frontend.Simplify(t.j))))
+    case CSubConnector(name, sub, _)=>
 //      prioritySeed += 1
-      val g = toGraph(sub)
+      val g = toGraph(sub,hideClosed)
 //      prioritySeed -=1
       addParent(name,g)
     case _ =>

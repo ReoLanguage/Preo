@@ -79,6 +79,13 @@ object Repository {
     (id^n)*(mergers(n))* id &
     (id^n)*drain )
 
+  /** forces 2 or more sinks to synchronise */
+  val barrier = (dupl*dupl) & (id*drain*id)
+  val barriers = lam(n,
+    (n===1)? id + (
+      (dupl*((dupl&(id*dupl))^(n-2)) * dupl) & (id*((drain*id)^(n-1)))
+    ))
+
 //  val ndupl = lam(n, Trace( NN, ((dupl * (id^x))^(x<--(n-1))) & sym(NN,n) ))
 //  val dupl4 = lam(n, Trace( 5 , ((dupl * (id^x))^(x<--3))     & sym(5,4) ))
 //  val ndupl = lam(n, Tr( ((n+1)*(n-2))/2, ((dupl * (id^x))^(x<--(n-1))) & sym( ((n+1)*(n-2))/2 ,n) ))

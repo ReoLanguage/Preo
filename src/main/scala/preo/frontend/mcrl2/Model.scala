@@ -1,12 +1,13 @@
 package preo.frontend.mcrl2
 
 import preo.ast._
+import preo.frontend.mcrl2
 
 import scala.collection.mutable
 
 
 
-class Model(val procs: List[Process],val init: Operation) {
+class Model(val procs: List[Process],val init: ProcessExpr) {
   override def toString: String = {
     val actions: String = toString(procs.flatMap(p => p.getActions))
     var processes: String = ""
@@ -63,27 +64,27 @@ class Model(val procs: List[Process],val init: Operation) {
     getMultiActions(init, procs_map).filter(s => s.nonEmpty)
   }
 
-  private def getMultiActions(op: Operation, procs_map: Map[String, Process]): List[Set[Action]] = op match{
+  private def getMultiActions(e: ProcessExpr, procs_map: Map[String, Process]): List[Set[Action]] = e match{
     case a@Action(_, _, _) => List(Set(a))
     case MultiAction(actions) => List(actions.toSet)
     case ProcessName(name) => getMultiActions(procs_map(name).getOperation, procs_map)
-    case preo.frontend.mcrl2.Seq(before, after) => getMultiActions(before, procs_map) ++ getMultiActions(after, procs_map)
-    case preo.frontend.mcrl2.Choice(left, right) => getMultiActions(left, procs_map) ++ getMultiActions(right, procs_map)
-    case preo.frontend.mcrl2.Par(left, right) => {
+    case mcrl2.Seq(before, after) => getMultiActions(before, procs_map) ++ getMultiActions(after, procs_map)
+    case mcrl2.Choice(left, right) => getMultiActions(left, procs_map) ++ getMultiActions(right, procs_map)
+    case mcrl2.Par(left, right) => {
       val mleft = getMultiActions(left, procs_map)
       val mright = getMultiActions(right, procs_map)
       mleft ++ mright ++ mleft.flatMap(ml => mright.map(mr => ml ++ mr))
     }
-    case Comm(syncActions, resultingAction, operation) => {
-      val m = getMultiActions(operation, procs_map)
+    case Comm(syncActions, resultingAction, expr) => {
+      val m = getMultiActions(expr, procs_map)
       val syncActionsSet = syncActions.toSet
       m.map(f =>
         if(syncActionsSet.subsetOf(f)) (f -- syncActionsSet) ++ Set(resultingAction)
         else f
       )
     }
-    case Block(actions, operation) => getMultiActions(operation, procs_map).filter(f => f.intersect(actions.toSet).isEmpty)
-    case Hide(actions, operation) => getMultiActions(operation, procs_map).map(f => f -- actions.toSet)
+    case Block(actions, expr) => getMultiActions(expr, procs_map).filter(f => f.intersect(actions.toSet).isEmpty)
+    case Hide(actions, expr)  => getMultiActions(expr, procs_map).map(f => f -- actions.toSet)
   }
 
   /**
@@ -105,14 +106,26 @@ class Model(val procs: List[Process],val init: Operation) {
     */
   private def getMultiActionsMap(ma: Set[Action]): Map[String,Set[Action]] = {
     var res = Map[String,Set[Action]]()
+//    for (a <- ma) {
+//      val names = a.name.split("_",4)
+//      res += (names.head -> ma)
+//      if (names.size > 3)
+//        res += names(2) -> ma
+////      for (name <- names)
+////        res += (name -> ma)
+//    }
     for (a <- ma) {
-      val names = a.name.split("_",4)
-      res += (names.head -> ma)
-      if (names.size > 3)
-        res += names(2) -> ma
-//      for (name <- names)
-//        res += (name -> ma)
+      var prev = List[String]()
+      for (subname <- a.name.split("_")) {
+        if (subname.matches("[0-9]+[imo][0-9]+"))
+          prev = List()
+        else {
+          prev ::= subname
+          res += (prev.reverse.mkString("_") -> ma)
+        }
+      }
     }
+
     res
   }
 
@@ -167,10 +180,10 @@ object Model {
     val (ins, names_in, procs, names_out, outs) = conToChannels(ccon)
 
     val inits = (names_in ++ names_out).toSet
-    val init: Operation =
+    val init: ProcessExpr =
       if(inits.isEmpty) ProcessName("delta")
       else
-        inits.tail.foldRight(inits.head.asInstanceOf[Operation])((a, b) => preo.frontend.mcrl2.Par(a, b))
+        inits.tail.foldRight(inits.head.asInstanceOf[ProcessExpr])((a, b) => preo.frontend.mcrl2.Par(a, b))
 
     init_count = 1
     channel_count = 1
@@ -207,10 +220,10 @@ object Model {
 
     case CSymmetry(CoreInterface(i), CoreInterface(j)) =>
       val channels = makeSyncs(i + j)
-      val ins: List[Action] = channels.flatMap(f => f.before)
-      val outs: List[Action] = channels.flatMap(f => f.after)
-      val namesIn: List[ProcessName] = channels.flatMap(f => f.before.map(_ => f.getName))
-      val namesOut: List[ProcessName] = channels.flatMap(f => f.after.map(_ => f.getName))
+      val ins: List[Action] = channels.flatMap(f => f.in)
+      val outs: List[Action] = channels.flatMap(f => f.out)
+      val namesIn: List[ProcessName] = channels.flatMap(f => f.in.map(_ => f.getName))
+      val namesOut: List[ProcessName] = channels.flatMap(f => f.out.map(_ => f.getName))
 
       (ins, namesIn, channels, namesOut.drop(i) ++ namesOut.take(i), outs.drop(i) ++ outs.take(i))
 
@@ -229,32 +242,44 @@ object Model {
 
     case CId(CoreInterface(i)) =>
       val channels = makeSyncs(i)
-      val ins: List[Action] = channels.flatMap(f => f.before)
-      val outs: List[Action] = channels.flatMap(f => f.after)
-      val namesIn: List[ProcessName] = channels.flatMap(f => f.before.map(_ => f.getName))
-      val namesOut: List[ProcessName] = channels.flatMap(f => f.after.map(_ => f.getName))
+      val ins: List[Action]           = channels.flatMap(f => f.in)
+      val outs: List[Action]          = channels.flatMap(f => f.out)
+      val namesIn: List[ProcessName]  = channels.flatMap(f => f.in.map(_ => f.getName))
+      val namesOut: List[ProcessName] = channels.flatMap(f => f.out.map(_ => f.getName))
 
       (ins, namesIn, channels, namesOut, outs)
 
     case CSubConnector(name, c, _) =>
       val (in, namesIn, procs, namesOut, out) = conToChannels(c)
       var count = 1
-      procs.foreach(proc => proc.getActions.foreach(a => {if(a.state != Sync){a.state = Middle(count); a.name = name; count+= 1}}))
+      for (proc <- procs; a <- proc.getActions if a.state != Sync) {
+        a.state = Middle(count)
+        a.name  = name+"_"+a.name
+        count  += 1
+      }
       count = 1
       //no action of the form "p[0..9]+sync" with state Sync should have a name change
-      in.foreach(a =>{if(a.state != Sync){a.state = In(count); a.name = name; count += 1}})
+      for (a <- in if a.state != Sync) {
+        a.state = In(count)
+//        a.name  = name+"/"+a.name
+        count  += 1
+      }
       count = 1
       //no action of the form "p[0..9]+sync" with state Sync should have a name change
-      out.foreach(a =>{ if(a.state != Sync){a.state = Out(count); a.name = name; count += 1}})
-      procs.foreach{
-        case i@Init(_, _, _, _, _) => i.toHide = true
-        case _ => ()
+      for (a <- out if a.state != Sync) {
+        a.state = Out(count)
+//        a.name  = name+"/"+a.name
+        count  += 1
+      }
+      procs.foreach {
+        case i:Init => i.toHide = true
+        case _      =>
       }
       (in, namesIn, procs, namesOut, out)
 
     case x@CPrim(_, _, _, _) =>
       val channel = primToChannel(x)
-      (channel.before, channel.before.map(_ => channel.getName), List(channel), channel.after.map(_ => channel.getName), channel.after)
+      (channel.in, channel.in.map(_ => channel.getName), List(channel), channel.out.map(_ => channel.getName), channel.out)
 
     case _ => (Nil, Nil, Nil, Nil, Nil)
   }
@@ -352,8 +377,8 @@ object Model {
     case CPrim(name, _, _, _) =>
       val inAction = Action(name, In(1), Some(channel_count))
       val outAction = Action(name, Out(1), Some(channel_count))
-      val channel = Channel(number = Some(channel_count), before = List(inAction), after = List(outAction),
-        operator = MultiAction(inAction, outAction))
+      val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
+        expression = MultiAction(inAction, outAction))
 
       channel_count += 1
       channel
@@ -374,8 +399,8 @@ object Model {
     else {
       val inAction = Action("sync", In(1), Some(channel_count))
       val outAction = Action("sync", Out(1), Some(channel_count))
-      val channel = Channel(number = Some(channel_count), before = List(inAction), after = List(outAction),
-        operator = MultiAction(inAction, outAction))
+      val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
+        expression = MultiAction(inAction, outAction))
       channel_count += 1
       channel :: makeSyncs(i - 1)
     }

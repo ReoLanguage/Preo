@@ -25,7 +25,7 @@ case class CSymmetry(i:CoreInterface,j:CoreInterface) extends CoreConnector
 case class CTrace(i:CoreInterface,c:CoreConnector) extends CoreConnector
 case class CPrim(name:String,i:CoreInterface,j:CoreInterface,extra:Option[Any]=None) extends CoreConnector
 
-case class CSubConnector(name:String, c:CoreConnector, anotation: List[Annotation]) extends CoreConnector
+case class CSubConnector(name:String, c:CoreConnector, annotation: List[Annotation]) extends CoreConnector
 
 case class CoreInterface(ports:Int) {
   def *(other:CoreInterface) = CoreInterface(ports + other.ports)

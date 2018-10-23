@@ -1,10 +1,14 @@
 package preo.frontend.mcrl2
 
-abstract class Atom extends Operation
+
+/**
+  * Atoms can be single actions, multi-actions, or process names
+  */
+sealed abstract class Atom extends ProcessExpr
 
 
 
-class State
+sealed abstract class State
 
 case class In(n: Int) extends State
 case class Middle(n: Int) extends State
@@ -31,7 +35,7 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
       case Out(n) => "o" + n.toString
       case Sync => "sync"
     }
-    s"${name}${if(number.isDefined) "_"+number.get else ""}$state_name"
+    s"$name${if(number.isDefined) "_"+number.get else ""}$state_name"
   }
 
 

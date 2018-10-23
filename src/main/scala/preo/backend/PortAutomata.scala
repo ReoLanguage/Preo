@@ -130,8 +130,13 @@ object PortAutomata {
       case Edge(CPrim("reader", _, _, _), List(a), List(),_) =>
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
 
+      // unknown name with type 1->1 -- behave as identity
+      case Edge(CPrim(name, _, _, _), List(a), List(b),_) =>
+        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
+
       case Edge(p, _, _,_) =>
         throw new GenerationException(s"Unknown port automata for primitive $p")
+
     }
 
     def emptyAutomata = PortAutomata(Set(), 0, Set())

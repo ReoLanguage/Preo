@@ -40,8 +40,8 @@ object Parser extends RegexParsers {
     case "lossy"    => lossy
     case "merger"   => merger
     case "swap"     => swap
-    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)))
-    case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)))
+    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some("component"))
+    case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some("component"))
     case "node"     => SubConnector(s,Repository.node, Nil)
     case "dupls"    => SubConnector(s,Repository.dupls, Nil)
     case "mergers"  => SubConnector(s,Repository.mergers, Nil)
@@ -149,8 +149,8 @@ object Parser extends RegexParsers {
   def litP: Parser[Connector] =
     "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~con~_ => Trace(ie,con) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
-    "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some(name))} |
-    "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some(name))} |
+    "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Some("component"))} |
+    "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Some("component"))} |
     "("~>connP<~")" |
     identifier ^^ inferPrim
 
