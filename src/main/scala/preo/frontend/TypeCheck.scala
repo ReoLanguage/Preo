@@ -138,7 +138,7 @@ object TypeCheck {
       val Type(args1,i1,j1,phi1,isG1) = check(gamma,c1)
       val Type(args2,i2,j2,phi2,isG2) = check(gamma,c2)
       check(gamma,b,BoolType)
-      Type(args1++args2, Cond(b,i1,i2), Cond(b,j1,j2), phi1 & phi2,isG1 && isG2)
+      Type(args1++args2, Cond(b,i1,i2), Cond(b,j1,j2), (b-->phi1) & (Not(b)-->phi2),isG1 && isG2)
     case Abs(x,et, c) =>
       val (Type(args,i,j,phi,isG),newx) = checkAndAddVar(gamma,x,et,c) //check(gamma.addVar(x),c)
       Type(args + (newx,et) ,i,j,phi,isG)

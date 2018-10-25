@@ -35,6 +35,9 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
         , (fire,es).hashCode().toString
         , to)
 
+  private def getName2(edge: Edge,fire:Set[Int]):String =
+    s"${edge.prim.name}-${edge.prim.extra}-${edge.parents.mkString(";")}-${fire.mkString(":")}"
+
   private def getName(edge: Edge,fire:Set[Int]):String = (edge.parents match {
     case Nil     => primName(edge.prim)
     case ""::_   => primName(edge.prim)

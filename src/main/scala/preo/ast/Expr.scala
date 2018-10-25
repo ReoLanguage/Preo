@@ -46,6 +46,12 @@ sealed trait BExpr extends Expr {
     case (_,And(es)) => if (es contains this) that else And(this::es)        // naive avoidance of repetitions
     case _ => And(List(this,that))
   }
+  def -->(that:BExpr) =
+    this.negate | that
+  def negate: BExpr = this match {
+    case Not(x) => x
+    case _      => Not(this)
+  }
   def ===(that:BExpr) =
     (this & that) | (Not(this) & Not(that))
   def |(that:BExpr) = Or(this,that)

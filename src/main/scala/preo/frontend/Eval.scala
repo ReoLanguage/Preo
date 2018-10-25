@@ -126,7 +126,7 @@ object Eval {
       case (a, b) if a == b => BVal(b = true)
       case (a:IExpr, b:IExpr) => LE(a, b)
     }
-    case And(Nil) => e
+    case And(Nil) => BVal(true)
     case And(e1 :: es) => (apply(e1), apply(And(es))) match {
       case (BVal(true), ev) => ev
       case (BVal(false), ev) => BVal(b = false)
