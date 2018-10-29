@@ -95,11 +95,11 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   /** List transitions in a pretty-print. */
   def show: String =
     s"$init:\n"+trans.map(x=>s" - ${x._1}->${x._2._1} "+
-      s"${x._2._2.mkString("[",",","]")} "+
-      s"${x._2._3.map(_.prim.name).mkString("(",",",")")}").mkString("\n")
+      s"${x._2._2.toList.sorted.mkString("[",",","]")} "+
+      s"${x._2._3.toList.map(_.prim.name).sorted.mkString("(",",",")")}").mkString("\n")
 
   def smallShow: String = {
-    trans.flatMap(_._2._3).map(_.prim.name).mkString("Aut(",",",")")
+    trans.flatMap(_._2._3).toList.map(_.prim.name).sorted.mkString("Aut(",",",")")
   }
 
 }
@@ -151,12 +151,12 @@ object PortAutomata {
       * @param a2 automata to be composed
       * @return composed automata
       */
-    def join(a1:PortAutomata,a2:PortAutomata): PortAutomata = join(a1,a2,10000)
+    def join(a1:PortAutomata,a2:PortAutomata): PortAutomata = join(a1,a2,20000)
 
     def join(a1:PortAutomata,a2:PortAutomata,timeout:Int): PortAutomata = {
       //     println(s"combining ${this.show}\nwith ${other.show}")
       var seed = 0
-      var steps = 0
+      var steps = timeout
       val shared = a1.ports.intersect(a2.ports)
       var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
       var newStates = Map[(Int,Int),Int]()
@@ -168,8 +168,8 @@ object PortAutomata {
         seed
       }
       def tick(): Unit =  {
-        steps+=1
-        if (steps>timeout) throw new
+        steps-=1
+        if (steps==0) throw new
             TimeoutException(s"When composing automata:\n - ${a1.smallShow}\n - ${a2.smallShow}")
       }
       def ok(toFire:Set[Int]): Boolean = {
@@ -199,6 +199,7 @@ object PortAutomata {
       //    println(s"got ${a.show}")
       val res2 = res1.cleanup
       //    println(s"cleaned ${a2.show}")
+//      println(s"${res2.smallShow} -> ${timeout-steps}\n===${res2.show}")
       res2
     }
 

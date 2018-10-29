@@ -147,7 +147,7 @@ object Parser extends RegexParsers {
     litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
 
   def litP: Parser[Connector] =
-    "Tr"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~con~_ => Trace(ie,con) }   |
+    "loop"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~con~_ => Trace(ie,con) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
     "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Some("component"))} |
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Some("component"))} |

@@ -25,11 +25,11 @@ class TestShow extends FlatSpec {
   testPrint(id^3,
             "id^3")
   testPrint(Trace(2,"fifo" & id),
-            "Tr(2)(fifo ; id)")
+            "loop(2)(fifo ; id)")
   testPrint(Abs("x",IntType,"fifo"^"x"),
             "\\x:I.(fifo^x)")
   testPrint(Trace(2,("fifo"^3) & (id * (id^3))),
-            "Tr(2)((fifo^3) ; (id ⊗ (id^3)))")
+            "loop(2)((fifo^3) ; (id ⊗ (id^3)))")
   testPrint(lam(x,lam("b":B,drain^x)),
     "\\x:I b:B.(drain^x)")
 

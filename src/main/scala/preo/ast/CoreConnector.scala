@@ -1,5 +1,7 @@
 package preo.ast
 
+import preo.ast
+
 sealed abstract class CoreConnector {
   // helpers for the DSL
   def &(that:CoreConnector) = CSeq(this,that)
@@ -31,5 +33,18 @@ case class CoreInterface(ports:Int) {
   def *(other:CoreInterface) = CoreInterface(ports + other.ports)
 
   def toInterface:Interface = Port(IVal(ports))
+}
+
+object CoreConnector {
+  type CC = CoreConnector
+  def visit(c:CC,f:PartialFunction[CC,CC]): CC= c match {
+    case CSeq(c1, c2) => tryF(f,CSeq(visit(c1,f),visit(c2,f)))
+    case CPar(c1, c2) => tryF(f,CPar(visit(c1,f),visit(c2,f)))
+    case CTrace(i,c) => tryF(f,CTrace(i,visit(c,f)))
+    case CSubConnector(name, c, anns) => tryF(f,CSubConnector(name,visit(c,f),anns))
+    case _ => tryF(f,c)
+  }
+  private def tryF(f:PartialFunction[CC,CC],c:CC): CC =
+    f.applyOrElse(c,(x:CC)=>x)
 }
 

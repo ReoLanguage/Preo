@@ -15,7 +15,7 @@ object Show {
     case Id(Port(IVal(0))) => "nil"
     case Id(x)          => s"Id(${apply(x)})"
     case Symmetry(i, j) => s"sym(${apply(i)},${apply(j)})"
-    case Trace(i, c)    => s"Tr(${apply(i)})(${show(c,isShort)})"
+    case Trace(i, c)    => s"loop(${apply(i)})(${show(c,isShort)})"
     case Prim(name,_,_,_) => name
     case Exp(a, c)  => s"${showP(c,isShort)}^${showP(a)}"
     case ExpX(x, a, c)  => s"${showP(c,isShort)}^{${apply(x:IExpr)}<--${apply(a)}}"

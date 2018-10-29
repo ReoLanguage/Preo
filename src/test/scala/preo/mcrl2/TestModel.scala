@@ -10,7 +10,7 @@ import preo.frontend.mcrl2._
 //todo: reestructure tests
 class TestModel {
     @Test
-    def test1(): Unit =runTest("Tr(1)(fifo ; fifo ; fifo)")
+    def test1(): Unit =runTest("loop(1)(fifo ; fifo ; fifo)")
     @Test
     def test2(): Unit =runTest("reader")
     @Test
@@ -30,7 +30,7 @@ class TestModel {
     @Test
     def test10(): Unit =runTest("(writer ; fifo ; reader) * (writer ; fifo ; reader)")
     @Test
-    def test11(): Unit = runTest("writer^3 ; sequencer 3 ; reader^3 { zip =   \\n.Tr((2*n)*(n-1))  ((id^(n-x)*sym(1,1)^x*id^(n-x))^x<--n;   sym((2*n)*(n-1),2*n)),unzip =  \\n.Tr((2*n)*(n-1))  (((id^(x+1)*sym(1,1)^((n-x)-1)*id^(x+1))^x<--n);   sym((2*n)*(n-1),2*n)), sequencer =  \\n.((dupl^n;unzip(n:I)) *    Tr(n)(sym(n-1,1);((fifofull;dupl)*((fifo ; dupl)^(n-1)));         unzip(n:I))) ;    (id^n*(zip(n:I) ; drain^n))}")
+    def test11(): Unit = runTest("writer^3 ; sequencer 3 ; reader^3 { zip =   \\n.loop((2*n)*(n-1))  ((id^(n-x)*sym(1,1)^x*id^(n-x))^x<--n;   sym((2*n)*(n-1),2*n)),unzip =  \\n.loop((2*n)*(n-1))  (((id^(x+1)*sym(1,1)^((n-x)-1)*id^(x+1))^x<--n);   sym((2*n)*(n-1),2*n)), sequencer =  \\n.((dupl^n;unzip(n:I)) *    loop(n)(sym(n-1,1);((fifofull;dupl)*((fifo ; dupl)^(n-1)));         unzip(n:I))) ;    (id^n*(zip(n:I) ; drain^n))}")
 
     def runTest(s:String): Unit = {
       //graph creation

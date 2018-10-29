@@ -249,12 +249,16 @@ object Model {
 
       (ins, namesIn, channels, namesOut, outs)
 
-    case CSubConnector(name, c, _) =>
-      val (in, namesIn, procs, namesOut, out) = conToChannels(c)
+    case CSubConnector(name, c, anns) =>
+      val toHide = Annotation.hidden(anns)
+      val c2 = if (toHide)  hideAllSubConn(c) else c
+
+      val (in, namesIn, procs, namesOut, out) = conToChannels(c2)
+
       var count = 1
       for (proc <- procs; a <- proc.getActions if a.state != Sync) {
         a.state = Middle(count)
-        a.name  = name+"_"+a.name
+        a.name  = if (toHide) name else name+"_"+a.name
         count  += 1
       }
       count = 1
@@ -272,7 +276,7 @@ object Model {
         count  += 1
       }
       procs.foreach {
-        case i:Init => i.toHide = true
+        case i:Init => i.toHide = toHide //true // TODO: CHECK if it makes sense (seems ok)
         case _      =>
       }
       (in, namesIn, procs, namesOut, out)
@@ -284,6 +288,10 @@ object Model {
     case _ => (Nil, Nil, Nil, Nil, Nil)
   }
 
+  private def hideAllSubConn(connector: CoreConnector) =
+    CoreConnector.visit(connector,{
+      case CSubConnector(name, c, anns) => CSubConnector(name,c,Annotation("hide",None)::anns)
+    })
 
   /**
     * Converts a primitive into (Input Nodes, Channel, Nil, Output Nodes) based on the name of the primitive
