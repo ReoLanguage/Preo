@@ -275,10 +275,12 @@ object Model {
 //        a.name  = name+"/"+a.name
         count  += 1
       }
-      procs.foreach {
-        case i:Init => i.toHide = toHide //true // TODO: CHECK if it makes sense (seems ok)
-        case _      =>
-      }
+      if (toHide)
+        procs.foreach {
+          case i:Init =>
+            i.toHide = true // TODO: CHECK if it makes sense (seems ok now)
+          case x      =>
+        }
       (in, namesIn, procs, namesOut, out)
 
     case x@CPrim(_, _, _, _) =>
