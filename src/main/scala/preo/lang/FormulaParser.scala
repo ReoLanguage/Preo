@@ -13,7 +13,7 @@ object FormulaParser extends RegexParsers {
     * @param c string representing a connector
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c:String): ParseResult[Formula] = parseAll(formula,c)
+  def parse(c:String): ParseResult[Formula] = parseAll(formulas,c)
 
   override def skipWhitespace = true
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
@@ -24,6 +24,9 @@ object FormulaParser extends RegexParsers {
   ///////////////
   /// Formula ///
   ///////////////
+
+  def formulas: Parser[Formula] =
+    rep1(formula) ^^ (_.reduce(AndF))
 
   def formula: Parser[Formula] =
       "true" ^^^ TrueF  |

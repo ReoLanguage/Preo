@@ -9,9 +9,10 @@ sealed abstract class Formula
 case object TrueF                         extends Formula
 case object FalseF                        extends Formula
 case class Diamond(r:RegularF, f:Formula) extends Formula
-case class MBox(r:RegularF, f:Formula) extends Formula
+case class MBox(r:RegularF, f:Formula)    extends Formula
 case class At(c:Container,f:Formula)      extends Formula
 case class Up(f:Formula)                  extends Formula
+case class AndF(f1:Formula, f2:Formula)   extends Formula
 
 sealed abstract class RegularF {
   def +(that:RegularF): OrsRegular = (this,that) match {
@@ -64,6 +65,8 @@ object Formula {
       case Nil => throw new GenerationException(s"Failed to hide $f. Already in top level")
       case _::rest => formula2mCRL2(f,rest,naming)
     }
+    case AndF(f1,f2) => formula2mCRL2(f1,pref,naming)+" && "+
+                        formula2mCRL2(f2,pref,naming)
   }
 
   private def regularF2mCRL2(f: RegularF, pref: List[Container],
