@@ -78,7 +78,7 @@ object Graph {
             addNode(o, None, Sink, None)
           }
           // between all outputs if no input end
-          if (e.ins.isEmpty && e.outs.size > 1) {
+          if (e.ins.isEmpty && e.outs.size >= 1) {
             for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i) < e.outs.indexOf(o)) {
               edges ::= ReoChannel(i, o, ArrowOut, ArrowOut, e.prim.name, style)
               addNode(i, None, Sink, None)
@@ -86,7 +86,7 @@ object Graph {
             addNode(e.outs.last, None, Sink, None) // last one also needs to be added
           }
           // between all inputs if no output end
-          if (e.outs.isEmpty && e.ins.size > 1) {
+          if (e.outs.isEmpty && e.ins.size >= 1) {
             for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
               edges ::= ReoChannel(i, o, ArrowIn, ArrowIn, e.prim.name, style)
               addNode(i, None, Source, None)

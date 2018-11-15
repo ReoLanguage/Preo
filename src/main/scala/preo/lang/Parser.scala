@@ -3,7 +3,7 @@ package preo.lang
 import preo.DSL._
 import preo.ast._
 import preo.examples.Repository
-import preo.frontend.{Show, Substitution}
+import preo.frontend._
 
 import scala.util.matching.Regex
 import scala.util.parsing.combinator._
@@ -24,7 +24,7 @@ object Parser extends RegexParsers {
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
 
   override def skipWhitespace = true
-  override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*\n)+".r
+  override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
@@ -40,6 +40,8 @@ object Parser extends RegexParsers {
     case "lossy"    => lossy
     case "merger"   => merger
     case "swap"     => swap
+    case "noSrc"    => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
+    case "noSnk"    => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
     case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some("component"))
     case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some("component"))
     case "node"     => SubConnector(s,Repository.node, Nil)
@@ -71,13 +73,51 @@ object Parser extends RegexParsers {
     }
 
   def whereP: Parser[Connector=>Connector] =
-      opt(annotate)~identifier~"="~prog~opt(","~>whereP) ^^ {
-        case Some(annotation)~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, annotation))
-        case Some(annotation)~s~_~co2~None => (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2, annotation))
-        case None~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, Nil))
-        case None~s~_~co2~None      => (co:Connector) => Substitution.replacePrim(s,  co ,SubConnector(s, co2, Nil))
+    opt(annotate)~identifier~"="~prog~opt(","~>whereP) ^^ {
+//        case Some(annotation)~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, annotation))
+//        case Some(annotation)~s~_~co2~None => (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2, annotation))
+//        case anns~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, anns.getOrElse(Nil)))
+//        case anns~s~_~co2~None    => (co:Connector) => Substitution.replacePrim(s,  co ,SubConnector(s, co2, anns.getOrElse(Nil)))
+      case anns~s~_~co2~where => (co:Connector) =>
+        Substitution.replacePrim(s, where.getOrElse((x:Connector)=>x)(co),
+                                 SubConnector(s,co2, anns.getOrElse(Nil)))
+    } |
+    opt(annotate)~treoLite~opt(","~>whereP) ^^ {
+      case anns~treo~where => (co:Connector) =>
+        val (s,co2) = treo
+        println(co2.toString)
+        println(s"treolite: ${Show(TreoLite.treo2preo(co2))}")
+        Substitution.replacePrim(s,  where.getOrElse((x:Connector)=>x)(co) ,
+                                 SubConnector(s, TreoLite.treo2preo(co2).toConnector, anns.getOrElse(Nil)))
+//                                 SubConnector(s, preo.ast.Prim("treo",1,1), anns.getOrElse(Nil)))
     }
 
+
+  ////////////////
+  /// TreoLite ///
+  ////////////////
+
+  def treoLite: Parser[(String,TreoLite)] =
+    identifier~"("~opt(trTypedArgs)~")"~"="~trConns ^^ {
+      // TODO: maybe infer types later, after parsing.
+      case s~_~args~_~_~cons => (s,TreoLite.inferTypes(TreoLiteAST(args.getOrElse(Nil),cons),inferPrim))
+    }
+  def trTypedArgs: Parser[List[TVar]] =
+    trTypedArg ~ rep(","~>trTypedArg) ^^ {
+      case a~more => a::more
+    }
+  def trTypedArg: Parser[TVar] =
+    identifier ~ "\\?|\\!".r ^^ {
+      case a~inout => TVar(a,inout=="?")}
+  def trConns: Parser[List[TConnAST]] = rep(trExpr)
+  def trExpr: Parser[TConnAST] =
+    identifier~"("~opt(trArgs)~")" ^^ {
+      case name~_~args~_ => TConnAST(name,args.getOrElse(Nil))
+    }
+  def trArgs: Parser[List[String]] =
+    identifier~rep(","~>identifier) ^^ {
+      case name~more => name :: more
+    }
 
   ///////////////
   // Connector //

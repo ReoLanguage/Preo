@@ -17,7 +17,7 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   extends Automata {
 
   /** Collects all states, seen as integers */
-  override def getStates: Set[Int] = (for((x,(y,_,_)) <- trans) yield Set(x,y)).flatten
+  override def getStates: Set[Int] = (for((x,(y,_,_)) <- trans) yield Set(x,y)).flatten + init
   // states: ints, transitions: maps from states to (new state,ports fired, primitives involved)
 
   /** Returns the initial state */
@@ -132,6 +132,10 @@ object PortAutomata {
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
       case Edge(CPrim("reader", _, _, _), List(a), List(),_) =>
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
+      case Edge(CPrim("noSnk", _, _, _), List(), List(a),_) =>
+        (PortAutomata(Set(a), seed, Set()), seed + 1)
+      case Edge(CPrim("noSrc", _, _, _), List(a), List(),_) =>
+        (PortAutomata(Set(a), seed, Set()), seed + 1)
 
       // unknown name with type 1->1 -- behave as identity
       case Edge(CPrim(name, _, _, _), List(a), List(b),_) =>

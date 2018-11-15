@@ -16,7 +16,7 @@ object FormulaParser extends RegexParsers {
   def parse(c:String): ParseResult[Formula] = parseAll(formula,c)
 
   override def skipWhitespace = true
-  override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*\n)+".r
+  override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
   val identifier: Parser[String] = """[a-z][a-zA-Z0-9_]*""".r
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
