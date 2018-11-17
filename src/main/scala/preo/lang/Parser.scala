@@ -20,7 +20,7 @@ object Parser extends RegexParsers {
     * @param c string representing a connector
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c:String): ParseResult[Connector] = parseAll(prog,c)
+  def parse(c:String): ParseResult[Connector] = parseAll(preo,c)
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
 
   override def skipWhitespace = true
@@ -59,37 +59,33 @@ object Parser extends RegexParsers {
   }
 
 
-
   ///////////////
   /// Program ///
   ///////////////
 
+  def preo: Parser[Connector] =
+    prog ^^ {p => TreoLite.expand(p,inferPrim)}
+
   def prog: Parser[Connector] =
     opt(annotate)~connP~opt("{"~>whereP<~"}")  ^^ {
       case Some(annotation) ~ co ~ Some(p) => SubConnector("", p(co), annotation)
-      case Some(annotation) ~co ~ None => SubConnector("", co, annotation)
+      case Some(annotation) ~co ~ None     => SubConnector("", co, annotation)
       case None~ co ~ Some(p) => p(co)
-      case None~ co ~ None => co
+      case None~ co ~ None    => co
     }
 
   def whereP: Parser[Connector=>Connector] =
     opt(annotate)~identifier~"="~prog~opt(","~>whereP) ^^ {
-//        case Some(annotation)~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, annotation))
-//        case Some(annotation)~s~_~co2~None => (co:Connector) => Substitution.replacePrim(s,co,SubConnector(s, co2, annotation))
-//        case anns~s~_~co2~Some(w) => (co:Connector) => Substitution.replacePrim(s,w(co),SubConnector(s, co2, anns.getOrElse(Nil)))
-//        case anns~s~_~co2~None    => (co:Connector) => Substitution.replacePrim(s,  co ,SubConnector(s, co2, anns.getOrElse(Nil)))
       case anns~s~_~co2~where => (co:Connector) =>
         Substitution.replacePrim(s, where.getOrElse((x:Connector)=>x)(co),
                                  SubConnector(s,co2, anns.getOrElse(Nil)))
     } |
     opt(annotate)~treoLite~opt(","~>whereP) ^^ {
-      case anns~treo~where => (co:Connector) =>
-        val (s,co2) = treo
-        println(co2.toString)
-        println(s"treolite: ${Show(TreoLite.treo2preo(co2))}")
-        Substitution.replacePrim(s,  where.getOrElse((x:Connector)=>x)(co) ,
-                                 SubConnector(s, TreoLite.treo2preo(co2).toConnector, anns.getOrElse(Nil)))
-//                                 SubConnector(s, preo.ast.Prim("treo",1,1), anns.getOrElse(Nil)))
+      case anns~treoPrim~where => (co:Connector) =>
+        // For each TreoLite, create a special Prim with its definition in the "extra" field.
+        Substitution.replacePrim(treoPrim.name,  where.getOrElse((x:Connector)=>x)(co) ,
+                                 SubConnector(treoPrim.name, treoPrim, anns.getOrElse(Nil)))
+  //                                 SubConnector(s, TreoLite.treo2preo(co2).toConnector, anns.getOrElse(Nil)))
     }
 
 
@@ -97,10 +93,14 @@ object Parser extends RegexParsers {
   /// TreoLite ///
   ////////////////
 
-  def treoLite: Parser[(String,TreoLite)] =
+  /**
+    * Parses a TreoLite definition "conn(p1?,p2!) = ..."
+     * @return a special Prim, with the full TreoLite in the "extra" argument.
+    */
+  def treoLite: Parser[Prim] =
     identifier~"("~opt(trTypedArgs)~")"~"="~trConns ^^ {
-      // TODO: maybe infer types later, after parsing.
-      case s~_~args~_~_~cons => (s,TreoLite.inferTypes(TreoLiteAST(args.getOrElse(Nil),cons),inferPrim))
+      case s~_~args~_~_~cons =>
+        Prim(s,1,1,Some(TreoLiteAST(args.getOrElse(Nil),cons)))
     }
   def trTypedArgs: Parser[List[TVar]] =
     trTypedArg ~ rep(","~>trTypedArg) ^^ {
@@ -112,7 +112,7 @@ object Parser extends RegexParsers {
   def trConns: Parser[List[TConnAST]] = rep(trExpr)
   def trExpr: Parser[TConnAST] =
     identifier~"("~opt(trArgs)~")" ^^ {
-      case name~_~args~_ => TConnAST(name,args.getOrElse(Nil))
+      case name~_~args~_ => TConnAST(Left(name),args.getOrElse(Nil))
     }
   def trArgs: Parser[List[String]] =
     identifier~rep(","~>identifier) ^^ {

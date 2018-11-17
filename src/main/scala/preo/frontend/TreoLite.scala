@@ -10,7 +10,7 @@ case class TConn(cc:CoreConnector,args:List[TVar])
 
 // before type inference
 case class TreoLiteAST(args:List[TVar],conns:List[TConnAST])
-case class TConnAST(name:String,args:List[String])
+case class TConnAST(name:Either[String,Connector],args:List[String])
 
 object TreoLite {
   /**
@@ -20,7 +20,8 @@ object TreoLite {
     * @return updated Treo connector with typed arguments
     */
   def inferTypes(c:TConnAST,inferPrim:String=>Connector): TConn = {
-    val preoConn: Connector = inferPrim(c.name)
+    val preoConn: Connector = c.name.fold(inferPrim,(x:Connector)=>x) // inferPrim(c.name)
+    // TODO: changing here
     preo.DSL.unsafeTypeOf(preoConn) match {
       case (Type(args, Port(IVal(i)),Port(IVal(j)),BVal(true),_),BVal(true)) if args.vars.isEmpty =>
         if (c.args.size != i+j)
@@ -87,9 +88,9 @@ object TreoLite {
     */
   private def sort(args: List[String], top: List[String], shared: Set[String]): List[String] = {
     val l2 = args.filterNot(top contains _)
-    val (l3,l4) = l2.partition(shared)
-    // top maintains the order, l4 does not care about order, l3 must be sorted.
-    val res = top ++ l4 ++ l3.sorted
+    val (l3,_) = l2.partition(shared)
+    // top maintains the order, l4 does not care about order (now deleted), l3 must be sorted.
+    val res = top ++ l3.sorted
     assert(res.size == res.toSet.size) // todo: Delete
     res
   }
@@ -101,19 +102,21 @@ object TreoLite {
     * @param acc transformations made so far
     * @return list of transformations until the "to" is reached
     */
-  def buildPath(from: List[String], to: List[String])
+  private def buildPath(from: List[String], to: List[String])
       : List[List[CoreConnector]] = {
+//    println(s"BP - ${from.mkString(".")} -> ${to.mkString(".")}")
     // cover loose ends (unique "from" and unique "to")
     val from2 = for (p <- from) yield (p,to   contains p)
     val to2   = for (p <- to  ) yield (p,from contains p)
-    val from3 = from2.filter(_._2).map(_._1)
-    val to3   = to2  .filter(_._2).map(_._1)
+    val from3 = from2.filter(_._2).map(_._1) // 'from' with shared names with 'to'
+    val to3   = to2  .filter(_._2).map(_._1) // 'to' with shared names with 'from'
     val plugFrom = if (from3.size==from.size) Nil
                    else List(from2.map(x => if (x._2) cID else cNoSrc))
     val plugTo   = if (to3.size==to.size) Nil
                    else List(to2.map(x =>   if (x._2) cID else cNoSnk))
     val inner = buildPath2(from3,to3,Nil)
-    println(s"BP1 - ${plugFrom.mkString(",")} / ${plugTo.map(_.map((x:CoreConnector) => Show.short(x.toConnector)))mkString(",")}")
+//    println(s"BP1 - ${plugFrom.map(_.map((x:CoreConnector) => Show.short(x.toConnector))).mkString(",")} / "+
+//                  s"${plugTo.map(_.map((x:CoreConnector) => Show.short(x.toConnector))).mkString(",")}")
     plugFrom ++ inner ++ plugTo
   }
 
@@ -180,6 +183,29 @@ object TreoLite {
       case CPrim("noSnk" , i, j, extra) => CPrim("noSrc" , j, i, extra)
       case x => x
     })
+  }
+
+  /////////////////
+
+  def expand(conn: Connector,infer: String=>Connector): Connector = conn match {
+    case Prim(name, i, j, Some(tr:TreoLiteAST)) =>
+      val treo = inferTypes(tr,infer)
+      treo2preo(treo).toConnector
+    case Seq(c1, c2) => Seq(expand(c1,infer),expand(c2,infer))
+    case Par(c1, c2) => Par(expand(c1,infer),expand(c2,infer))
+    case Trace(i, c) => Trace(i,expand(c,infer))
+
+    case SubConnector(name, c1, anns) => SubConnector(name,expand(c1,infer),anns)
+
+    case Exp(a,c) => Exp(a,expand(c,infer))
+    case ExpX(x,a,c) => ExpX(x,a,expand(c,infer))
+    case Choice(b,c1,c2) => Choice(b,expand(c1,infer),expand(c2,infer))
+    case Abs(x,et,c) => Abs(x,et,expand(c,infer))
+    case App(c,a) => App(expand(c,infer),a)
+
+    case Restr(c,phi) => Restr(expand(c,infer),phi)
+
+    case _ => conn
   }
 
 
