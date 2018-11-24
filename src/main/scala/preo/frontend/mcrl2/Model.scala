@@ -47,11 +47,6 @@ class Model(val procs: List[Process],val init: ProcessExpr) {
 
   private def toString(act: List[Action]): String = 
     act.mkString(", ")
-  // act match{
-  //   case x :: y:: rest => x.toString + ", " + toString(y :: rest)
-  //   case x:: Nil => x.toString
-  //   case Nil => ""
-  // }
 
   def getChannels: List[Process] = procs.filter(p => p.isInstanceOf[Channel])
 
@@ -106,14 +101,6 @@ class Model(val procs: List[Process],val init: ProcessExpr) {
     */
   private def getMultiActionsMap(ma: Set[Action]): Map[String,Set[Action]] = {
     var res = Map[String,Set[Action]]()
-//    for (a <- ma) {
-//      val names = a.name.split("_",4)
-//      res += (names.head -> ma)
-//      if (names.size > 3)
-//        res += names(2) -> ma
-////      for (name <- names)
-////        res += (name -> ma)
-//    }
     for (a <- ma) {
       var prev = List[String]()
       for (subname <- a.name.split("_")) {
@@ -134,28 +121,6 @@ class Model(val procs: List[Process],val init: ProcessExpr) {
       m(n) = m.getOrElse(n,Set()) + ma
     }
   }
-
-
-
-//  def storeInFile: Unit = {
-//    val id = Thread.currentThread().getId
-//    val file = new File(s"/tmp/model_$id.mcrl2")
-//    file.setExecutable(true)
-//    val pw = new PrintWriter(file)
-//    pw.write(toString)
-//    pw.close()
-//  }
-//
-//  def generateLPS: Int = {
-//    val id = Thread.currentThread().getId
-//    s"${mcrl2path}mcrl22lps /tmp/model_$id.mcrl2 /tmp/model_$id.lps".!
-//  }
-//
-//  def generateLTS: Int = {
-//    val id = Thread.currentThread().getId
-//    generateLPS
-//    s"${mcrl2path}lps2lts /tmp/model_$id.lps /tmp/model_$id.lts".!
-//  }
 
 }
 
@@ -300,13 +265,19 @@ object Model {
       case CSubConnector(name, c, anns) => CSubConnector(name,c,Annotation("hide",None)::anns)
     })
 
-  def hideUntilPrefix(conn: CoreConnector, conts: List[List[Container]]): CoreConnector = conn match {
-    case CSeq(c1, c2) => CSeq(hideUntilPrefix(c1,conts),hideUntilPrefix(c2,conts))
-    case CPar(c1, c2) => CPar(hideUntilPrefix(c1,conts),hideUntilPrefix(c2,conts))
-    case CTrace(i,c) => CTrace(i,hideUntilPrefix(c,conts))
+  /**
+    * Hide all sub connectors not in the given list of prefixes, and unhides the remaining ones.
+    * @param conn connector to be updated
+    * @param conts prefixes that should be exposed
+    * @return updated connector with different 'hide' annotations
+    */
+  def unhideUntilPrefix(conn: CoreConnector, conts: List[List[Container]]): CoreConnector = conn match {
+    case CSeq(c1, c2) => CSeq(unhideUntilPrefix(c1,conts),unhideUntilPrefix(c2,conts))
+    case CPar(c1, c2) => CPar(unhideUntilPrefix(c1,conts),unhideUntilPrefix(c2,conts))
+    case CTrace(i,c) => CTrace(i,unhideUntilPrefix(c,conts))
     case CSubConnector(name, c, anns) =>
       if (conts.exists(_.headOption.contains(Container(name))))
-        CSubConnector(name,hideUntilPrefix(c,enterPrefix(name,conts)),rmHide(anns))
+        CSubConnector(name,unhideUntilPrefix(c,enterPrefix(name,conts)),rmHide(anns))
       else
         hideAllSubConn(conn)
     case _ => conn

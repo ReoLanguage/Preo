@@ -65,7 +65,7 @@ object ParserUtils {
     val prefixes = Formula.notToHide(form)
 //    println(s"# not hiding ${prefixes.map(_.mkString("[", "/", "]")).mkString(",")}")
     // we can override hide info here...
-    val c2 = Model.hideUntilPrefix(conn, prefixes)
+    val c2 = Model.unhideUntilPrefix(conn, prefixes)
 //    println(s"# got ${Show(c2)}")
     var err = ""
     val model = preo.frontend.mcrl2.Model(c2)

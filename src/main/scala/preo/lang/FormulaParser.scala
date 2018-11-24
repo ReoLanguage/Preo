@@ -1,6 +1,5 @@
 package preo.lang
 
-import preo.frontend.mcrl2
 import preo.frontend.mcrl2._
 
 import scala.util.matching.Regex
@@ -57,11 +56,6 @@ object FormulaParser extends RegexParsers {
   def starRF: Parser[RegularF] =
     actionLit<~"*" ^^ Kleene |
     actionFormNoOr
-//    actionForm ~ opt("*") ^^ {
-//      case a ~ None => a
-//      case a ~ _    => Kleene(a)
-//    } |
-//    "("~>regForm<~")"
 
   def actionLit: Parser[ActionF] =
     "tau" ^^^ Tau |
