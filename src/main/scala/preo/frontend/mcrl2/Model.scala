@@ -290,10 +290,35 @@ object Model {
     case _ => (Nil, Nil, Nil, Nil, Nil)
   }
 
-  private def hideAllSubConn(connector: CoreConnector) =
+  /**
+    * Adds a "hide" annotation to all children (recursively)
+    * @param connector
+    * @return new connector
+    */
+  def hideAllSubConn(connector: CoreConnector) =
     CoreConnector.visit(connector,{
       case CSubConnector(name, c, anns) => CSubConnector(name,c,Annotation("hide",None)::anns)
     })
+
+  def hideUntilPrefix(conn: CoreConnector, conts: List[List[Container]]): CoreConnector = conn match {
+    case CSeq(c1, c2) => CSeq(hideUntilPrefix(c1,conts),hideUntilPrefix(c2,conts))
+    case CPar(c1, c2) => CPar(hideUntilPrefix(c1,conts),hideUntilPrefix(c2,conts))
+    case CTrace(i,c) => CTrace(i,hideUntilPrefix(c,conts))
+    case CSubConnector(name, c, anns) =>
+      if (conts.exists(_.headOption.contains(Container(name))))
+        CSubConnector(name,hideUntilPrefix(c,enterPrefix(name,conts)),rmHide(anns))
+      else
+        hideAllSubConn(conn)
+    case _ => conn
+  }
+
+  private def rmHide(annotations: List[Annotation]): List[Annotation] =
+    annotations.filter(_.name.toLowerCase != "hide")
+  private def addHide(annotations: List[Annotation]): List[Annotation] =
+    Annotation("hide",None) :: annotations
+  private def enterPrefix(str: String, list: List[List[Container]]): List[List[Container]] =
+    for (cts <- list if cts.headOption.contains(str)) yield cts.tail
+
 
   /**
     * Converts a primitive into (Input Nodes, Channel, Nil, Output Nodes) based on the name of the primitive

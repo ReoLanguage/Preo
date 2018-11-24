@@ -25,8 +25,8 @@ object Show {
     case Abs(x,et, c)  => s"\\${apply(x)}:${apply(et)}${showAP(c,isShort)}"
     case App(c, a)     => s"${showP(c,isShort)}(${apply(a)})"
     case Restr(c,b)     => s"${showP(c,isShort)} | ${showP(b)}"
-    case SubConnector(name, c, _) if  isShort => if (name=="") showP(c,isShort) else name
-    case SubConnector(name, c, _) if !isShort => (if (name=="") "" else name) + s"{${show(c,isShort)}}"
+    case SubConnector(name, c, a) if  isShort => if (name=="") showP(c,isShort) else name
+    case SubConnector(name, c, a) if !isShort => (if (name=="") "" else name) + show(a) + s"{${show(c,isShort)}}"
   }
 
   private def showP(con:Connector,isShort:Boolean): String = con match {
@@ -34,6 +34,9 @@ object Show {
          Exp(_,_) | ExpX(_,_,_) | Restr(_,_) => s"(${show(con,isShort)})"
 
     case _ => show(con,isShort)
+  }
+  private def show(as:List[Annotation]): String = {
+    if (as.isEmpty) "" else as.map(a=>a.name+(if (a.value.isDefined) s":${Show(a.value.get)}" else "")).mkString("[",",","]")
   }
   private def showAP(con:Connector,isShort:Boolean): String = con match {
     case Abs(x,et,c) => s" ${apply(x)}:${apply(et)}${showAP(c,isShort)}"

@@ -92,4 +92,70 @@ object Formula {
     case Tau => "tau"
   }
 
+
+  def formula2mCRL2(f:Formula,names: mutable.Map[String, Set[Set[Action]]],
+                    error: String => Unit ): String =
+    formula2mCRL2(f,list => getMNames(list.map(_.name).reverse.mkString("_"),names,error))
+
+
+  /**
+    * replace a given container name by a "or" of channel names
+    * in the mCRL2 spec.
+    * @param str name of the container
+    * @param names mapping from container names to channels where they are used
+    * @return "Or" list of the associated channels
+//    */
+  private def getMNames(str: String, names: mutable.Map[String, Set[Set[Action]]],
+                        error: String => Unit): String = {
+    val actions = str.split(" *[|] *")
+    var res: Option[Set[Set[Action]]] = None
+    //    println(s"starting: ${actions.mkString(".")}")
+    for (a <- actions) {
+      (names.get(a),res) match {
+        case (Some(mas),Some(acc)) =>
+          res = Some(acc intersect mas)
+        //          println(s"updated res - ${res.mkString(".")}")
+        case (Some(mas),None) =>
+          res = Some(mas)
+        //          println(s"reset res - ${res.mkString(".")}")
+        case (None,_) =>
+          if (a=="id") Some("sync")
+        //          println(s"## left res - ${res.mkString(".")}")
+      }
+    }
+    res match {
+      case None =>
+        error(s"unknown container: ${actions.mkString("/")}")
+        str //s"##${str}/${actions.mkString("/")}##"
+      case Some(set) =>
+        if (set.isEmpty) "false"
+        else set.map(_.mkString("|")).mkString("("," || ",")")
+    }
+  }
+
+  def notToHide(f:Formula, par:List[Container]=Nil): List[List[Container]] = f match {
+    case TrueF => List()
+    case FalseF => List()
+    case Diamond(reg,f) => par.reverse :: notToHide(f,par)
+    case MBox(reg,f) => par.reverse :: notToHide(f,par)
+    case At(c,f) => notToHide(f,c::par)
+    case Up(f) => notToHide(f,if (par.isEmpty) Nil else par.tail)
+    case AndF(f1,f2) => notToHide(f1,par) ::: notToHide(f2,par)
+  }
+
+//  def notToHide(f: RegularF) : List[List[Container]] = f match {
+//    case Kleene(fp) => notToHide(fp)
+//    case SeqRF(r1, r2) => notToHide(r1) ::: notToHide(r2)
+//    case OrsRegular(paths) => paths.flatMap(notToHide)
+//    case AllA => List(Nil) // ?
+//    case NoneA => List(Nil) // ?
+//    case NegFP(l) => notToHide(l)
+//    case AndsFP(paths) =>  paths.flatMap(notToHide)
+//    case OrsFP(paths) =>  paths.flatMap(notToHide)
+//    case c:Container => List(Nil) // ?
+//    case Tau => List(Nil) //?
+//  }
+
+
+
 }

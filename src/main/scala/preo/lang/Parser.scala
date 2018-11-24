@@ -1,7 +1,9 @@
 package preo.lang
 
+import preo.DSL
 import preo.DSL._
 import preo.ast._
+import preo.common.{GenerationException, TypeCheckException}
 import preo.examples.Repository
 import preo.frontend._
 
@@ -22,6 +24,7 @@ object Parser extends RegexParsers {
     */
   def parse(c:String): ParseResult[Connector] = parseAll(preo,c)
   def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
+
 
   override def skipWhitespace = true
   override val whiteSpace: Regex = "( |\t|\r|\f|\n|//.*)+".r
