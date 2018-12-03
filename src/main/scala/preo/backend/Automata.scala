@@ -79,6 +79,7 @@ object Automata {
       //    var next = if (g.ins.nonEmpty) ins(g.ins.head)
       //    for (in <- g.ins.headOption; set <- ins.get(in); e <- )
 
+      // TODO: call "hide" when relevant
       while (missing.nonEmpty) {
         while (next.nonEmpty) {
           // pop "prev" from "next"
@@ -118,5 +119,7 @@ trait AutomataBuilder[A<:Automata] {
     * @return composed automata
     */
   def join(a1:A,a2:A): A
+
+  // TODO: add "hide" construct
 
 }

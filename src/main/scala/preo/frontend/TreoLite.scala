@@ -2,7 +2,7 @@ package preo.frontend
 
 import preo.DSL
 import preo.ast._
-import preo.common.TypeCheckException
+import preo.common.{GenerationException, TypeCheckException}
 
 case class TreoLite(args:List[TVar],conns:List[TConn])
 case class TVar(name:String,isIn:Boolean) {def isOut: Boolean = !isIn}
@@ -59,6 +59,10 @@ object TreoLite {
     val (ins,outs) = (insV.map(_.name),outsV.map(_.name))
     // 3. collect shared ports
     val shared = ins.toSet intersect outs.toSet
+    // 3b. check if boundaries are not mixed
+    val boundaryShared  = shared intersect t.args.map(_.name).toSet
+    if (boundaryShared.nonEmpty)
+      throw new GenerationException(s"Treo: boundary nodes cannot be mixed nodes: ${boundaryShared.mkString(",")}")
     // 4. determine desired order (first args, then unshared, then shared (sorted))
     val insFinal  = sort(ins, t.args.filter(_.isIn ).map(_.name),shared)
     val outsFinal = sort(outs,t.args.filter(_.isOut).map(_.name),shared)
@@ -91,8 +95,8 @@ object TreoLite {
     val (l3,_) = l2.partition(shared)
     // top maintains the order, l4 does not care about order (now deleted), l3 must be sorted.
     val res = top ++ l3.sorted
-    assert(res.size == res.toSet.size) // todo: Delete
-    res
+//    assert(res.size == res.toSet.size,s"unexpected replicas: ${res.mkString(",")} - ignored ${l4.mkString(",")}.") // todo: Delete
+    res.distinct
   }
 
   /**
@@ -115,6 +119,11 @@ object TreoLite {
     val plugTo   = if (to3.size==to.size) Nil
                    else List(to2.map(x =>   if (x._2) cID else cNoSnk))
     val inner = buildPath2(from3,to3,Nil)
+    // check if there are repeated not-needed ends
+    val fromToPlug = from2.filterNot(_._2).map(_._1)
+    if (fromToPlug != fromToPlug.distinct)
+      throw new GenerationException(s"Unused mixed port(s) ${fromToPlug.diff(fromToPlug.distinct).distinct.mkString(",")}")
+    //
 //    println(s"BP1 - ${plugFrom.map(_.map((x:CoreConnector) => Show.short(x.toConnector))).mkString(",")} / "+
 //                  s"${plugTo.map(_.map((x:CoreConnector) => Show.short(x.toConnector))).mkString(",")}")
     plugFrom ++ inner ++ plugTo
