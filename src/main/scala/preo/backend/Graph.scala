@@ -11,7 +11,7 @@ New simplified graph - to be visualied
   */
 case class Graph(edges: List[ReoChannel], nodes:List[ReoNode])
 
-case class ReoChannel(src:Int,trg:Int, srcType:EndType, trgType:EndType, name:String, style:Option[String])
+case class ReoChannel(src:Int, trg:Int, srcType:EndType, trgType:EndType, name:String, extra:Option[String])
 sealed abstract class EndType
 case object ArrowIn  extends EndType
 case object ArrowOut extends EndType
@@ -19,7 +19,7 @@ case object NoArrow  extends EndType
 
 
 
-case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, style:Option[String])
+case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, extra:Option[String])
 sealed abstract class NodeType     { def dual:NodeType}
 case object Source extends NodeType {def dual = Sink  }
 case object Sink   extends NodeType {def dual = Source}
@@ -28,9 +28,9 @@ case object Mixed  extends NodeType {def dual = Mixed }
 
 object Graph {
 
-  def apply(c:CoreConnector): Graph = {
+  def apply(c:CoreConnector, hideSome: Boolean=false): Graph = {
 //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
-    val g = ReoGraph(c)
+    val g = ReoGraph(c,hideSome)
     var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
@@ -51,6 +51,7 @@ object Graph {
     for (e <- g.edges) {
       val style = e.prim.extra.map(_.toString)
 
+      // start by checking the extra field
       style match {
         // found a box (closed container) or a container
         case Some(s) =>

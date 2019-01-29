@@ -29,9 +29,10 @@ object ReoGraph {
     * @return graph representation
     */
   def apply(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
-    seed=0
+//    seed=0
     //    reduceGraph(toGraph(prim))
-    simplifyGraph(toGraph(prim,hideClosed))
+//    simplifyGraph(toGraph(prim,hideClosed))
+    simplifyGraph(toGraphOneToOne(prim,hideClosed))
   }
 
   /**
@@ -131,7 +132,7 @@ object ReoGraph {
     val g2 = applyRemap(ReoGraph(es,g.ins,g.outs),remap)
     // remove replicators and mergers when possible
     val (inmap,outmap) = collectInsOuts(g2)
-    val (es2,remap2) = dropReplDupl(g2,inmap,outmap)
+    val (es2,remap2) = dropDuplMerg(g2,inmap,outmap)
     val g3 = applyRemap(ReoGraph(es2,g2.ins,g2.outs),remap2)
     val g4 = applyRemap(g3,remap2)
     val g5 = applyRemap(g4,remap2)
@@ -202,11 +203,11 @@ object ReoGraph {
     * @param outmap map from output ports to edges (by collectInsOuts)
     * @return simplified graph
     */
-  private def dropReplDupl(g:ReoGraph,inmap:Map[Int,Set[Edge]],outmap:Map[Int,Set[Edge]])
+  private def dropDuplMerg(g:ReoGraph, inmap:Map[Int,Set[Edge]], outmap:Map[Int,Set[Edge]])
       : (List[Edge],Map[Int,Int]) = g.edges match {
     case Nil => (Nil,Map())
     case (edge@Edge(CPrim("dupl",_,_,_),List(i1),eo@List(_,_),_))::tl =>
-      val (e,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
+      val (e,m) = dropDuplMerg(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       var syncs: List[Edge] = List()
       var binds: Map[Int,Int] = Map()
       for (o <- eo) {
@@ -221,12 +222,12 @@ object ReoGraph {
       (e:::syncs,m++binds)
     case Edge(CPrim("merger",_,_,_),ei@List(i1,i2),List(o1),_)::tl
         if allHaveEdges(ei,outmap)=>
-      val (e,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
+      val (e,m) = dropDuplMerg(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       val m2 = if (getEdge("dupl",i1,outmap).isDefined) m  else m  + (i1 -> o1)
       val m3 = if (getEdge("dupl",i2,outmap).isDefined) m2 else m2 + (i2 -> o1)
       (e,m3)
     case e::tl =>
-      val (es,m) = dropReplDupl(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
+      val (es,m) = dropDuplMerg(ReoGraph(tl,g.ins,g.outs),inmap,outmap)
       (e::es,m)
   }
 

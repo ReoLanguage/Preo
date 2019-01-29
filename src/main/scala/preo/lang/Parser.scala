@@ -1,9 +1,7 @@
 package preo.lang
 
-import preo.DSL
 import preo.DSL._
 import preo.ast._
-import preo.common.{GenerationException, TypeCheckException}
 import preo.examples.Repository
 import preo.frontend._
 
@@ -15,15 +13,32 @@ import scala.util.parsing.combinator._
   * For examples,check the unit tests - [[preo.TestParser]]
   * Created by jose on 07/03/2017.
   */
-object Parser extends RegexParsers {
+object Parser {
+  def preoParser:Parser = new Parser {}
+
+  type Result[T] = Either[String,T]
+
+  def parse(c:String): Result[Connector] = preoParser.parse(c)
+  def pa(c:String): Result[BExpr]        = preoParser.pa(c)
+}
+
+trait Parser extends RegexParsers {
+
+
+  type Result[T] = Either[String,T]
 
   /**
     * Main function that parses a string.
     * @param c string representing a connector
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parse(c:String): ParseResult[Connector] = parseAll(preo,c)
-  def pa(c:String): ParseResult[BExpr] = parseAll(bexpr,c)
+  def parse(c:String): Result[Connector] = toEither(parseAll(preo,c))
+  def pa(c:String): Result[BExpr] = toEither(parseAll(bexpr,c))
+
+  private def toEither[T](pr:ParseResult[T]): Either[String,T] = pr match {
+    case Success(result, _) => Right(result)
+    case f: NoSuccess       => Left(f.msg)
+  }
 
 
   override def skipWhitespace = true
@@ -279,10 +294,16 @@ object Parser extends RegexParsers {
   ///////////////
 
   def annotate: Parser[List[Annotation]] =
-    "["~identifierCap~opt(":"~>expr)~opt(","~>annotate)~"]" ^^ {
-      case _~s~Some(exp)~Some(anotation)~_ => Annotation(s, Some(exp)) :: anotation
-      case _~s~Some(exp)~None~_ => Annotation(s, Some(exp)) :: Nil
-      case _~s~None~None~_      => Annotation(s, None) :: Nil
+    "["~>annotations<~"]"
+
+  def annotations: Parser[List[Annotation]] =
+    annotation~opt(","~>annotations) ^^ {
+      case ann~Some(rest) => ann :: rest
+      case ann~None => ann :: Nil
     }
 
+  def annotation:Parser[Annotation] =
+    identifierCap~opt(":"~>expr) ^^ {
+      case s~e => Annotation(s,e)
+    }
 }

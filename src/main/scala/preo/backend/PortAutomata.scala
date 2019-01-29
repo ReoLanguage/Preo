@@ -111,6 +111,13 @@ object PortAutomata {
   /** How to build basic Port automata */
   implicit object PortAutomataBuilder extends AutomataBuilder[PortAutomata] {
 
+    /** Given an edge between two nodes (ports), builds a primitive automata for the connector in its edge.
+      * Only recognises primitive connectors.
+      *
+      * @param e edge with primitive and ports
+      * @param seed current counter used to generate state names
+      * @return new PortAutomata and updated counter for state names
+      */
     def buildAutomata(e: Edge, seed: Int): (PortAutomata, Int) = e match {
       case Edge(CPrim("sync", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)

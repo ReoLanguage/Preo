@@ -125,7 +125,7 @@ object Formula {
     }
     res match {
       case None =>
-        error(s"unknown container: ${actions.mkString("/")}")
+        error(s"unknown container: ${actions.mkString("/")}") // in ${names.mkString("\n")}")
         str //s"##${str}/${actions.mkString("/")}##"
       case Some(set) =>
         if (set.isEmpty) "false"

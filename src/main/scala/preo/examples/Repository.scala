@@ -61,12 +61,16 @@ object Repository {
 
   /** n-ary duplicator */
   val dupls = lam (n, Tr(n-1,(id * (dupl^(n-1))) & sym(1,(n-1)*2)))
+  def duplsGen(d:Connector): Connector =
+    lam (n, Tr(n-1,(id * (d^(n-1))) & sym(1,(n-1)*2)))
 
   /** n-ary merger */
   val mergers = lam (n, Tr(n-1,sym((n-1)*2,1) & (id * (merger^(n-1)))))
 
   /** n-ary merger and duplicator (node) */
   val node = mergers & dupls
+  def nodeGen(d:Connector): Connector =
+    mergers & duplsGen(d)
 
   /** n-ary exrouter */
   // n-ary exrouter

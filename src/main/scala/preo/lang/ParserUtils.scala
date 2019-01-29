@@ -10,9 +10,9 @@ object ParserUtils {
   /**
     * Parses a string, returning either an error message or a core connector.
     */
-  def parseCoreConnector(in:String): Either[String,CoreConnector] = {
+  def parseCoreConnector(in:String): Either[String, CoreConnector] = {
     DSL.parseWithError(in) match {
-      case preo.lang.Parser.Success(result,_) =>
+      case Right(result) =>
         try {
           val reduced: Connector = Eval.instantiate(result)
           Right(Eval.reduce(reduced))
@@ -22,10 +22,12 @@ object ParserUtils {
           case e: GenerationException =>
             Left("Generation failed: " + e.getMessage)
         }
-      case preo.lang.Parser.Failure(emsg,_) =>
-        Left("Parser failure: " + emsg + " in "+in)
-      case preo.lang.Parser.Error(emsg,_) =>
-        Left("Parser error: " + emsg + " in "+in)
+      case Left(msg) =>
+        Left("Parser failure: " + msg + " in "+in)
+//      case preo.lang.Parser.Failure(emsg,_) =>
+//        Left("Parser failure: " + emsg + " in "+in)
+//      case preo.lang.Parser.Error(emsg,_) =>
+//        Left("Parser error: " + emsg + " in "+in)
     }
   }
 

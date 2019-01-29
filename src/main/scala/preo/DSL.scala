@@ -6,6 +6,7 @@ import ast.{Var, _}
 import frontend._
 import lang.Parser
 import common.TypeCheckException
+import preo.lang.Parser.Result
 
 import scala.language.implicitConversions
 import scala.util.control.NonFatal
@@ -109,16 +110,16 @@ object DSL {
     * @param s string representing a connector
     * @return Parse result (parsed(connector) or failure(error))
     */
-  def parseWithError(s:String): Parser.ParseResult[Connector] = Parser.parse(s)
+  def parseWithError(s:String): Result[Connector] = Parser.parse(s)
 
   /**
     * Parses a string into a connector.
     * @param s string representing a connector
     * @return parsed connector
     */
-  def parse(s:String): Connector =  Parser.parse(s) match {
-    case Parser.Success(result, next) => result
-    case f: Parser.NoSuccess => throw new TypeCheckException("Parser failed: "+f.msg)
+  def parse(s:String): Connector = Parser.parse(s) match {
+    case Right(result) => result
+    case Left(fail)    => throw new TypeCheckException("Parser failed: "+fail)
   }
 
   // overall methods to typecheck
