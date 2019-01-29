@@ -11,7 +11,35 @@ New simplified graph - to be visualied
   */
 case class Graph(edges: List[ReoChannel], nodes:List[ReoNode])
 
-case class ReoChannel(src:Int,trg:Int, srcType:EndType, trgType:EndType, name:String, style:Option[String])
+case class ReoChannel(src:Int,trg:Int, srcType:EndType, trgType:EndType, name:String, style:Option[String]) {
+  def inputs:Set[Int] = {
+    var ins:Set[Int] = Set()
+    srcType match {
+      case ArrowIn => ins = ins ++ Set(src)
+      case NoArrow => ins = ins ++ Set(src)
+      case _ => ins
+    }
+    trgType match {
+      case ArrowIn => ins = ins ++ Set(trg)
+      case NoArrow => ins = ins ++ Set(trg)
+      case _ => ins
+    }
+    ins
+  }
+
+  def outputs:Set[Int] = {
+    var outs:Set[Int] = Set()
+    srcType match {
+      case ArrowOut => outs = outs ++ Set(src)
+      case _ => outs
+    }
+    trgType match {
+      case ArrowOut => outs = outs ++ Set(trg)
+      case _ => outs
+    }
+    outs
+  }
+}
 sealed abstract class EndType
 case object ArrowIn  extends EndType
 case object ArrowOut extends EndType
@@ -28,9 +56,9 @@ case object Mixed  extends NodeType {def dual = Mixed }
 
 object Graph {
 
-  def apply(c:CoreConnector): Graph = {
+  def apply(c:CoreConnector,hideClosed: Boolean = true): Graph = {
 //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
-    val g = ReoGraph(c)
+    val g = ReoGraph(c,hideClosed)
     var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
