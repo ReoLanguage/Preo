@@ -111,7 +111,8 @@ object ReoGraph {
 
   private def mkGrSyncs(i:Iterable[Int],j:Iterable[Int]): List[Edge] = {
     (for ((i,j) <- i.zip(j)) yield
-      Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j), Nil)).toList
+      mkSync(i,j)).toList
+//      Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j), Nil)).toList
   }
 
   private def mkSync(i:Int,j:Int): Edge =

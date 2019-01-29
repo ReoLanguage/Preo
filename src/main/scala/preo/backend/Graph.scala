@@ -81,7 +81,7 @@ object Graph {
 
       // start by checking the extra field
       style match {
-        // found a box (closed container) or a container
+        // found a box (closed container) or a component
         case Some(s) =>
           val isComp = s contains "component"
           val typ = if (isComp) {

@@ -24,10 +24,10 @@ class TestParser extends FlatSpec {
   private def testOK(in:String,out:Connector) =
     s"""The string "$in"""" should s"""produce the connector "${Show(out)}"""" in {
       Parser.parse(in) match {
-        case Parser.Success(result, _) =>
+        case Right(result) =>
           assertResult(out)(result)
         //          assert(s"Wrong parsed value. Got\n  $result\nexpected\n  $out",result,out)
-        case err: Parser.NoSuccess =>
+        case Left(err) =>
           fail("Parse error: "+err)
       }
     }
