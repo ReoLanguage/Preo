@@ -29,10 +29,9 @@ object ReoGraph {
     * @return graph representation
     */
   def apply(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
-//    seed=0
-    //    reduceGraph(toGraph(prim))
-//    simplifyGraph(toGraph(prim,hideClosed))
-    simplifyGraph(toGraphOneToOne(prim,hideClosed))
+    //    simplifyGraph(toGraphOneToOne(prim,hideClosed)) // original
+    //    simplifyGraph2(toGraphOneToOne(prim,hideClosed)) // under development (not working)
+        simplifyGraph3(toGraphOneToOne(prim,hideClosed)) // templ: replacing dupls/mergers by nodes and dropping sync
   }
 
   /**
@@ -122,6 +121,13 @@ object ReoGraph {
 
   //////////////////
   type IOMap = Map[Int,Set[Edge]]
+
+  def simplifyGraph3(g: ReoGraph): ReoGraph = {
+    val (es,remap) = dropSyncs(g)
+    val g2 = applyRemap(ReoGraph(es,g.ins,g.outs),remap)
+    ReoGraph(g2.edges.map(toNode),g2.ins,g2.outs)
+
+  }
 
   def simplifyGraph2(g: ReoGraph): ReoGraph = {
     val boundary = g.ins++g.outs
