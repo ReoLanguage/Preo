@@ -86,7 +86,7 @@ object ReoGraph {
     case CSubConnector(name, sub, anns)
         if hideSome && Annotation.hidden(anns) =>
       val (t,_) = preo.DSL.unsafeTypeOf(sub.toConnector)
-      toGraph(CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),Some("box")),hideSome)
+      toGraph(CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),Set("box")),hideSome)
 //      toGraph(CPrim(s"[$name]",preo.frontend.Eval.reduce(preo.frontend.Simplify(t.i)),preo.frontend.Eval.reduce(preo.frontend.Simplify(t.j))))
     case CSubConnector(name, sub, _)=>
 //      prioritySeed += 1
@@ -118,6 +118,87 @@ object ReoGraph {
   private def mkSync(i:Int,j:Int): Edge =
     Edge(CPrim("sync", CoreInterface(1), CoreInterface(1)), List(i), List(j), Nil)
 
+
+
+  //////////////////
+  type IOMap = Map[Int,Set[Edge]]
+
+  def simplifyGraph2(g: ReoGraph): ReoGraph = {
+    val boundary = g.ins++g.outs
+    val (inmap,outmap) = collectInsOuts(g)
+    val fringe:Set[Edge] = g.edges.headOption.map(Set(_)).getOrElse(Set())
+//      getNeighbours(g.ins, inmap) ++
+//      getNeighbours(g.outs,outmap)
+    val newEdges = traverse(fringe,Set(),g.edges.toSet -- fringe,inmap,outmap)
+    ReoGraph(newEdges.toList,g.ins,g.outs)
+  }
+
+  def traverse(fringe: Set[Edge], done: Set[Edge], missing:Set[Edge], inmap:IOMap, outmap:IOMap): Set[Edge] = {
+    println(s"fringe ${fringe.mkString(",")}")
+    fringe.headOption match {
+      case None =>
+        missing.headOption match {
+          case Some(edge) => traverse(Set(edge),Set(),missing-edge,inmap,outmap)
+          case None => Set()
+        }
+      case Some(e1@Edge(prim, ins, outs, pars)) =>
+        val nexts = (getNeighbours(ins, outmap) ++ getNeighbours(outs, inmap)) -- done
+        var newedges = Set[Edge]()
+        var tofringe = Set[Edge]()
+        val e1n = toNode(e1)
+        nexts.headOption match {
+          case Some(e2) =>
+            val e2n = toNode(e2)
+            println(s"joining $e1n + $e2n")
+            val e12 = join(e1n, e2n)
+            println(s"joined ${e12.mkString(" - ")}")
+            if (e12 contains e1n) {
+              newedges += e1n
+              tofringe ++= (e12 - e1n)
+            }
+            else
+              tofringe ++= e12
+          case None =>
+            newedges += e1
+        }
+        newedges ++ traverse((tofringe ++ fringe) - e1, done + e1, missing--tofringe, inmap, outmap)
+    }
+  }
+
+  private def getNeighbours(io: List[Int], map: IOMap): Set[Edge] =
+    io.toSet.flatMap(map.getOrElse(_:Int,Set[Edge]()))
+
+  private def toNode(e:Edge): Edge = e match {
+    case Edge(CPrim("dupl",i,j,e),ins1,outs1,ps1) =>
+      Edge(CPrim("node",i,j,e+"dupl"),ins1,outs1,ps1)
+    case Edge(CPrim("xor",i,j,e),ins1,outs1,ps1) =>
+      Edge(CPrim("node",i,j,e+"xor"),ins1,outs1,ps1)
+    case Edge(CPrim("merger",i,j,e),ins1,outs1,ps1) =>
+      Edge(CPrim("node",i,j,e),ins1,outs1,ps1)
+    case e => e
+  }
+  private def join(e1:Edge,e2:Edge): Set[Edge] = (e1,e2) match {
+    case (Edge(CPrim("sync",_,_,_),List(i),List(o),ps1)
+         ,Edge(p2,ins,outs,ps2)) =>
+      if (ins contains o)
+           Set(Edge(p2,ins.filterNot(_==o),outs,ps2))
+      else Set(Edge(p2,ins,outs.filterNot(_==o),ps2))
+    case (e1,e2@Edge(CPrim("sync",_,_,_),_,_,_)) =>
+      join(e2,e1) // infinite loop if sync has wrong interfaces
+    case (Edge(CPrim("node",CoreInterface(is1),CoreInterface(js1),ex1),ins1,outs1,ps1)
+         ,Edge(CPrim("node",CoreInterface(is2),CoreInterface(js2),ex2),ins2,outs2,ps2))
+         if nodeCompat(ex1,ex2)  =>
+      val newpars = if (ps2.length>ps1.length) ps2 else ps1
+      val ins  = ins1.toSet ++ ins2.toSet -- outs1.toSet -- outs2.toSet
+      val outs = outs1.toSet ++ outs2.toSet -- ins1.toSet -- ins2.toSet
+      Set(Edge(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
+        ,ins.toList,outs.toList,newpars))
+    case _ => Set(e1,e2)
+  }
+
+  private def nodeCompat(ex1: Set[Any], ex2: Set[Any]): Boolean =
+    !(((ex1 contains "xor") && (ex2 contains "dupl")) ||
+      ((ex2 contains "xor") && (ex1 contains "dupl")))
 
 
   /**

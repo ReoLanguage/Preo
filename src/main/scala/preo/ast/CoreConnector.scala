@@ -25,7 +25,7 @@ case class CPar(c1:CoreConnector, c2:CoreConnector) extends CoreConnector
 case class CId(i:CoreInterface) extends CoreConnector
 case class CSymmetry(i:CoreInterface,j:CoreInterface) extends CoreConnector
 case class CTrace(i:CoreInterface,c:CoreConnector) extends CoreConnector
-case class CPrim(name:String,i:CoreInterface,j:CoreInterface,extra:Option[Any]=None) extends CoreConnector
+case class CPrim(name:String,i:CoreInterface,j:CoreInterface,extra:Set[Any]=Set()) extends CoreConnector
 
 case class CSubConnector(name:String, c:CoreConnector, annotation: List[Annotation]) extends CoreConnector
 

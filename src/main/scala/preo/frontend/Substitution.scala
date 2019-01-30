@@ -226,7 +226,8 @@ object Substitution {
 
   def replacePrim(s:String,con:Connector,by:Connector): Connector = con match {
     case Prim(name,_,_,_) if name == s => by
-    case Prim(n,i,j,Some(t:TreoLiteAST)) => Prim(n,i,j,Some(replacePrim(s,t,by)))
+//    case Prim(n,i,j,Some(t:TreoLiteAST)) => Prim(n,i,j,Some(replacePrim(s,t,by)))
+    case Prim(n,i,j,extra) => Prim(n,i,j,extra.map(tryToReplace(s,_,by)))
     case Seq(c1, c2)   => Seq(replacePrim(s,c1,by),replacePrim(s,c2,by))
     case Par(c1, c2)   => Par(replacePrim(s,c1,by),replacePrim(s,c2,by))
     case Trace(i, c)   => Trace(i,replacePrim(s,c,by))
@@ -240,8 +241,11 @@ object Substitution {
     case _ => con
   }
 
-  def replacePrim(s:String,t:TreoLiteAST,by:Connector): TreoLiteAST =
-    TreoLiteAST(t.args,t.conns.map(replacePrim(s,_,by)))
+  def tryToReplace(s:String,elem:Any,by:Connector): Any = elem match {
+    case t: TreoLiteAST => TreoLiteAST(t.args,t.conns.map(replacePrim(s,_,by)))
+    case _ => s
+  }
+//    TreoLiteAST(t.args,t.conns.map(replacePrim(s,_,by)))
   def replacePrim(s: String, t: TConnAST, by: Connector): TConnAST = t.name match {
     case Left(s2) if s2==s => TConnAST(Right(by),t.args)
     case Right(c2) => TConnAST(Right(replacePrim(s,c2,by)),t.args)

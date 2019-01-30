@@ -8,13 +8,13 @@ import preo.ast._
   */
 object Repository {
 
-  def filter(p:Any=>Boolean) = Prim("filter",1,1,Some(p))
-  def transf[A,B,C](f:(A,B)=>C) = Prim("transf",2,1,Some(f))
-  def transf[A,B](f:A=>B) = Prim("transf",1,1,Some(f))
-  def writer(l:List[Any]) = Prim("writer",0,1,Some(l))
-  def writer(v:Int)    = Prim("writer",0,1,Some(List(v)))
-  def writer(v:String) = Prim("writer",0,1,Some(List(v)))
-  def reader(n:Int) = Prim("reader",1,0,Some(n))
+  def filter(p:Any=>Boolean) = Prim("filter",1,1,Set(p))
+  def transf[A,B,C](f:(A,B)=>C) = Prim("transf",2,1,Set(f))
+  def transf[A,B](f:A=>B) = Prim("transf",1,1,Set(f))
+  def writer(l:List[Any]) = Prim("writer",0,1,Set(l))
+  def writer(v:Int)    = Prim("writer",0,1,Set(List(v)))
+  def writer(v:String) = Prim("writer",0,1,Set(List(v)))
+  def reader(n:Int) = Prim("reader",1,0,Set(n))
 
   /** alternates between 2 inputs */
   val alternator = dupl*dupl & id*drain*fifo & merger

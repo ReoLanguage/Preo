@@ -197,9 +197,12 @@ object TreoLite {
   /////////////////
 
   def expand(conn: Connector,infer: String=>Connector): Connector = conn match {
-    case Prim(name, i, j, Some(tr:TreoLiteAST)) =>
-      val treo = inferTypes(tr,infer)
-      treo2preo(treo).toConnector
+    case Prim(name, i, j, trs) => trs.toList match {
+      case List(tr:TreoLiteAST) =>
+        val treo = inferTypes(tr,infer)
+        treo2preo(treo).toConnector
+      case _ => conn
+    }
     case Seq(c1, c2) => Seq(expand(c1,infer),expand(c2,infer))
     case Par(c1, c2) => Par(expand(c1,infer),expand(c2,infer))
     case Trace(i, c) => Trace(i,expand(c,infer))

@@ -60,8 +60,8 @@ trait Parser extends RegexParsers {
     case "swap"     => swap
     case "noSrc"    => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
     case "noSnk"    => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
-    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)),Some("component"))
-    case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)),Some("component"))
+    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component"))
+    case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
     case "node"     => SubConnector(s,Repository.node, Nil)
     case "dupls"    => SubConnector(s,Repository.dupls, Nil)
     case "mergers"  => SubConnector(s,Repository.mergers, Nil)
@@ -118,7 +118,7 @@ trait Parser extends RegexParsers {
   def treoLite: Parser[Prim] =
     identifier~"("~opt(trTypedArgs)~")"~"="~trConns ^^ {
       case s~_~args~_~_~cons =>
-        Prim(s,1,1,Some(TreoLiteAST(args.getOrElse(Nil),cons)))
+        Prim(s,1,1,Set(TreoLiteAST(args.getOrElse(Nil),cons)))
     }
   def trTypedArgs: Parser[List[TVar]] =
     trTypedArg ~ rep(","~>trTypedArg) ^^ {
@@ -207,8 +207,8 @@ trait Parser extends RegexParsers {
   def litP: Parser[Connector] =
     "loop"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~con~_ => Trace(ie,con) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
-    "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Some("component"))} |
-    "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Some("component"))} |
+    "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Set("component"))} |
+    "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
     identifier ^^ inferPrim
 

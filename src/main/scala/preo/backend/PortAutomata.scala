@@ -54,10 +54,10 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
       case _ => "↕"
     }
   }
-  private def primName(prim: CPrim): String = (prim.name,prim.extra) match {
-    case ("writer",Some(s:String)) => s"wr($s)"
-    case ("reader",Some(s:String)) => s"rd($s)"
-    case (n,Some(s:String)) => s"$n($s)"
+  private def primName(prim: CPrim): String = (prim.name,prim.extra.toList) match {
+    case ("writer",List(s:String)) => s"wr($s)"
+    case ("reader",List(s:String)) => s"rd($s)"
+    case (n,List(s:String)) => s"$n($s)"
     case (n,_) => n
   }
   private def cleanDir(s:String,rest:Set[String]): Set[String] = (s.init,s.last) match {
