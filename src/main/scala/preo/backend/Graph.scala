@@ -74,9 +74,18 @@ case object Mixed  extends NodeType {def dual = Mixed }
 
 object Graph {
 
+
   def apply(c:CoreConnector,hideClosed: Boolean = true): Graph = {
-//    val g = Automata.toAutomata(ReoGraph(c)).toGraph
-    val g = ReoGraph(c,hideClosed)
+    //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
+    apply(ReoGraph(c, hideClosed))
+  }
+
+  def connToNodeGraph(c:CoreConnector,hideClosed: Boolean = true): Graph = {
+    //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
+    apply(ReoGraph.toGraphOneToOneSimple(c, hideClosed))
+  }
+
+  def apply(g:ReoGraph): Graph = {
     var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
