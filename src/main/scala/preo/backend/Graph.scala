@@ -165,10 +165,9 @@ object Graph {
     for (e <- g.edges) {
       val extra = e.prim.extra
       // start by checking the extra field
-
       // found a box (closed container) or a component //
       ///////////////////////////////////////////////////
-      if ((extra contains "component") || (extra contains "box")) {
+      if ((extra contains "component") || (extra contains "box") || (extra contains "mrg") || (extra contains "dupl") || (extra contains "xor")) {
         val isComp = extra contains "component"
         val typ = if (isComp) {
           if (e.ins.isEmpty) Source else Sink
