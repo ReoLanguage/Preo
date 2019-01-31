@@ -77,7 +77,6 @@ object Graph {
   def apply(c:CoreConnector,hideClosed: Boolean = true): Graph = {
 //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
     val g = ReoGraph(c,hideClosed)
-    println("reograph: "+g)
     var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
@@ -114,6 +113,44 @@ object Graph {
 //        }
 //      }
 //    }
+
+//    def replaceNodes(from: Set[Int], to: Int, edges: Set[ReoGraph.Edge]): Set[ReoGraph.Edge] = {
+//      nodes.map(n => if (from contains n.id) ReoNode(to,n.name,n.nodeType,n.extra)
+//                     else n)
+//      edges.map(e => ReoGraph.Edge(e.prim,e.ins.map(i => if (from contains i) to else i),
+//                                          e.outs.map(i => if (from contains i) to else i),e.parents))
+//    }
+//    var missing = g.edges.toSet
+//    var toReplace = Set[ReoGraph.Edge]()
+//
+//    for (e<-g.edges) {
+//      if (e.prim.name == "node") {
+//        missing -= e
+//        toReplace += e
+//      }
+//    }
+//    while (toReplace.nonEmpty) {
+//      val e = toReplace.head
+//      toReplace = toReplace.tail
+//      seed += 1
+//      val srcs = e.ins.intersect(g.ins)
+//      val snks = e.outs.intersect(g.outs)
+//      //        val nType =
+//      //          if (e.ins == srcs) Sink else if (e.outs.isEmpty) Source else Mixed
+//      println(s"replacing ${e} by ${seed} type mixed")
+//      missing   = replaceNodes(((e.ins.toSet ++ e.outs.toSet) -- g.ins.toSet) -- g.outs.toSet, seed, missing)
+//      toReplace = replaceNodes(((e.ins.toSet ++ e.outs.toSet) -- g.ins.toSet) -- g.outs.toSet, seed, toReplace)
+//      addNode(seed, None, Mixed, e.prim.extra)
+//      for (e <- srcs) {
+//        addNode(e, None, Source, Set())
+//        edges ::= ReoChannel(e, seed, NoArrow, ArrowOut, "", Set())
+//      }
+//      for (e <- snks) {
+//        addNode(e, None, Sink, Set())
+//        edges ::= ReoChannel(seed, e, NoArrow, ArrowOut, "", Set())
+//      }
+//    }
+
 
     // For every ReoGraph edge, update the 'edges' and 'nodes'.
     for (e <- g.edges) {

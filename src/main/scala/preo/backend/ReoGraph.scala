@@ -17,21 +17,34 @@ case class ReoGraph(edges:List[ReoGraph.Edge], ins:List[Int], outs:List[Int]) {
 object ReoGraph {
   /** Represents a primitive of [[Prim]] from a list of input nodes to a list of output nodes.
     */
-  case class Edge(prim: CPrim, ins:List[Int], outs:List[Int], parents:List[String])
+  case class Edge(prim: CPrim, ins:List[Int], outs:List[Int], parents:List[String]) {
+    override def toString: String = s"{(${ins.mkString(",")})-${prim.name}/${prim.extra.mkString(",")}->(${outs.mkString(",")})}"
+  }
 
   private var seed:Int = 0 // global variable
   private var prioritySeed:Int = 0 // measure to assign priority to edges
 
   /**
     * Calculates and reduces a graph representation of a (instantiated and simplified) connector.
+    * Nodes are not guaranteed to have at most one input edge and one output edge.
     *
     * @param prim connector to be converted to a graph
     * @return graph representation
     */
   def apply(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
-    //    simplifyGraph(toGraphOneToOne(prim,hideClosed)) // original
-    //    simplifyGraph2(toGraphOneToOne(prim,hideClosed)) // under development (not working)
-        simplifyGraph3(toGraphOneToOne(prim,hideClosed)) // templ: replacing dupls/mergers by nodes and dropping sync
+    simplifyGraph(toGraphOneToOne(prim,hideClosed)) // original
+//    simplifyGraph2(toGraphOneToOne(prim,hideClosed)) // replacing dupls/mergers by nodes and dropping sync
+  }
+
+  /**
+    * Same as `apply`, but nodes have at most one input/output edge.
+    * Dupl, merger, and xor are transformed into "node" primitives.
+    * @param prim connector to be converted.
+    * @param hideClosed replace hidden subconnectors by a "box"
+    * @return simplified graph
+    */
+  def toGraphOneToOneSimple(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
+    simplifyGraph2(toGraphOneToOne(prim,hideClosed)) // replacing dupls/mergers by nodes and dropping sync
   }
 
   /**
@@ -121,58 +134,105 @@ object ReoGraph {
 
   //////////////////
   type IOMap = Map[Int,Set[Edge]]
+  type IOMapF = Int => Set[Edge]
 
-  def simplifyGraph3(g: ReoGraph): ReoGraph = {
-    val (es,remap) = dropSyncs(g)
-    val g2 = applyRemap(ReoGraph(es,g.ins,g.outs),remap)
-    ReoGraph(g2.edges.map(toNode),g2.ins,g2.outs)
-
-  }
-
+  /**
+    * Simplify a graph by dropping syncs, converting dupl/merger/xor to nodes,
+    * and merging compatible nodes.
+    * @param g graph to be simplified
+    * @return simplified graph
+    */
   def simplifyGraph2(g: ReoGraph): ReoGraph = {
-    val boundary = g.ins++g.outs
-    val (inmap,outmap) = collectInsOuts(g)
-    val fringe:Set[Edge] = g.edges.headOption.map(Set(_)).getOrElse(Set())
-//      getNeighbours(g.ins, inmap) ++
-//      getNeighbours(g.outs,outmap)
-    val newEdges = traverse(fringe,Set(),g.edges.toSet -- fringe,inmap,outmap)
-    ReoGraph(newEdges.toList,g.ins,g.outs)
+    println("ReoGraph before: "+g)
+    val (es,remap) = dropSyncs(g,false)
+    val g2 = applyRemap(ReoGraph(es,g.ins,g.outs),remap)
+    println("ReoGraph no syncs: "+g2)
+    val g3 = ReoGraph(g2.edges.map(toNode),g2.ins,g2.outs)
+
+    val (inmap,outmap) = collectInsOuts(g3)
+    val maps = joinMap(inmap,outmap)
+
+    println("ReoGraph before2: "+g3)
+    val edg4 = traverse(Set(),Set(),g3.edges,maps)
+    val g4 = ReoGraph(edg4,g3.ins,g3.outs)
+    println("ReoGraph after: "+g4)
+
+    val g5 = fixLoops(g4)
+    val g6 = addBorderSyncs(g5)
+    g6
   }
 
-  def traverse(fringe: Set[Edge], done: Set[Edge], missing:Set[Edge], inmap:IOMap, outmap:IOMap): Set[Edge] = {
-    println(s"fringe ${fringe.mkString(",")}")
-    fringe.headOption match {
-      case None =>
-        missing.headOption match {
-          case Some(edge) => traverse(Set(edge),Set(),missing-edge,inmap,outmap)
-          case None => Set()
+  private def joinMap(m1:IOMap,m2:IOMap): IOMapF = i =>
+    m1.getOrElse(i,Set()) ++ m2.getOrElse(i,Set())
+//    m2.headOption match {
+//    case Some((k,v)) =>
+//      val rest = joinMap(m1,m2.tail)
+//      rest + (k -> (rest.getOrElse(k,Set())++v))
+//  }
+
+  def traverse(fringe: Set[Edge], done:Set[Edge], rest: List[Edge], maps: IOMapF): List[Edge] = {
+    val (mbEdge,fringe2,rest2) = getNext(fringe,rest)
+    mbEdge match {
+      case Some(edge: Edge) =>
+        println(s"## traversing $edge")
+        val neighbours = getNeighb(edge,done,maps)
+        if (neighbours.isEmpty)
+          edge :: traverse(fringe2,done+edge,rest2,maps)
+        else {
+          println(s"## joining with ${neighbours.mkString("/")}")
+          val newEdge = joinAll(edge,neighbours)
+          traverse(fringe2+newEdge--neighbours,(done+edge)++neighbours,rest2.filterNot(neighbours),maps)
         }
-      case Some(e1@Edge(prim, ins, outs, pars)) =>
-        val nexts = (getNeighbours(ins, outmap) ++ getNeighbours(outs, inmap)) -- done
-        var newedges = Set[Edge]()
-        var tofringe = Set[Edge]()
-        val e1n = toNode(e1)
-        nexts.headOption match {
-          case Some(e2) =>
-            val e2n = toNode(e2)
-            println(s"joining $e1n + $e2n")
-            val e12 = join(e1n, e2n)
-            println(s"joined ${e12.mkString(" - ")}")
-            if (e12 contains e1n) {
-              newedges += e1n
-              tofringe ++= (e12 - e1n)
-            }
-            else
-              tofringe ++= e12
-          case None =>
-            newedges += e1
-        }
-        newedges ++ traverse((tofringe ++ fringe) - e1, done + e1, missing--tofringe, inmap, outmap)
+      case _ => Nil
     }
   }
+  private def getNext(fringe: Set[Edge], rest: List[Edge])
+     :(Option[Edge],Set[Edge],List[Edge]) = {
+    fringe.headOption match {
+      case Some(e) => (Some(e),fringe.tail,rest)
+      case _ => rest match {
+        case e::rest2 => (Some(e),fringe,rest2)
+        case Nil => (None,fringe,rest)
+      }
+    }
+  }
+  private def getNeighb(edge: Edge, done: Set[Edge], m: IOMapF): Set[Edge] = {
+    val around: Set[Edge] = (edge.ins.toSet++edge.outs.toSet).flatMap(m) - edge -- done
+    println(s"## around: ${around.mkString(",")}")
+    println(s"## compat: ${around.filter(edgeCompat(edge,_)).mkString(",")}")
+    around.filter(edgeCompat(edge,_))
+  }
+  private def edgeCompat(e1: Edge, e2: Edge): Boolean = {
+    print(s"## compat? $e1 vs. $e2 ")
+    (e1,e2) match {
+    case (Edge(CPrim("node",_,_,ex1),i1,o1,_)
+         ,Edge(CPrim("node",_,_,ex2),i2,o2,_)) =>
+      val xordupl = !(((ex1 contains "xor") && (ex2 contains "dupl")) ||
+                     ((ex2 contains "xor") && (ex1 contains "dupl")))
+      lazy val onelink =
+        if ((i1.toSet intersect o2.toSet).nonEmpty)
+             i1.size<=1 || o2.size<=1
+        else i2.size<=1 || o1.size<=1
 
-  private def getNeighbours(io: List[Int], map: IOMap): Set[Edge] =
-    io.toSet.flatMap(map.getOrElse(_:Int,Set[Edge]()))
+      println(s"$xordupl /\\ $onelink")
+      xordupl && onelink
+    case _ => {println("false"); false}
+  }}
+  private def joinAll(e:Edge,es: Set[Edge]): Edge = {
+    es.fold[Edge](e)(joinNodes)
+  }
+  private def joinNodes(e1:Edge,e2:Edge): Edge = (e1,e2) match {
+    case (Edge(CPrim("node",CoreInterface(is1),CoreInterface(js1),ex1),ins1,outs1,ps1)
+         ,Edge(CPrim("node",CoreInterface(is2),CoreInterface(js2),ex2),ins2,outs2,ps2)) =>
+      val newpars = if (ps2.length>ps1.length) ps2 else ps1
+      val ins  = ins1.toSet ++ ins2.toSet -- outs1.toSet -- outs2.toSet
+      val outs = outs1.toSet ++ outs2.toSet -- ins1.toSet -- ins2.toSet
+      println(s"$ins $outs $ins1 $outs1 $ins2 $outs2")
+      if (ins1.size+outs1.size+ins2.size+outs2.size - ins.size - outs.size <= 2)
+        Edge(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
+                  ,ins.toList,outs.toList,newpars)
+      else throw new RuntimeException(s"Failed to combine nodes $e1 and $e2 - more than one shared end.")
+  }
 
   private def toNode(e:Edge): Edge = e match {
     case Edge(CPrim("dupl",i,j,e),ins1,outs1,ps1) =>
@@ -180,32 +240,11 @@ object ReoGraph {
     case Edge(CPrim("xor",i,j,e),ins1,outs1,ps1) =>
       Edge(CPrim("node",i,j,e+"xor"),ins1,outs1,ps1)
     case Edge(CPrim("merger",i,j,e),ins1,outs1,ps1) =>
-      Edge(CPrim("node",i,j,e),ins1,outs1,ps1)
+      Edge(CPrim("node",i,j,e+"mrg"),ins1,outs1,ps1)
     case e => e
   }
-  private def join(e1:Edge,e2:Edge): Set[Edge] = (e1,e2) match {
-    case (Edge(CPrim("sync",_,_,_),List(i),List(o),ps1)
-         ,Edge(p2,ins,outs,ps2)) =>
-      if (ins contains o)
-           Set(Edge(p2,ins.filterNot(_==o),outs,ps2))
-      else Set(Edge(p2,ins,outs.filterNot(_==o),ps2))
-    case (e1,e2@Edge(CPrim("sync",_,_,_),_,_,_)) =>
-      join(e2,e1) // infinite loop if sync has wrong interfaces
-    case (Edge(CPrim("node",CoreInterface(is1),CoreInterface(js1),ex1),ins1,outs1,ps1)
-         ,Edge(CPrim("node",CoreInterface(is2),CoreInterface(js2),ex2),ins2,outs2,ps2))
-         if nodeCompat(ex1,ex2)  =>
-      val newpars = if (ps2.length>ps1.length) ps2 else ps1
-      val ins  = ins1.toSet ++ ins2.toSet -- outs1.toSet -- outs2.toSet
-      val outs = outs1.toSet ++ outs2.toSet -- ins1.toSet -- ins2.toSet
-      Set(Edge(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
-        ,ins.toList,outs.toList,newpars))
-    case _ => Set(e1,e2)
-  }
 
-  private def nodeCompat(ex1: Set[Any], ex2: Set[Any]): Boolean =
-    !(((ex1 contains "xor") && (ex2 contains "dupl")) ||
-      ((ex2 contains "xor") && (ex1 contains "dupl")))
-
+  // Original approach, quite ad hoc.
 
   /**
     * Simplifies a graph, by:
@@ -273,14 +312,21 @@ object ReoGraph {
     * @param graph to be simplified
     * @return the new list of edges, and a remap of ports that need to be replaced.
     */
-  private def dropSyncs(graph: ReoGraph): (List[Edge],Map[Int,Int]) = graph.edges match {
+  private def dropSyncs(graph: ReoGraph,keepBoundary:Boolean=true): (List[Edge],Map[Int,Int]) = graph.edges match {
     case Nil => (graph.edges,Map())
-    case Edge(CPrim("sync",_,_,_),List(in),List(out),_)::tl
-      if (!graph.ins.contains(in)) && (!graph.outs.contains(out)) => // do not remove if connected to some boundary
-      val (e,m) = dropSyncs(ReoGraph(tl,graph.ins,graph.outs))
-      (e,m + (out -> in))
+    case (e@Edge(CPrim("sync",_,_,_),List(in),List(out),_))::tl =>
+      val (es,m) = dropSyncs(ReoGraph(tl,graph.ins,graph.outs),keepBoundary)
+      if (!keepBoundary) {
+        if (graph.outs.contains(out)) (es,m+(in->out))
+        else (es,m+(in->out))
+      }
+      // do not remove if connected to some boundary
+      else if (graph.ins.contains(in) || graph.outs.contains(out))
+        (e::es,m)
+      else
+        (es,m+(out->in))
     case e::tl =>
-      val (es,m) = dropSyncs(ReoGraph(tl,graph.ins,graph.outs))
+      val (es,m) = dropSyncs(ReoGraph(tl,graph.ins,graph.outs),keepBoundary)
       (e::es,m)
   }
 
