@@ -54,6 +54,13 @@ object Automata {
     buildAutomata[A](gr)(builder)
   }
 
+  def fromOneToOneSimple[A<:Automata](cc:CoreConnector)
+                        (implicit builder: AutomataBuilder[A]): A = {
+    seed = 0
+    val gr = ReoGraph.toGraphOneToOneSimple(cc,hideClosed = false)
+    buildAutomata[A](gr)(builder)
+  }
+
 
   /**
     * Build an automaton by starting at a random edge, and follow neighbours.
