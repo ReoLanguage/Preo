@@ -1,6 +1,7 @@
 package preo.backend
 
-import preo.ast.CoreConnector
+import preo.ast.{CPrim, CoreConnector}
+import preo.backend.ReoGraph.Edge
 
 /**
   * Created by jose on 07/07/2017.
@@ -85,6 +86,10 @@ object Graph {
     apply(ReoGraph.toGraphOneToOneSimple(c, hideClosed))
   }
 
+  def connToVirtuosoGraph(c:CoreConnector,hideClose:Boolean = true): Graph = {
+    toVirtuoso(ReoGraph.toGraphOneToOneSimple(c, hideClose))
+  }
+
   def apply(g:ReoGraph): Graph = {
     var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
@@ -167,7 +172,7 @@ object Graph {
       // start by checking the extra field
       // found a box (closed container) or a component //
       ///////////////////////////////////////////////////
-      if ((extra contains "component") || (extra contains "box") || (extra contains "mrg") || (extra contains "dupl") || (extra contains "xor")) {
+      if ((extra contains "component") || (extra contains "box")) {
         val isComp = extra contains "component"
         val typ = if (isComp) {
           if (e.ins.isEmpty) Source else Sink
@@ -229,6 +234,157 @@ object Graph {
     }
 
     Graph(edges,nodes.toList)
+  }
+
+  private def isHub(e: ReoGraph.Edge): Boolean = {
+    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard")
+    hubs.contains(e.prim.name)
+  }
+
+  private def toVirtuoso(g:ReoGraph): Graph = {
+    var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
+
+    val nodes  = scala.collection.mutable.Set[ReoNode]()
+    var edges  = List[ReoChannel]()
+
+    var remap: Map[Int,Set[Int]] = Map()
+    var nodeEdges: Map[Int,(List[Int],List[Int])] = Map()
+//    def mkPort(i:Int): Int = remap.getOrElse(i,i)
+    // update the "nodes" set
+    /**
+      * Update the set of nodes, preserving the extra parameters
+      * @param id    of the node to be added or updated
+      * @param name  of the node to be added or updated
+      * @param nType of the node to be added or updated
+      * @param extra of the node to be added or updated
+      */
+    def addNode(id:Int,name:Option[String],nType:NodeType,extra:Set[Any]): Unit = {
+      //      print(s"adding node $id $name $nType $extra")
+      if (!nodes.exists(_ similar ReoNode(id,name,Mixed,Set()))) {
+        nodes.find(_ similar ReoNode(id,name,nType.dual,Set())) match {
+          case Some(rn) =>
+            nodes -= rn
+            nodes += ReoNode(id, name, Mixed, rn.extra++extra)
+          case None =>
+            nodes += ReoNode(id, name, nType, extra)
+        }
+      }
+      //      println(s" - nodes ${nodes.mkString(",")}")
+    }
+
+
+    // For every ReoGraph edge, update the 'edges' and 'nodes'.
+    for (e <- g.edges) {
+      val extra = e.prim.extra
+      // start by checking the extra field
+      // found a box (closed container) or a component //
+      ///////////////////////////////////////////////////
+      if ((extra contains "component") || (extra contains "box")) {
+        val isComp = extra contains "component"
+        val typ = if (isComp) {
+          if (e.ins.isEmpty) Source else Sink
+        } else Mixed
+        val inArrow = if (isComp) ArrowOut else NoArrow
+        seed += 1
+        addNode(seed, Some(e.prim.name), typ, extra) // Main node: preserve box/component
+        for (i <- e.ins) {
+          edges ::= ReoChannel(i, seed, NoArrow, inArrow, "", Set()) // extras are in the main node
+          addNode(i, None, Source, Set())
+        }
+        for (o <- e.outs) {
+          edges ::= ReoChannel(seed, o, NoArrow, ArrowOut, "", Set()) // extras are in the main node
+          addNode(o, None, Sink, Set())
+        }
+      } else
+      // check if it is dupl or xor or merger //
+      ///////////////////////
+        if ((extra contains "dupl") || (extra contains "xor") || (extra contains "mrg")) {
+          seed += 1
+          addNode(seed,Some(e.prim.name), Mixed,extra)
+          remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
+          nodeEdges += seed -> ((e.ins, e.outs))
+      } else {
+        // Normal channel //
+        ////////////////////
+        // from every input to every output
+        for (i <- e.ins; o <- e.outs) {
+          edges ::= ReoChannel(i,o, NoArrow, ArrowOut, e.prim.name, extra)
+          addNode(i, None, Source, Set())
+          addNode(o, None, Sink, Set())
+        }
+        // between all outputs if no input end
+        if (e.ins.isEmpty && e.outs.nonEmpty) {
+          for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i) < e.outs.indexOf(o)) {
+            edges ::= ReoChannel(i, o, ArrowOut, ArrowOut, e.prim.name, extra)
+            addNode(i, None, Sink, Set())
+          }
+          addNode(e.outs.last, None, Sink, Set()) // last one also needs to be added
+        }
+        // between all inputs if no output end
+        if (e.outs.isEmpty && e.ins.nonEmpty) {
+          for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
+            edges ::= ReoChannel(i,o, ArrowIn, ArrowIn, e.prim.name, extra)
+            addNode(i, None, Source, Set())
+          }
+          addNode(e.ins.last, None, Source, Set()) // last one also needs to be added
+        }
+      }
+    }
+
+    remapGraph(Graph(edges,nodes.toList),remap,nodeEdges,seed)
+  }
+
+  private def remapGraph(g:Graph, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])],currentSeed:Int):Graph = {
+//    (nodes:List[ReoNode], edges:List[ReoChannel]):(List[ReoNode],List[ReoChannel]) = {
+    var seed = currentSeed
+    var newEdges = List[ReoChannel]()
+    var newNodes = List[ReoNode]()
+    var nodesToRm = Set[Int]()
+    // remap edges to correspnding nodes
+    newEdges = g.edges.map(e => e match {
+      case ReoChannel(src, trg, sT, tT, name, extra) =>
+        var ns = if (remap.contains(src)) {nodesToRm ++= Set(src); remap(src).head} else src
+        var nt = if (remap.contains(trg)) {nodesToRm ++= Set(trg); remap(trg).head} else trg
+        // remap.head should always be one in this case
+        ReoChannel(ns, nt,sT,tT,name,extra)
+    })
+
+    // add extra links between dupl/xor/mrg nodes
+    for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg"))) {
+      val (ins, outs) = nodeEdges.getOrElse(n.id,(List(),List()))
+      for (i <- ins ) {
+        if (remap.contains(i) && remap(i).size >1){ // is mixed
+          var src = (remap(i) - n.id).head
+          newEdges::= ReoChannel(src,n.id, NoArrow,ArrowOut,"",n.extra)
+        }
+      }
+      for (o <- outs) {
+        if (remap.contains(o) && remap(o).size >1){ // is mixed
+          var trg = (remap(o) - n.id).head
+          newEdges::= ReoChannel(n.id,trg, NoArrow,ArrowOut,"",n.extra)
+        }
+      }
+    }
+    // remove unused nodes
+    newNodes = g.nodes.filterNot(n => nodesToRm.contains(n.id))
+
+    //add border syncs to xor, dupl, mrg
+    for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg"))) {
+      var currentIns = newEdges.filter(e => e.outputs.contains(n.id))
+      var currentOuts = newEdges.filter(e => e.inputs.contains(n.id))
+
+      for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
+        seed += 1
+        newEdges ::= ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
+        newNodes ::= ReoNode(seed, None, Source, Set())
+      }
+      for ( missing <- 1 to (nodeEdges(n.id)._2.size) - (currentOuts.size)){
+        seed += 1
+        newEdges ::= ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
+        newNodes ::= ReoNode(seed, None, Sink, Set())
+      }
+    }
+    Graph(newEdges,newNodes)
   }
 
 }
