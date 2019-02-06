@@ -236,9 +236,9 @@ object Graph {
     Graph(edges,nodes.toList)
   }
 
-  private def isHub(e: ReoGraph.Edge): Boolean = {
-    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard")
-    hubs.contains(e.prim.name)
+  private def isHub(n:String): Boolean = {
+    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","data","port")
+    hubs.contains(n)
   }
 
   private def toVirtuoso(g:ReoGraph): Graph = {
@@ -303,10 +303,16 @@ object Graph {
           addNode(seed,Some(e.prim.name), Mixed,extra)
           remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
           nodeEdges += seed -> ((e.ins, e.outs))
-      } else {
+      } else
+        if (isHub(e.prim.name)) {
+          seed +=1
+          addNode(seed,Some(e.prim.name), Mixed,Set(e.prim.name))
+          remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
+          nodeEdges += seed -> ((e.ins, e.outs))
+        } else{
         // Normal channel //
         ////////////////////
-        // from every input to every output
+        //  from every input to every output
         for (i <- e.ins; o <- e.outs) {
           edges ::= ReoChannel(i,o, NoArrow, ArrowOut, e.prim.name, extra)
           addNode(i, None, Source, Set())
@@ -323,7 +329,7 @@ object Graph {
         // between all inputs if no output end
         if (e.outs.isEmpty && e.ins.nonEmpty) {
           for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
-            edges ::= ReoChannel(i,o, ArrowIn, ArrowIn, e.prim.name, extra)
+            edges ::= ReoChannel(i, o, ArrowIn, ArrowIn, e.prim.name, extra)
             addNode(i, None, Source, Set())
           }
           addNode(e.ins.last, None, Source, Set()) // last one also needs to be added
@@ -335,14 +341,21 @@ object Graph {
   }
 
   private def remapGraph(g:Graph, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])],currentSeed:Int):Graph = {
-//    (nodes:List[ReoNode], edges:List[ReoChannel]):(List[ReoNode],List[ReoChannel]) = {
     var seed = currentSeed
     var newEdges = List[ReoChannel]()
     var newNodes = List[ReoNode]()
     var nodesToRm = Set[Int]()
+    def isAHub(set: Set[Any]):Boolean = {
+      val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","port","data")
+      var res = false
+      for (h <- hubs ) res = res || set.contains(h)
+      res
+    }
+
     // remap edges to correspnding nodes
     newEdges = g.edges.map(e => e match {
       case ReoChannel(src, trg, sT, tT, name, extra) =>
+        //&& g.nodes.contains(remap(src)) && !g.nodes.find(_.id == remap(src).head).get.extra.contains("drain")
         var ns = if (remap.contains(src)) {nodesToRm ++= Set(src); remap(src).head} else src
         var nt = if (remap.contains(trg)) {nodesToRm ++= Set(trg); remap(trg).head} else trg
         // remap.head should always be one in this case
@@ -350,13 +363,15 @@ object Graph {
     })
 
     // add extra links between dupl/xor/mrg nodes
-    for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg"))) {
+    for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
       val (ins, outs) = nodeEdges.getOrElse(n.id,(List(),List()))
       for (i <- ins ) {
         if (remap.contains(i) && remap(i).size >1){ // is mixed
           var src = (remap(i) - n.id).head
           newEdges::= ReoChannel(src,n.id, NoArrow,ArrowOut,"",n.extra)
-        }
+        } //else if (remap.contains(i) && n.extra.contains("drain")) { //this is a drain
+          //newEdges::= ReoChannel(i,n.id, NoArrow,ArrowOut,"",n.extra)
+        //}
       }
       for (o <- outs) {
         if (remap.contains(o) && remap(o).size >1){ // is mixed
@@ -369,7 +384,7 @@ object Graph {
     newNodes = g.nodes.filterNot(n => nodesToRm.contains(n.id))
 
     //add border syncs to xor, dupl, mrg
-    for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg"))) {
+    for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
       var currentIns = newEdges.filter(e => e.outputs.contains(n.id))
       var currentOuts = newEdges.filter(e => e.inputs.contains(n.id))
 
