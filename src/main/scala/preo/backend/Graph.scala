@@ -344,7 +344,7 @@ object Graph {
 
   private def remapGraph(g:Graph, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])],currentSeed:Int):Graph = {
     var seed = currentSeed
-    var newEdges = List[ReoChannel]()
+    var newEdges = Set[ReoChannel]()
     var newNodes = List[ReoNode]()
     var nodesToRm = Set[Int]()
     def isAHub(set: Set[Any]):Boolean = {
@@ -362,25 +362,27 @@ object Graph {
         var nt = if (remap.contains(trg)) {nodesToRm ++= Set(trg); remap(trg).head} else trg
         // remap.head should always be one in this case
         ReoChannel(ns, nt,sT,tT,name,extra)
-    })
+    }).toSet
 
-    // add extra links between dupl/xor/mrg nodes
+    // add extra links between dupl/xor/mrg nodes and hubs (don't merge two nodes into one)
     for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
       val (ins, outs) = nodeEdges.getOrElse(n.id,(List(),List()))
       for (i <- ins ) {
         if (remap.contains(i) && remap(i).size >1){ // is mixed
           var src = (remap(i) - n.id).head
-          newEdges::= ReoChannel(src,n.id, NoArrow,ArrowOut,"",n.extra)
-        } //else if (remap.contains(i) && n.extra.contains("drain")) { //this is a drain
-          //newEdges::= ReoChannel(i,n.id, NoArrow,ArrowOut,"",n.extra)
+          newEdges += ReoChannel(src,n.id, NoArrow,ArrowOut,"",Set())//n.extra)
+        } //else //if (remap.contains(i) ) { //has one only
+//          newEdges::= ReoChannel(i,n.id, NoArrow,ArrowOut,"",n.extra)
         //}
       }
       for (o <- outs) {
         if (remap.contains(o) && remap(o).size >1){ // is mixed
           var trg = (remap(o) - n.id).head
-          newEdges::= ReoChannel(n.id,trg, NoArrow,ArrowOut,"",n.extra)
-        }
+          newEdges += ReoChannel(n.id,trg, NoArrow,ArrowOut,"",Set())//n.extra)
+        } //else if (remap.contains(o)) {
+        //}
       }
+      //}
     }
     // remove unused nodes
     newNodes = g.nodes.filterNot(n => nodesToRm.contains(n.id))
@@ -392,16 +394,16 @@ object Graph {
 
       for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
         seed += 1
-        newEdges ::= ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
+        newEdges += ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
         newNodes ::= ReoNode(seed, None, Source, Set())
       }
       for ( missing <- 1 to (nodeEdges(n.id)._2.size) - (currentOuts.size)){
         seed += 1
-        newEdges ::= ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
+        newEdges += ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
         newNodes ::= ReoNode(seed, None, Sink, Set())
       }
     }
-    Graph(newEdges,newNodes)
+    Graph(newEdges.toList,newNodes)
   }
 
 }
