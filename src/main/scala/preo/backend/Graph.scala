@@ -235,10 +235,17 @@ object Graph {
 
     Graph(edges,nodes.toList)
   }
-
-  private def isHub(n:String): Boolean = {
-    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
+  val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
+  private def isAHub(n:String): Boolean = {
+//    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
     hubs.contains(n)
+  }
+
+  def isAHub(set: Set[Any]):Boolean = {
+//    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","port","event")
+    var res = false
+    for (h <- hubs ) res = res || set.contains(h)
+    res
   }
 
 
@@ -306,7 +313,7 @@ object Graph {
           remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
           nodeEdges += seed -> ((e.ins, e.outs))
       } else
-        if (isHub(e.prim.name)) {
+        if (isAHub(e.prim.name)) {
           seed +=1
           addNode(seed,Some(e.prim.name), Mixed,Set(e.prim.name))
           remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
@@ -339,7 +346,8 @@ object Graph {
       }
     }
 
-    remapGraph(Graph(edges,nodes.toList),remap,nodeEdges,seed)
+    var g1 = changeDrains(remapGraph(Graph(edges,nodes.toList),remap,nodeEdges,seed))
+    addBorderSyncs(g1,remap,nodeEdges)
   }
 
   private def remapGraph(g:Graph, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])],currentSeed:Int):Graph = {
@@ -347,12 +355,7 @@ object Graph {
     var newEdges = Set[ReoChannel]()
     var newNodes = List[ReoNode]()
     var nodesToRm = Set[Int]()
-    def isAHub(set: Set[Any]):Boolean = {
-      val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","port","event")
-      var res = false
-      for (h <- hubs ) res = res || set.contains(h)
-      res
-    }
+
 
     // remap edges to correspnding nodes
     newEdges = g.edges.map(e => e match {
@@ -388,10 +391,68 @@ object Graph {
     newNodes = g.nodes.filterNot(n => nodesToRm.contains(n.id))
 
     //add border syncs to xor, dupl, mrg
+//    for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
+//      var currentIns = newEdges.filter(e => e.outputs.contains(n.id))
+//      var currentOuts = newEdges.filter(e => e.inputs.contains(n.id))
+//      if (n.extra.contains("xor") || n.extra.contains("dupl")) {
+//
+//      }
+//      for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
+//        seed += 1
+//        newEdges += ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
+//        newNodes ::= ReoNode(seed, None, Source, Set())
+//      }
+//      for ( missing <- 1 to (nodeEdges(n.id)._2.size) - (currentOuts.size)){
+//        seed += 1
+//        newEdges += ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
+//        newNodes ::= ReoNode(seed, None, Sink, Set())
+//      }
+//    }
+    Graph(newEdges.toList,newNodes)
+  }
+
+  private def changeDrains(g:Graph):Graph = {
+    var drains = g.edges.filter(e => e.name == "drain")
+    var newNodes = g.nodes.toSet
+    var newEdges = g.edges.toSet //Set[ReoChannel]()
+
+    var seed:Int = (Set(0) ++ g.nodes.map(_.id) ++ g.edges.flatMap(e => e.inputs ++ e.outputs)).max
+
+    for (d <- drains) d match {
+      case c@ReoChannel(src, trg, srcType, trgType, name, extra) if (src == trg) =>
+        seed += 3
+        newNodes += ReoNode(seed-2, None, Mixed, Set("hidden")) //hiden1
+        newNodes += ReoNode(seed-1, None, Mixed, Set("hidden")) //hiden 2
+        newNodes += ReoNode(seed, None, Mixed, Set("drain")) //hiden 2
+        newEdges += ReoChannel(src,seed-2,NoArrow,NoArrow,"",Set()) // src to h1
+        newEdges += ReoChannel(src,seed-1,NoArrow,NoArrow,"",Set()) // src to h2
+        newEdges += ReoChannel(seed-2,seed,NoArrow,ArrowOut,"",Set()) // h1 to drain
+        newEdges += ReoChannel(seed-1,seed,NoArrow,ArrowOut,"",Set()) // h2 to drain
+        // remove drain channel
+        newEdges -= c
+      case c@ReoChannel(src, trg, srcType, trgType, name, extra) if (src != trg) =>
+        seed += 1
+        newEdges += ReoChannel(src,seed,NoArrow,ArrowOut,name,Set()) // src to drain
+        newEdges += ReoChannel(trg,seed,NoArrow,ArrowOut,name,Set()) // trg to drain
+        newNodes += ReoNode(seed, None, Mixed, Set("drain")) //hiden 2
+        // remove drain channel
+        newEdges -= c
+    }
+    Graph(newEdges.toList,newNodes.toList)
+    //g
+  }
+
+  private def addBorderSyncs(g:Graph,remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])]):Graph = {
+    var newNodes = g.nodes
+    var newEdges = g.edges.toSet
+    var seed:Int = (Set(0) ++ g.nodes.map(_.id) ++ g.edges.flatMap(e => e.inputs ++ e.outputs)).max
+     //add border syncs to xor, dupl, mrg
     for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
       var currentIns = newEdges.filter(e => e.outputs.contains(n.id))
       var currentOuts = newEdges.filter(e => e.inputs.contains(n.id))
+      if (n.extra.contains("xor") || n.extra.contains("dupl")) {
 
+      }
       for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
         seed += 1
         newEdges += ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
