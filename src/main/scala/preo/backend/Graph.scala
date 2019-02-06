@@ -237,10 +237,12 @@ object Graph {
   }
 
   private def isHub(n:String): Boolean = {
-    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","data","port")
+    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
     hubs.contains(n)
   }
 
+
+  // todo: fix drains
   private def toVirtuoso(g:ReoGraph): Graph = {
     var seed:Int = (0::(g.ins ++ g.outs ++ g.edges.flatMap(x => x.ins ++ x.outs))).max
 
@@ -346,7 +348,7 @@ object Graph {
     var newNodes = List[ReoNode]()
     var nodesToRm = Set[Int]()
     def isAHub(set: Set[Any]):Boolean = {
-      val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","port","data")
+      val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","port","event")
       var res = false
       for (h <- hubs ) res = res || set.contains(h)
       res
