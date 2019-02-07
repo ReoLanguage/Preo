@@ -82,7 +82,7 @@ trait Parser extends RegexParsers {
   ///////////////
 
   def preo: Parser[Connector] =
-    prog ^^ {p => TreoLite.expand(p,inferPrim)}
+    prog ^^ {p => TreoLite.expand(p,inferPrim,"dupl")}
 
   def prog: Parser[Connector] =
     opt(annotate)~connP~opt("{"~>whereP<~"}")  ^^ {

@@ -42,9 +42,10 @@ object TreoLite {
   /**
     * Converts a [[TreoLite]] into a [[CoreConnector]].
     * @param t TreoLite to be converted
+    * @param split dupl or xor connector - how to transform a merge into a splitting connector
     * @return Resulting CoreConnector
     */
-  def treo2preo(t:TreoLite): CoreConnector = {
+  def treo2preo(t:TreoLite,split:String): CoreConnector = {
     // aux function
     def mkPar(c1:CoreConnector, c2:CoreConnector) = c1*c2
     def mkSeq(c1:CoreConnector, c2:CoreConnector) = c1&c2
@@ -68,7 +69,7 @@ object TreoLite {
     val outsFinal = sort(outs,t.args.filter(_.isOut).map(_.name),shared)
     // 5. build path recursively
     val outsPath: List[List[CoreConnector]] = buildPath(outs,outsFinal)
-    val insPath: List[List[CoreConnector]] = reverse(buildPath(ins,insFinal))
+    val insPath: List[List[CoreConnector]] = reverse(buildPath(ins,insFinal),split)
     // ins is same, but reversed
     // 6. create pre and post connectors
     val insConn  = insPath
@@ -184,10 +185,10 @@ object TreoLite {
     }
   }
 
-  private def reverse(list: List[List[CoreConnector]]): List[List[CoreConnector]] = {
+  private def reverse(list: List[List[CoreConnector]],dupl: String): List[List[CoreConnector]] = {
     list.reverse.map(_.map {
-      case CPrim("merger", i, j, extra) => CPrim("dupl"  , j, i, extra)
-      case CPrim("dupl"  , i, j, extra) => CPrim("merger", j, i, extra)
+      case CPrim("merger", i, j, extra) => CPrim(dupl    , j, i, extra)
+      case CPrim(`dupl`  , i, j, extra) => CPrim("merger", j, i, extra)
       case CPrim("noSrc" , i, j, extra) => CPrim("noSnk" , j, i, extra)
       case CPrim("noSnk" , i, j, extra) => CPrim("noSrc" , j, i, extra)
       case x => x
@@ -196,26 +197,26 @@ object TreoLite {
 
   /////////////////
 
-  def expand(conn: Connector,infer: String=>Connector): Connector = conn match {
+  def expand(conn: Connector,infer: String=>Connector, split: String): Connector = conn match {
     case Prim(name, i, j, trs) => trs.toList match {
       case List(tr:TreoLiteAST) =>
         val treo = inferTypes(tr,infer)
-        treo2preo(treo).toConnector
+        treo2preo(treo,split).toConnector
       case _ => conn
     }
-    case Seq(c1, c2) => Seq(expand(c1,infer),expand(c2,infer))
-    case Par(c1, c2) => Par(expand(c1,infer),expand(c2,infer))
-    case Trace(i, c) => Trace(i,expand(c,infer))
+    case Seq(c1, c2) => Seq(expand(c1,infer,split),expand(c2,infer,split))
+    case Par(c1, c2) => Par(expand(c1,infer,split),expand(c2,infer,split))
+    case Trace(i, c) => Trace(i,expand(c,infer,split))
 
-    case SubConnector(name, c1, anns) => SubConnector(name,expand(c1,infer),anns)
+    case SubConnector(name, c1, anns) => SubConnector(name,expand(c1,infer,split),anns)
 
-    case Exp(a,c) => Exp(a,expand(c,infer))
-    case ExpX(x,a,c) => ExpX(x,a,expand(c,infer))
-    case Choice(b,c1,c2) => Choice(b,expand(c1,infer),expand(c2,infer))
-    case Abs(x,et,c) => Abs(x,et,expand(c,infer))
-    case App(c,a) => App(expand(c,infer),a)
+    case Exp(a,c) => Exp(a,expand(c,infer,split))
+    case ExpX(x,a,c) => ExpX(x,a,expand(c,infer,split))
+    case Choice(b,c1,c2) => Choice(b,expand(c1,infer,split),expand(c2,infer,split))
+    case Abs(x,et,c) => Abs(x,et,expand(c,infer,split))
+    case App(c,a) => App(expand(c,infer,split),a)
 
-    case Restr(c,phi) => Restr(expand(c,infer),phi)
+    case Restr(c,phi) => Restr(expand(c,infer,split),phi)
 
     case _ => conn
   }

@@ -203,7 +203,7 @@ object ReoGraph {
     around.filter(edgeCompat(edge,_))
   }
   private def edgeCompat(e1: Edge, e2: Edge): Boolean = {
-    print(s"## compat? $e1 vs. $e2 ")
+    // print(s"## compat? $e1 vs. $e2 ")
     (e1,e2) match {
     case (Edge(CPrim("node",_,_,ex1),i1,o1,_)
          ,Edge(CPrim("node",_,_,ex2),i2,o2,_)) =>
@@ -214,9 +214,10 @@ object ReoGraph {
              i1.size<=1 || o2.size<=1
         else i2.size<=1 || o1.size<=1
 
-      println(s"$xordupl /\\ $onelink")
+      // println(s"$xordupl /\\ $onelink")
       xordupl && onelink
-    case _ => {println("false"); false}
+    case (Edge(CPrim("port",_,_,_),_,_,_),Edge(CPrim("port",_,_,_),_,_,_)) => true
+    case _ => false
   }}
   private def joinAll(e:Edge,es: Set[Edge]): Edge = {
     es.fold[Edge](e)(joinNodes)
@@ -232,6 +233,12 @@ object ReoGraph {
         Edge(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
                   ,ins.toList,outs.toList,newpars)
       else throw new RuntimeException(s"Failed to combine nodes $e1 and $e2 - more than one shared end.")
+    case (Edge(CPrim("port",i,o,e1),i1,o1,ps1)
+         ,Edge(CPrim("port",_,_,e2),i2,o2,ps2)) =>
+      val newpars = if (ps2.length>ps1.length) ps2 else ps1
+      if (o1==i2) Edge(CPrim("port",i,o,e1++e2),i1,o2,newpars)
+      else        Edge(CPrim("port",i,o,e1++e2),i2,o1,newpars)
+    case _ => throw new RuntimeException(s"Failed to combine edges $e1 and $e2.")
   }
 
   private def toNode(e:Edge): Edge = e match {
