@@ -54,6 +54,13 @@ object Automata {
     buildAutomata[A](gr)(builder)
   }
 
+  def fromOneToOneSimple[A<:Automata](str:String)
+                        (implicit builder: AutomataBuilder[A]): A = {
+    val c = preo.DSL.parse(str)
+    val cc = preo.DSL.reduce(c)
+    fromOneToOneSimple(cc)(builder)
+  }
+
   def fromOneToOneSimple[A<:Automata](cc:CoreConnector)
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
