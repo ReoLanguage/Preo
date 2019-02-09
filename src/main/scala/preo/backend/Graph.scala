@@ -235,7 +235,8 @@ object Graph {
 
     Graph(edges,nodes.toList)
   }
-  val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
+  val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port",
+    "eventFull","dataEventFull","fifoFull","blackboardFull")
   private def isAHub(n:String): Boolean = {
 //    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
     hubs.contains(n)
