@@ -24,7 +24,7 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   override def getInit: Int = init
 
   /** Returns the transitions to be displayed */
-  override def getTrans: Automata.Trans =
+  override def getTrans(fullName:Boolean = false): Automata.Trans =
     for ((from, (to, fire, es)) <- trans)
       yield (
           from
