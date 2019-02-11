@@ -65,6 +65,7 @@ object Automata {
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
     val gr = ReoGraph.toGraphOneToOneSimple(cc,hideClosed = false)
+    println("graph: "+gr)
     buildAutomata[A](gr)(builder)
   }
 
