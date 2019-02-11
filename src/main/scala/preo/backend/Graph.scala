@@ -368,8 +368,8 @@ object Graph {
         ReoChannel(ns, nt,sT,tT,name,extra)
     }).toSet
 
-    // add extra links between dupl/xor/mrg nodes and hubs (don't merge two nodes into one)
-    for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
+    // add extra links between dupl/xor/mrg nodes and hubs (don't merge two nodes into one) //todo box and commponent
+    for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra) || n.extra.contains("component") || n.extra.contains("box") )) {
       val (ins, outs) = nodeEdges.getOrElse(n.id,(List(),List()))
       for (i <- ins ) {
         if (remap.contains(i) && remap(i).size >1){ // is mixed
@@ -416,7 +416,8 @@ object Graph {
     var drains = g.edges.filter(e => e.name == "drain")
     var newNodes = g.nodes.toSet
     var newEdges = g.edges.toSet //Set[ReoChannel]()
-
+    //todo: fix writers when connected to drains
+    
     var seed:Int = (Set(0) ++ g.nodes.map(_.id) ++ g.edges.flatMap(e => e.inputs ++ e.outputs)).max
 
     for (d <- drains) d match {
