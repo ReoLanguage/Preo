@@ -16,7 +16,7 @@ trait Automata {
   def getInit: Int
 
   /** Returns the transitions to be displayed */
-  def getTrans: Automata.Trans // set of (from, label, id, to)
+  def getTrans(fullName:Boolean = false): Automata.Trans // set of (from, label, id, to)
 
 //  /**
 //    * Automata composition - combining every possible transition,
