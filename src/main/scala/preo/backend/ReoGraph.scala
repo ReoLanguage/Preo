@@ -237,7 +237,7 @@ object ReoGraph {
       val newpars = if (ps2.length>ps1.length) ps2 else ps1
       val ins  = ins1.toSet ++ ins2.toSet -- outs1.toSet -- outs2.toSet
       val outs = outs1.toSet ++ outs2.toSet -- ins1.toSet -- ins2.toSet
-      println(s"$ins $outs $ins1 $outs1 $ins2 $outs2")
+      // println(s"$ins $outs $ins1 $outs1 $ins2 $outs2")
       if (ins1.size+outs1.size+ins2.size+outs2.size - ins.size - outs.size <= 2)
         Edge(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
                   ,ins.toList,outs.toList,newpars)

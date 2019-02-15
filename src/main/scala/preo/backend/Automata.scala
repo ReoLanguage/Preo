@@ -65,7 +65,7 @@ object Automata {
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
     val gr = ReoGraph.toGraphOneToOneSimple(cc,hideClosed = false)
-    println("about to create automata from\n"+gr)
+    // println("about to create automata from\n"+gr)
     buildAutomata[A](gr)(builder)
   }
 
@@ -86,7 +86,7 @@ object Automata {
     if (g.edges.nonEmpty) {
       var prev = g.edges.head
       var missing = g.edges.toSet - prev
-//      println(s"next: ${prev.prim.name} ${prev.ins} ${prev.outs} ")
+      // println(s"- next (1): ${prev.prim.name} ${prev.ins} ${prev.outs} ")
       val aut2 = builder.buildAutomata(prev,seed)
       var aut = aut2._1
       seed = aut2._2
@@ -102,13 +102,13 @@ object Automata {
           next = next.tail
           val prim = builder.buildAutomata(prev,seed)
           seed = prim._2
-//          println(s"next1: ${prev.prim.name} ${prev.ins} ${prev.outs} ")
+          // println(s"- next (2): ${prev.prim.name} ${prev.ins} ${prev.outs} ")
           aut = builder.join(aut , prim._1) // update automata with "prev"
           missing -= prev // add "prev" to known edges
         }
         if (missing.nonEmpty) {
           prev = missing.head
-//          println(s"next2: ${prev.prim.name} ${prev.ins} ${prev.outs}")
+          // println(s"- next (t): ${prev.prim.name} ${prev.ins} ${prev.outs}")
           val prim = builder.buildAutomata(prev,seed)
           seed = prim._2
           aut = builder.join (aut , prim._1)

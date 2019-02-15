@@ -109,7 +109,7 @@ object TreoLite {
     */
   private def buildPath(from: List[String], to: List[String])
       : List[List[CoreConnector]] = {
-    println(s"BP - ${from.mkString(".")} -> ${to.mkString(".")}")
+    // println(s"BP - ${from.mkString(".")} -> ${to.mkString(".")}")
     // cover loose ends (unique "from" and unique "to")
     val from2 = for (p <- from) yield (p,to   contains p)
     val to2   = for (p <- to  ) yield (p,from contains p)
