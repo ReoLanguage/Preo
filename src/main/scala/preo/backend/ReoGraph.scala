@@ -152,13 +152,14 @@ object ReoGraph {
     val (inmap,outmap) = collectInsOuts(g3)
     val maps = joinMap(inmap,outmap)
 
-    //println("ReoGraph before2: "+g3)
+    //println("ReoGraph after toNode: "+g3)
     val edg4 = traverse(Set(),Set(),g3.edges,maps)
     val g4 = ReoGraph(edg4,g3.ins,g3.outs)
-    //println("ReoGraph after: "+g4)
+    //println("ReoGraph after traversal: "+g4)
 
     val g5 = fixLoops(g4)
     val g6 = addBorderSyncs(g5)
+    //println("ReoGraph after border syncs: "+g6)
     g6
   }
 
@@ -181,6 +182,7 @@ object ReoGraph {
         else {
           //println(s"## joining with ${neighbours.mkString("/")}")
           val newEdge = joinAll(edge,neighbours)
+          //println(s"## joined  ${newEdge}")
           traverse(fringe2+newEdge--neighbours,(done+edge)++neighbours,rest2.filterNot(neighbours),maps)
         }
       case _ => Nil
@@ -250,7 +252,7 @@ object ReoGraph {
          if (Set("sync","id","port") contains name1)
            (if (Set("sync","id") contains name2) (name1,ip1,op1) else (name2,ip2,op2))
          else (name1,ip1,op1)
-      val (i,o) = if (Set("sync","id","por") contains name1)
+      val (i,o) = if (Set("sync","id","port") contains name1)
           (replace(i2,o1.head->i1.head),replace(o2,i1.head->o1.head))
         else
           (replace(i1,o2.head->i2.head),replace(o1,i2.head->o2.head))
