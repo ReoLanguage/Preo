@@ -107,9 +107,9 @@ object Formula {
 //    */
   private def getMNames(str: String, names: mutable.Map[String, Set[Set[Action]]],
                         error: String => Unit): String = {
-    val actions = str.split(" *[|] *")
+    val actions = str.split(" *[_] *")
     var res: Option[Set[Set[Action]]] = None
-    //    println(s"starting: ${actions.mkString(".")}")
+    //println(s"getting names: ${actions.mkString(",")}")
     for (a <- actions) {
       (names.get(a),res) match {
         case (Some(mas),Some(acc)) =>
