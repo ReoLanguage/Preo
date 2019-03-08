@@ -29,15 +29,19 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
       yield (
           from
         , es.map(getName(_,fire))
-            .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
+//            .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
             .foldRight[Set[String]](Set())(cleanDir)
-            .mkString(".")
+            .mkString(".") +"~"+
+          fire.mkString("~")
         , (fire,es).hashCode().toString
         , to)
 
   private def getName2(edge: Edge,fire:Set[Int]):String =
     s"${edge.prim.name}-${edge.prim.extra}-${edge.parents.mkString("/")}-${fire.mkString(":")}"
 
+  private def getName3(edge: Edge,fire:Set[Int]):String = {
+    getName(edge,fire)+"~"+(edge.ins:::edge.outs).toSet.mkString("~")
+  }
   private def getName(edge: Edge,fire:Set[Int]):String = (edge.parents match {
     case Nil     => primName(edge.prim)
     case ""::_   => primName(edge.prim)
@@ -147,6 +151,23 @@ object PortAutomata {
       // unknown name with type 1->1 -- behave as identity
       case Edge(CPrim(name, _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
+
+      // if we use onetooneSimple we need to add support for nodes
+      case Edge(CPrim("node",_,_,extra), ins, outs, _) if extra contains("dupl") =>
+        val i = ins.toSet
+        val o = outs.toSet
+        (PortAutomata(i ++ o, seed
+          , for (xi <- i) yield
+            seed -> (seed, o+xi, Set(e)))
+          , seed + 1)
+      case Edge(CPrim("node",_,_,extra), ins, outs, _)  => // xor node - only for virtuoso so far...
+        val i = ins.toSet
+        val o = outs.toSet
+        (PortAutomata(i ++ o, seed
+          , for (xi <- i; xo <- o) yield
+            seed -> (seed, Set(xi,xo), Set(e)))
+          , seed + 1)
+
 
       case Edge(p, _, _,_) =>
         throw new GenerationException(s"Unknown port automata for primitive $p")

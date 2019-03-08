@@ -22,6 +22,7 @@ object ReoGraph {
   }
 
   private var seed:Int = 0 // global variable
+  private var hiddenSeed:Int = 5000
   private var prioritySeed:Int = 0 // measure to assign priority to edges
 
   /**
@@ -31,7 +32,8 @@ object ReoGraph {
     * @param prim connector to be converted to a graph
     * @return graph representation
     */
-  def apply(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = {
+  def apply(prim:CoreConnector,hideClosed:Boolean = true): ReoGraph = { // used by circuit
+//    toGraphOneToOne(prim,hideClosed) //
     simplifyGraph(toGraphOneToOne(prim,hideClosed)) // original
 //    simplifyGraph2(toGraphOneToOne(prim,hideClosed)) // replacing dupls/mergers by nodes and dropping sync
   }
@@ -95,16 +97,34 @@ object ReoGraph {
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
       ReoGraph(List(Edge(p,i,j,Nil)),i,j)
+
+      // HIDING subonnector
     case CSubConnector(name, sub, anns)
         if hideSome && Annotation.hidden(anns) =>
       val (t,_) = preo.DSL.unsafeTypeOf(sub.toConnector)
-      toGraph(CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),Set("box")),hideSome)
+      val oldseed = seed
+      if (oldseed<5000)
+        seed = hiddenSeed
+      val res = toGraph(CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),Set("box")),hideSome)
+      if (oldseed<5000) {
+        hiddenSeed = seed
+        seed = oldseed
+      }
+      res
 //      toGraph(CPrim(s"[$name]",preo.frontend.Eval.reduce(preo.frontend.Simplify(t.i)),preo.frontend.Eval.reduce(preo.frontend.Simplify(t.j))))
+
+      // NOT HIDING subconnector
     case CSubConnector(name, sub, _)=>
-//      prioritySeed += 1
+      val oldseed = seed
+      if (oldseed<5000)
+        seed = hiddenSeed
       val g = toGraph(sub,hideSome)
-//      prioritySeed -=1
+      if (oldseed<5000) {
+        hiddenSeed = seed
+        seed = oldseed
+      }
       addParent(name,g)
+
     case _ =>
       throw new TypeCheckException("Failed to compile a non-instantiated connector "+Show(prim))
   }
@@ -158,9 +178,9 @@ object ReoGraph {
     //println("ReoGraph after traversal: "+g4)
 
     val g5 = fixLoops(g4)
-    val g6 = addBorderSyncs(g5)
+//    val g6 = addBorderSyncs(g5)
     //println("ReoGraph after border syncs: "+g6)
-    g6
+    g5
   }
 
   private def joinMap(m1:IOMap,m2:IOMap): IOMapF = i =>
@@ -298,8 +318,8 @@ object ReoGraph {
     val g5 = applyRemap(g4,remap2)
     // add syncs to border mergers and replicators
     val g6 = fixLoops(g5)
-    val g7 = addBorderSyncs(g6)
-    g7
+//    val g7 = addBorderSyncs(g6)
+    g6
   }
 
   /**

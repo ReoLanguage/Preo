@@ -243,7 +243,7 @@ object Substitution {
 
   def tryToReplace(s:String,elem:Any,by:Connector): Any = elem match {
     case t: TreoLiteAST => TreoLiteAST(t.args,t.conns.map(replacePrim(s,_,by)))
-    case _ => s
+    case _ => elem
   }
 //    TreoLiteAST(t.args,t.conns.map(replacePrim(s,_,by)))
   def replacePrim(s: String, t: TConnAST, by: Connector): TConnAST = t.name match {
