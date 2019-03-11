@@ -43,12 +43,12 @@ ${script(c)}
 </html>"""
 
   private def toSpringEdges(c:CoreConnector): (String,String) = {
-    val g = ReoGraph(c)
+    val g = Network(c)
 //    val g = Graph(c)
     val nodes  = scala.collection.mutable.Set[String]()
     val bounds = scala.collection.mutable.Set[String]()
     var edges  = List[String]()
-    for (e <- g.edges) {
+    for (e <- g.prims) {
       for (i <- e.ins; o <- e.outs) {
         edges ::= s"['$i', '$o', {label: '${e.prim.name}'}]"
         nodes += i.toString

@@ -1,10 +1,10 @@
 package preo.backend
 
 import preo.ast.CoreConnector
-import preo.backend.ReoGraph._
+import preo.backend.Network._
 
 /**
-  * Representation of an automata, aimed at being generated from a [[ReoGraph]].
+  * Representation of an automata, aimed at being generated from a [[Network]].
   */
 trait Automata {
 
@@ -49,25 +49,34 @@ object Automata {
   def apply[A<:Automata](cc:CoreConnector)
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
-    val gr = ReoGraph.toGraphOneToOne(cc,hideClosed = false)
+    val gr = Network(cc,hideClosed = false)
 //    println("about to create automata from\n"+gr)
     buildAutomata[A](gr)(builder)
   }
 
-  def fromOneToOneSimple[A<:Automata](str:String)
-                        (implicit builder: AutomataBuilder[A]): A = {
-    val c = preo.DSL.parse(str)
-    val cc = preo.DSL.reduce(c)
-    fromOneToOneSimple(cc)(builder)
+  def toAutWithRedundandy[A<:Automata](cc:CoreConnector)
+                                      (implicit builder: AutomataBuilder[A]): (A,Map[Int,Int]) = {
+    seed = 0
+    val (gr,ext) = Network.toNetwWithRedundancy(cc,hideClosed = false)
+    //    println("about to create automata from\n"+gr)
+    (buildAutomata[A](gr)(builder),ext)
   }
 
-  def fromOneToOneSimple[A<:Automata](cc:CoreConnector)
-                        (implicit builder: AutomataBuilder[A]): A = {
-    seed = 0
-    val gr = ReoGraph.toGraphOneToOneSimple(cc,hideClosed = false)
-    // println("about to create automata from\n"+gr)
-    buildAutomata[A](gr)(builder)
-  }
+
+  //  def fromOneToOneSimple[A<:Automata](str:String)
+//                        (implicit builder: AutomataBuilder[A]): A = {
+//    val c = preo.DSL.parse(str)
+//    val cc = preo.DSL.reduce(c)
+//    fromOneToOneSimple(cc)(builder)
+//  }
+//
+//  def fromOneToOneSimple[A<:Automata](cc:CoreConnector)
+//                        (implicit builder: AutomataBuilder[A]): A = {
+//    seed = 0
+//    val gr = Network.toGraphOneToOneSimple(cc,hideClosed = false)
+//    // println("about to create automata from\n"+gr)
+//    buildAutomata[A](gr)(builder)
+//  }
 
 
   /**
@@ -75,17 +84,17 @@ object Automata {
     * @param g graph to be converted into an automaton
     * @return
     */
-  private def buildAutomata[A<:Automata](g: ReoGraph)
+  private def buildAutomata[A<:Automata](g: Network)
                                         (implicit builder:AutomataBuilder[A]): A = {
     val (ins,outs) = collectInsOuts(g)
-    def getNeighbours(e:Edge): List[Edge] =
+    def getNeighbours(e:Prim): List[Prim] =
       (for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
       (for (o <- e.outs) yield ins.getOrElse(o,Set())).flatten
 
 
-    if (g.edges.nonEmpty) {
-      var prev = g.edges.head
-      var missing = g.edges.toSet - prev
+    if (g.prims.nonEmpty) {
+      var prev = g.prims.head
+      var missing = g.prims.toSet - prev
       // println(s"- next (1): ${prev.prim.name} ${prev.ins} ${prev.outs} ")
       val aut2 = builder.buildAutomata(prev,seed)
       var aut = aut2._1
@@ -124,7 +133,7 @@ object Automata {
 }
 
 trait AutomataBuilder[A<:Automata] {
-  def buildAutomata(e:Edge,seed:Int): (A,Int)
+  def buildAutomata(e:Prim, seed:Int): (A,Int)
   def emptyAutomata: A
   /**
     * Automata composition - combining every possible transition,

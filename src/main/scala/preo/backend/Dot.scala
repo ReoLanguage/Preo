@@ -22,9 +22,9 @@ object Dot {
   }
 
   private def toDotEdges(c:CoreConnector): (String,String,String,String) = {
-    val g = ReoGraph(c)
+    val g = Network(c)
     val res = new StringBuilder
-    for (e <- g.edges) {
+    for (e <- g.prims) {
       res append ((e.prim.name,e.ins,e.outs) match {
         case ("dupl",List(i),os)   =>
           (for (o <- os) yield s"  $i -> $o;\n").mkString("")
@@ -48,11 +48,11 @@ object Dot {
     val outs  =
       if (g.outs.size<=1) "  "++g.outs.mkString++"\n"
       else "  "++g.outs.mkString(" -> ")++" [style=invis];\n"//new StringBuilder
-    val comps = toDotComps(g.edges)
+    val comps = toDotComps(g.prims)
     (res.toString,ins.toString,outs.toString,comps)
   }
 
-  private def toDotComps(es: List[ReoGraph.Edge]): String = {
+  private def toDotComps(es: List[Network.Prim]): String = {
     val res = new StringBuilder
     for (e <- es) {
       (e.ins,e.outs) match {
@@ -66,7 +66,7 @@ object Dot {
     res.toString()
   }
 
-  private def toDotEdgeGeneric(e:ReoGraph.Edge): String = {
+  private def toDotEdgeGeneric(e:Network.Prim): String = {
     val res = new StringBuilder
     for (i <- e.ins; o <- e.outs) // in to out
       res append s"  $i -> $o [label=${e.prim.name}];\n"

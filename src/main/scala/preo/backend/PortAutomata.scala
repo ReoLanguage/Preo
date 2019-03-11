@@ -2,16 +2,17 @@ package preo.backend
 
 import preo.ast.CPrim
 import preo.backend.PortAutomata.Trans
-import preo.backend.ReoGraph.Edge
+import preo.backend.Network.Prim
 import preo.common.{GenerationException, TimeoutException, TypeCheckException}
 import preo.frontend.Show
 
 /**
-  * Representation of an automata, aimed at being generated from a [[ReoGraph]].
+  * Representation of an automata, aimed at being generated from a [[Network]].
+ *
   * @param ports Represent the possible labels (actions)
-  * @param init Initial state
+  * @param init  Initial state
   * @param trans Transitions - Relation between input and output states, with associated
-  *              sets of actions and of edges (as in [[ReoGraph.Edge]]).
+  *              sets of actions and of edges (as in [[Network.Prim]]).
   */
 case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   extends Automata {
@@ -29,27 +30,27 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
       yield (
           from
         , es.map(getName(_,fire))
-//            .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
+            .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
             .foldRight[Set[String]](Set())(cleanDir)
             .mkString(".") +"~"+
           fire.mkString("~")
         , (fire,es).hashCode().toString
         , to)
 
-  private def getName2(edge: Edge,fire:Set[Int]):String =
+  private def getName2(edge: Prim, fire:Set[Int]):String =
     s"${edge.prim.name}-${edge.prim.extra}-${edge.parents.mkString("/")}-${fire.mkString(":")}"
 
-  private def getName3(edge: Edge,fire:Set[Int]):String = {
+  private def getName3(edge: Prim, fire:Set[Int]):String = {
     getName(edge,fire)+"~"+(edge.ins:::edge.outs).toSet.mkString("~")
   }
-  private def getName(edge: Edge,fire:Set[Int]):String = (edge.parents match {
+  private def getName(edge: Prim, fire:Set[Int]):String = (edge.parents match {
     case Nil     => primName(edge.prim)
     case ""::_   => primName(edge.prim)
     case head::_ => head
   }) + getDir(edge,fire) //+
   //  s"[${edge.ins.toSet.intersect(fire).mkString("|")}->${edge.outs.toSet.intersect(fire).mkString("|")}]"
   //  fire.mkString("|")
-  private def getDir(edge: Edge,fire:Set[Int]): String = {
+  private def getDir(edge: Prim, fire:Set[Int]): String = {
     val src = (edge.ins.toSet intersect fire).nonEmpty
     val snk = (edge.outs.toSet intersect fire).nonEmpty
     (src,snk) match {
@@ -72,7 +73,7 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
     case _ => rest + s
   }
 
-  private def printPrim(edge: Edge):String = {
+  private def printPrim(edge: Prim):String = {
     s"""${edge.prim.name}-${edge.prim.i.ports}-${edge.prim.j.ports}-${edge.ins.mkString(".")}-${edge.outs.mkString(".")}"""
   }
 
@@ -110,7 +111,7 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
 
 object PortAutomata {
 
-  type Trans = Set[(Int,(Int,Set[Int],Set[Edge]))]
+  type Trans = Set[(Int,(Int,Set[Int],Set[Prim]))]
 
   /** How to build basic Port automata */
   implicit object PortAutomataBuilder extends AutomataBuilder[PortAutomata] {
@@ -122,45 +123,47 @@ object PortAutomata {
       * @param seed current counter used to generate state names
       * @return new PortAutomata and updated counter for state names
       */
-    def buildAutomata(e: Edge, seed: Int): (PortAutomata, Int) = e match {
-      case Edge(CPrim("sync", _, _, _), List(a), List(b),_) =>
+    def buildAutomata(e: Prim, seed: Int): (PortAutomata, Int) = e match {
+      case Prim(CPrim("sync", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
-      case Edge(CPrim("id", _, _, _), List(a), List(b),_) =>
+      case Prim(CPrim("id", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
-      case Edge(CPrim("lossy", _, _, _), List(a), List(b),_) =>
+      case Prim(CPrim("lossy", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)), seed -> (seed, Set(a), Set(e)))), seed + 1)
-      case Edge(CPrim("fifo", _, _, _), List(a), List(b),_) =>
+      case Prim(CPrim("fifo", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed - 1, Set(seed - 1 -> (seed, Set(a), Set(e)), seed -> (seed - 1, Set(b), Set(e)))), seed + 2)
-      case Edge(CPrim("fifofull", _, _, _), List(a), List(b),_) =>
+      case Prim(CPrim("fifofull", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed - 1 -> (seed, Set(a), Set(e)), seed -> (seed - 1, Set(b), Set(e)))), seed + 2)
-      case Edge(CPrim("drain", _, _, _), List(a, b), List(),_) =>
+      case Prim(CPrim("drain", _, _, _), List(a, b), List(),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
-      case Edge(CPrim("merger", _, _, _), List(a, b), List(c),_) =>
+      // deprecated - using nodes instead
+      case Prim(CPrim("merger", _, _, _), List(a, b), List(c),_) =>
         (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, c), Set(e)), seed -> (seed, Set(b, c), Set(e)))), seed + 1)
-      case Edge(CPrim("dupl", _, _, _), List(a), List(b, c),_) =>
+      // deprecated - using nodes instead
+      case Prim(CPrim("dupl", _, _, _), List(a), List(b, c),_) =>
         (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, b, c), Set(e)))), seed + 1)
-      case Edge(CPrim("writer", _, _, _), List(), List(a),_) =>
+      case Prim(CPrim("writer", _, _, _), List(), List(a),_) =>
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
-      case Edge(CPrim("reader", _, _, _), List(a), List(),_) =>
+      case Prim(CPrim("reader", _, _, _), List(a), List(),_) =>
         (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
-      case Edge(CPrim("noSnk", _, _, _), List(), List(a),_) =>
+      case Prim(CPrim("noSnk", _, _, _), List(), List(a),_) =>
         (PortAutomata(Set(a), seed, Set()), seed + 1)
-      case Edge(CPrim("noSrc", _, _, _), List(a), List(),_) =>
+      case Prim(CPrim("noSrc", _, _, _), List(a), List(),_) =>
         (PortAutomata(Set(a), seed, Set()), seed + 1)
 
       // unknown name with type 1->1 -- behave as identity
-      case Edge(CPrim(name, _, _, _), List(a), List(b),_) =>
+      case Prim(CPrim(name, _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
 
-      // if we use onetooneSimple we need to add support for nodes
-      case Edge(CPrim("node",_,_,extra), ins, outs, _) if extra contains("dupl") =>
+      // new version uses nodes instead of dupl/merger
+      case Prim(CPrim("node",_,_,extra), ins, outs, _) if extra contains "dupl" =>
         val i = ins.toSet
         val o = outs.toSet
         (PortAutomata(i ++ o, seed
           , for (xi <- i) yield
             seed -> (seed, o+xi, Set(e)))
           , seed + 1)
-      case Edge(CPrim("node",_,_,extra), ins, outs, _)  => // xor node - only for virtuoso so far...
+      case Prim(CPrim("node",_,_,extra), ins, outs, _)  => // xor node - only for virtuoso so far...
         val i = ins.toSet
         val o = outs.toSet
         (PortAutomata(i ++ o, seed
@@ -169,7 +172,7 @@ object PortAutomata {
           , seed + 1)
 
 
-      case Edge(p, _, _,_) =>
+      case Prim(p, _, _,_) =>
         throw new GenerationException(s"Unknown port automata for primitive $p")
 
     }
@@ -190,7 +193,7 @@ object PortAutomata {
       var seed = 0
       var steps = timeout
       val shared = a1.ports.intersect(a2.ports)
-      var restrans = Set[(Int,(Int,Set[Int],Set[Edge]))]()
+      var restrans = Set[(Int,(Int,Set[Int],Set[Prim]))]()
       var newStates = Map[(Int,Int),Int]()
       def mkState(i1:Int,i2:Int) = if (newStates.contains((i1,i2)))
         newStates((i1,i2))
