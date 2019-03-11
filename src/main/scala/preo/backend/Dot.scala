@@ -30,6 +30,12 @@ object Dot {
           (for (o <- os) yield s"  $i -> $o;\n").mkString("")
         case ("merger",is,List(o)) =>
           (for (i <- is) yield s"  $i -> $o;\n").mkString("")
+//        case ("node",List(i),os)   =>
+//          (for (o <- os) yield s"  $i -> $o;\n").mkString("")
+//        case ("node",is,List(o)) =>
+//          (for (i <- is) yield s"  $i -> $o;\n").mkString("")
+//        case ("node",is,os) =>
+//          (for (i <- is; o <- os) yield s"  $i -> $o;\n").mkString("")
         case ("sync",List(i),List(o))   => s"  $i -> $o;\n"
         case ("lossy",List(i),List(o))  => s"  $i -> $o [style=dashed];\n"
         case ("fifo",List(i),List(o))   =>
@@ -69,7 +75,10 @@ object Dot {
   private def toDotEdgeGeneric(e:Network.Prim): String = {
     val res = new StringBuilder
     for (i <- e.ins; o <- e.outs) // in to out
-      res append s"  $i -> $o [label=${e.prim.name}];\n"
+      if (e.prim.name == "node")
+        res append s"""  $i -> $o;\n"""
+      else
+        res append s"""  $i -> $o [label="${e.prim.name}"];\n"""
     if (e.ins.isEmpty && e.outs.size>1) { // only outs
     //        for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i)<e.outs.indexOf(o))
     //          res append s"""  $i -> $o [dir=both,label="${e.prim.name}"];\n"""
