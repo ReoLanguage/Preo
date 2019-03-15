@@ -15,6 +15,23 @@ import scala.util.control.NonFatal
  * Created by jose on 17/05/15.
  */
 object DSL {
+
+  val PRIMITIVE = Set(
+      "id"
+    , "sync"
+    , "lossy"
+    , "drain"
+    , "fifo"
+    , "fifofull"
+    , "node"
+    , "dupl"
+    , "dupls"
+    , "xor"
+    , "xors"
+    , "mrg"
+    , "drain"
+  )
+
   // goal: e.g., to write "fifo" * id & id^2
   implicit def str2conn(s:String): Connector = Prim(s,1,1)
   implicit def str2Var(s:String): ast.Var = ast.Var(s)
