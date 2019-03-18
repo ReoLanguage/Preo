@@ -55,8 +55,10 @@ trait Parser extends RegexParsers {
     case "id"       => id
     case "ids"      => lam(n,id^n)
     case "dupl"     => dupl
+    case "vdupl"    => vdupl
     case "lossy"    => lossy
     case "merger"   => merger
+    case "vmerger"  => vmerger
     case "swap"     => swap
     case "noSrc"    => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
     case "noSnk"    => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
@@ -64,7 +66,9 @@ trait Parser extends RegexParsers {
     case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
     case "node"     => SubConnector(s,Repository.node, Nil)
     case "dupls"    => SubConnector(s,Repository.dupls, Nil)
+    case "vdupls"   => SubConnector(s,Repository.vdupls, Nil)
     case "mergers"  => SubConnector(s,Repository.mergers, Nil)
+    case "vmergers" => SubConnector(s,Repository.vmergers, Nil)
     case "zip"      => SubConnector(s,Repository.zip, Nil)
     case "unzip"    => SubConnector(s,Repository.unzip, Nil)
     case "exrouter" => SubConnector(s,Repository.exrouter, Nil)

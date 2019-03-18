@@ -24,11 +24,11 @@ object DSL {
     , "fifo"
     , "fifofull"
     , "node"
-    , "dupl"
-    , "dupls"
+    , "dupl", "vdupl"
+    , "dupls", "vdupls"
     , "xor"
     , "xors"
-    , "mrg"
+    , "mrg", "vmrg"
     , "drain"
   )
 
@@ -88,7 +88,9 @@ object DSL {
   val fifofull = Prim("fifofull",1,1)
   val lossy = Prim("lossy",1,1)
   val dupl = Prim("dupl",1,2)
+  val vdupl = Prim("vdupl",1,2)
   val merger = Prim("merger",2,1)
+  val vmerger = Prim("vmerger",2,1)
   val drain = Prim("drain",2,0)
   val noSrc = Prim("noSrc",1,0)
   val noSnk = Prim("noSnk",0,1)

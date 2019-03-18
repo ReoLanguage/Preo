@@ -259,14 +259,20 @@ object Network {
       // two compatible nodes
       case (Prim(CPrim("node", _, _, ex1), i1, o1, _)
       , Prim(CPrim("node", _, _, ex2), i2, o2, _)) =>
-        val xordupl = !(((ex1 contains "xor") && (ex2 contains "dupl")) ||
+        val xordupl = !(((ex1 contains "xor") && ((ex2 contains "dupl"))) ||
           ((ex2 contains "xor") && (ex1 contains "dupl")))
+        val duplvdupl = !(((ex1 contains "vdupl") && ((ex2 contains "dupl"))) ||
+          ((ex2 contains "vdupl") && (ex1 contains "dupl")))
+        val mergervmerger = !(((ex1 contains "vmrg") && ((ex2 contains "mrg"))) ||
+          ((ex2 contains "vmrg") && (ex1 contains "mrg")))
+        val xorvdupl = !(((ex1 contains "vdupl") && ((ex2 contains "xor"))) ||
+          ((ex2 contains "vdupl") && (ex1 contains "xor")))
         lazy val onelink =
           if ((i1.toSet intersect o2.toSet).nonEmpty)
             i1.size <= 1 || o2.size <= 1
           else i2.size <= 1 || o1.size <= 1
         // println(s"$xordupl /\\ $onelink")
-        xordupl && onelink
+        xordupl && onelink && xorvdupl && duplvdupl && mergervmerger
       // one is a port/sync/id
       case (Prim(CPrim(name1, _, _, _), _, _, _)
            ,Prim(CPrim(name2, _, _, _), _, _, _)) =>
@@ -321,10 +327,14 @@ object Network {
     else e match {
       case Prim(CPrim("dupl", i, j, e), ins1, outs1, ps1) =>
         Prim(CPrim("node", i, j, e + "dupl"), ins1, outs1, ps1)
+      case Prim(CPrim("vdupl", i, j, e), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, e + "vdupl"), ins1, outs1, ps1)
       case Prim(CPrim("xor", i, j, e), ins1, outs1, ps1) =>
         Prim(CPrim("node", i, j, e + "xor"), ins1, outs1, ps1)
       case Prim(CPrim("merger", i, j, e), ins1, outs1, ps1) =>
         Prim(CPrim("node", i, j, e + "mrg"), ins1, outs1, ps1)
+      case Prim(CPrim("vmerger", i, j, e), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, e + "vmrg"), ins1, outs1, ps1)
       case e => e
     }
 
@@ -502,7 +512,7 @@ object Network {
     var res = graph
     for (in <- graph.ins) {
       if ((inmap contains in) &&
-          (inmap(in).size > 1 || inmap(in).exists(_.prim.name=="dupl")
+          (inmap(in).size > 1 || inmap(in).exists(_.prim.name=="dupl") || inmap(in).exists(_.prim.name=="vdupl")
             || inmap(in).exists(_.prim.name=="node"))) {
         val e = mkSync(seed,in)
         newPorts2 += seed -> in

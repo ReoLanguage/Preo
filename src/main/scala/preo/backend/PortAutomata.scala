@@ -155,6 +155,8 @@ object PortAutomata {
       case Prim(CPrim(name, _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
 
+      case Prim(CPrim("node",_,_,extra), _, _, _) if extra.intersect(Set("vdupl","vmrg","vxor")).nonEmpty =>
+        throw new GenerationException(s"Connector with variable parts ${extra.mkString(",")}, to be interpreted only as an IFTA instance")
       // new version uses nodes instead of dupl/merger
       case Prim(CPrim("node",_,_,extra), ins, outs, _) if extra contains "dupl" =>
         val i = ins.toSet

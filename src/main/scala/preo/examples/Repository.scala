@@ -64,8 +64,15 @@ object Repository {
   def duplsGen(d:Connector): Connector =
     lam (n, Tr(n-1,(id * (d^(n-1))) & sym(1,(n-1)*2)))
 
+  /** n-ary variable duplicator */
+  val vdupls = lam (n, Tr(n-1,(id * (vdupl^(n-1))) & sym(1,(n-1)*2)))
+
+
   /** n-ary merger */
   val mergers = lam (n, Tr(n-1,sym((n-1)*2,1) & (id * (merger^(n-1)))))
+
+  /** n-ary variable merger */
+  val vmergers = lam (n, Tr(n-1,sym((n-1)*2,1) & (id * (vmerger^(n-1)))))
 
   /** n-ary merger and duplicator (node) */
   val node = mergers & dupls
