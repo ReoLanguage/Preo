@@ -1,7 +1,7 @@
 package preo.backend
 
 import preo.ast.{CPrim, CoreConnector}
-import preo.backend.Network.Prim
+import preo.backend.Network.{Port, Prim}
 
 import scala.collection.mutable
 
@@ -65,7 +65,7 @@ case object NoArrow  extends EndType
   * @param nodeType Source, sink, or mixed
   * @param extra if it is a component or a box, and other properties
   */
-case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, extra:Set[Any])  {
+case class ReoNode(id:Int, name:Option[String], nodeType:NodeType, extra:Set[Any],ports:Set[Port])  {
   def similar(n:ReoNode): Boolean = n.id==id && n.name==name // && n.nodeType==nodeType
 }
 //case class ReoNode(id:Int, name:Option[String], nodeType:NodeType)
@@ -103,10 +103,10 @@ object Circuit {
 
     // update the "nodes" set
     /** Add a new node to the set of known nodes, before remapping */
-    def addNode(id:Int,name:Option[String],nType:NodeType,extra:Set[Any]): Unit =
-      nodes += ReoNode(id,name,nType,extra)
+    def addNode(id:Int,name:Option[String],nType:NodeType,extra:Set[Any],ports:Set[Port]): Unit =
+      nodes += ReoNode(id,name,nType,extra,ports)
     /** Update the set of nodes, applying the current remap */
-    def reAddNode(id1:Int,name:Option[String],nType:NodeType,extra:Set[Any]): Unit = {
+    def reAddNode(id1:Int,name:Option[String],nType:NodeType,extra:Set[Any],ports:Set[Port]): Unit = {
       val id = toRemap.getOrElse(id1,id1)
       def update(n1: ReoNode, n2: ReoNode): Unit = {
         nodes -= n1
@@ -120,9 +120,9 @@ object Circuit {
         case _ => nt1
       }
      //print(s"adding node $id $name $nType $extra, knowing ${nodes.mkString(",")}")
-      nodes.find(_ similar ReoNode(id,name,null,null)) match {
-        case Some(rn) => update(rn,ReoNode(id,name,joinType(rn.nodeType,nType),rn.extra++extra))
-        case _ => nodes += ReoNode(id,name,nType,extra)
+      nodes.find(_ similar ReoNode(id,name,null,null,null)) match {
+        case Some(rn) => update(rn,ReoNode(id,name,joinType(rn.nodeType,nType),rn.extra++extra,rn.ports++ports))
+        case _ => nodes += ReoNode(id,name,nType,extra,ports)
       }
       //println(s" - nodes ${nodes.mkString(",")}")
     }
@@ -172,7 +172,7 @@ object Circuit {
       if (e.prim.name == "node") {
         e.outs:::e.ins match {
           case somePort::rest =>
-            addNode(somePort,None,Sink,e.prim.extra)
+            addNode(somePort,None,Sink,e.prim.extra,(e.ins++e.outs).toSet)
             for (p <- rest) addRemap(p -> somePort, e.ins)
             toRemap += somePort->somePort // adding self loop in the end on purpose
           case _ =>
@@ -189,14 +189,14 @@ object Circuit {
         } else Mixed
         val inArrow = if (isComp) ArrowOut else NoArrow
         seed += 1
-        addNode(seed, Some(e.prim.name), typ, extra) // Main node: preserve box/component
+        addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
         for (i <- e.ins) {
           addReoChannel(i, seed, NoArrow, inArrow, "", Set()) // extras are in the main node
-          addNode(i, None, Source, Set())
+          addNode(i, None, Source, Set(),Set(i))
         }
         for (o <- e.outs) {
           addReoChannel(seed, o, NoArrow, ArrowOut, "", Set()) // extras are in the main node
-          addNode(o, None, Sink, Set())
+          addNode(o, None, Sink, Set(),Set(o))
         }
       } else {
       // Normal channel //
@@ -204,24 +204,24 @@ object Circuit {
         // from every input to every output
         for (i <- e.ins; o <- e.outs) {
           addReoChannel(i, o, NoArrow, ArrowOut, e.prim.name, extra)
-          addNode(i, None, Source, Set())
-          addNode(o, None, Sink, Set())
+          addNode(i, None, Source, Set(),Set(i))
+          addNode(o, None, Sink, Set(),Set(o))
         }
         // between all outputs if no input end
         if (e.ins.isEmpty && e.outs.nonEmpty) {
           for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i) < e.outs.indexOf(o)) {
             addReoChannel(i, o, ArrowOut, ArrowOut, e.prim.name, extra)
-            addNode(i, None, Sink, Set())
+            addNode(i, None, Sink, Set(),Set(i))
           }
-          addNode(e.outs.last, None, Sink, Set()) // last one also needs to be added
+          addNode(e.outs.last, None, Sink, Set(),Set(e.outs.last)) // last one also needs to be added
         }
         // between all inputs if no output end
         if (e.outs.isEmpty && e.ins.nonEmpty) {
           for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
             addReoChannel(i, o, ArrowIn, ArrowIn, e.prim.name, extra)
-            addNode(i, None, Source, Set())
+            addNode(i, None, Source, Set(),Set(i))
           }
-          addNode(e.ins.last, None, Source, Set()) // last one also needs to be added
+          addNode(e.ins.last, None, Source, Set(),Set(e.ins.last)) // last one also needs to be added
         }
       }
 //      // Create a writer component if exactly one output and no intput
@@ -248,7 +248,7 @@ object Circuit {
     val edgesOld = edges
     nodes.clear()
     edges = Set()
-    for(n<-nodesOld) reAddNode(n.id,n.name,n.nodeType,n.extra)
+    for(n<-nodesOld) reAddNode(n.id,n.name,n.nodeType,n.extra,n.ports)
     for(e<-edgesOld) reAddReoChannel(e.src,e.trg,e.srcType,e.trgType,e.name,e.extra)
 
     //println(s"edges: ${edges.mkString(",")}\nnodes: ${nodes.mkString(",")}\nremap: ${toRemap.mkString(",")}")
@@ -289,15 +289,15 @@ object Circuit {
       * @param nType of the node to be added or updated
       * @param extra of the node to be added or updated
       */
-    def addNode(id:Int,name:Option[String],nType:NodeType,extra:Set[Any]): Unit = {
+    def addNode(id:Int,name:Option[String],nType:NodeType,extra:Set[Any],ports:Set[Port]): Unit = {
       //      print(s"adding node $id $name $nType $extra")
-      if (!nodes.exists(_ similar ReoNode(id,name,Mixed,Set()))) {
-        nodes.find(_ similar ReoNode(id,name,nType.dual,Set())) match {
+      if (!nodes.exists(_ similar ReoNode(id,name,Mixed,Set(),ports))) {
+        nodes.find(_ similar ReoNode(id,name,nType.dual,Set(),ports)) match {
           case Some(rn) =>
             nodes -= rn
-            nodes += ReoNode(id, name, Mixed, rn.extra++extra)
+            nodes += ReoNode(id, name, Mixed, rn.extra++extra,rn.ports++ports)
           case None =>
-            nodes += ReoNode(id, name, nType, extra)
+            nodes += ReoNode(id, name, nType, extra,ports)
         }
       }
       //      println(s" - nodes ${nodes.mkString(",")}")
@@ -317,27 +317,27 @@ object Circuit {
         } else Mixed
         val inArrow = if (isComp) ArrowOut else NoArrow
         seed += 1
-        addNode(seed, Some(e.prim.name), typ, extra) // Main node: preserve box/component
+        addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
         for (i <- e.ins) {
           edges ::= ReoChannel(i, seed, NoArrow, inArrow, "", Set()) // extras are in the main node
-          addNode(i, None, Source, Set())
+          addNode(i, None, Source, Set(),Set(i))
         }
         for (o <- e.outs) {
           edges ::= ReoChannel(seed, o, NoArrow, ArrowOut, "", Set()) // extras are in the main node
-          addNode(o, None, Sink, Set())
+          addNode(o, None, Sink, Set(),Set(o))
         }
       } else
       // check if it is dupl or xor or merger //
       ///////////////////////
         if ((extra contains "dupl") || (extra contains "xor") || (extra contains "mrg")) {
           seed += 1
-          addNode(seed,Some(e.prim.name), Mixed,extra)
+          addNode(seed,Some(e.prim.name), Mixed,extra,(e.ins++e.outs).toSet)
           remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
           nodeEdges += seed -> ((e.ins, e.outs))
       } else
         if (isAHub(e.prim.name)) {
           seed +=1
-          addNode(seed,Some(e.prim.name), Mixed,Set(e.prim.name))
+          addNode(seed,Some(e.prim.name), Mixed,Set(e.prim.name),(e.ins++e.outs).toSet)
           remap++=  e.outs.map(o => o -> (remap.getOrElse(o,Set()) ++ Set(seed))) ++ e.ins.map(i => i -> (remap.getOrElse(i,Set()) ++ Set(seed)))
           nodeEdges += seed -> ((e.ins, e.outs))
         } else{
@@ -346,24 +346,24 @@ object Circuit {
         //  from every input to every output
         for (i <- e.ins; o <- e.outs) {
           edges ::= ReoChannel(i,o, NoArrow, ArrowOut, e.prim.name, extra)
-          addNode(i, None, Source, Set())
-          addNode(o, None, Sink, Set())
+          addNode(i, None, Source, Set(),Set(i))
+          addNode(o, None, Sink, Set(),Set(o))
         }
         // between all outputs if no input end
         if (e.ins.isEmpty && e.outs.nonEmpty) {
           for (i <- e.outs; o <- e.outs; if e.outs.indexOf(i) < e.outs.indexOf(o)) {
             edges ::= ReoChannel(i, o, ArrowOut, ArrowOut, e.prim.name, extra)
-            addNode(i, None, Sink, Set())
+            addNode(i, None, Sink, Set(),Set(i))
           }
-          addNode(e.outs.last, None, Sink, Set()) // last one also needs to be added
+          addNode(e.outs.last, None, Sink, Set(),Set(e.outs.last)) // last one also needs to be added
         }
         // between all inputs if no output end
         if (e.outs.isEmpty && e.ins.nonEmpty) {
           for (i <- e.ins; o <- e.ins; if e.ins.indexOf(i) < e.ins.indexOf(o)) {
             edges ::= ReoChannel(i, o, ArrowIn, ArrowIn, e.prim.name, extra)
-            addNode(i, None, Source, Set())
+            addNode(i, None, Source, Set(),Set(i))
           }
-          addNode(e.ins.last, None, Source, Set()) // last one also needs to be added
+          addNode(e.ins.last, None, Source, Set(),Set(e.ins.last)) // last one also needs to be added
         }
       }
     }
@@ -444,9 +444,9 @@ object Circuit {
     for (d <- drains) d match {
       case c@ReoChannel(src, trg, srcType, trgType, name, extra) if (src == trg) =>
         seed += 3
-        newNodes += ReoNode(seed-2, None, Mixed, Set("hidden")) //hiden1
-        newNodes += ReoNode(seed-1, None, Mixed, Set("hidden")) //hiden 2
-        newNodes += ReoNode(seed, None, Mixed, Set("drain")) //hiden 2
+        newNodes += ReoNode(seed-2, None, Mixed, Set("hidden"),Set(src)) //hiden1
+        newNodes += ReoNode(seed-1, None, Mixed, Set("hidden"),Set(src)) //hiden 2
+        newNodes += ReoNode(seed, None, Mixed, Set("drain"),Set(src)) //hiden 2
         newEdges += ReoChannel(src,seed-2,NoArrow,NoArrow,"",Set()) // src to h1
         newEdges += ReoChannel(src,seed-1,NoArrow,NoArrow,"",Set()) // src to h2
         newEdges += ReoChannel(seed-2,seed,NoArrow,ArrowOut,"",Set()) // h1 to drain
@@ -457,7 +457,7 @@ object Circuit {
         seed += 1
         newEdges += ReoChannel(src,seed,NoArrow,ArrowOut,name,Set()) // src to drain
         newEdges += ReoChannel(trg,seed,NoArrow,ArrowOut,name,Set()) // trg to drain
-        newNodes += ReoNode(seed, None, Mixed, Set("drain")) //hiden 2
+        newNodes += ReoNode(seed, None, Mixed, Set("drain"),Set(src,trg)) //hiden 2
         // remove drain channel
         newEdges -= c
     }
@@ -473,18 +473,18 @@ object Circuit {
     for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
       var currentIns = newEdges.filter(e => e.outputs.contains(n.id))
       var currentOuts = newEdges.filter(e => e.inputs.contains(n.id))
-      if (n.extra.contains("xor") || n.extra.contains("dupl")) {
-
-      }
+//      if (n.extra.contains("xor") || n.extra.contains("dupl")) {
+//
+//      }
       for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
         seed += 1
         newEdges += ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
-        newNodes ::= ReoNode(seed, None, Source, Set())
+        newNodes ::= ReoNode(seed, None, Source, Set(),Set(n.id)) // todo: find correct port
       }
       for ( missing <- 1 to (nodeEdges(n.id)._2.size) - (currentOuts.size)){
         seed += 1
         newEdges += ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
-        newNodes ::= ReoNode(seed, None, Sink, Set())
+        newNodes ::= ReoNode(seed, None, Sink, Set(),Set(n.id)) // todo: find correct port
       }
     }
     Circuit(newEdges.toList,newNodes)
