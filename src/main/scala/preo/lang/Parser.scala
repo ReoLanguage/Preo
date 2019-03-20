@@ -59,6 +59,7 @@ trait Parser extends RegexParsers {
     case "lossy"    => lossy
     case "merger"   => merger
     case "vmerger"  => vmerger
+//    case "timer"    => timer
     case "swap"     => swap
     case "noSrc"    => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
     case "noSnk"    => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
@@ -214,8 +215,8 @@ trait Parser extends RegexParsers {
     "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Set("component"))} |
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
+    "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to"->ival.n))} |
     identifier ^^ inferPrim
-
 
   ////////////////
   // expression //

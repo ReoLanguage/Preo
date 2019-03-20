@@ -150,11 +150,13 @@ object PortAutomata {
         (PortAutomata(Set(a), seed, Set()), seed + 1)
       case Prim(CPrim("noSrc", _, _, _), List(a), List(),_) =>
         (PortAutomata(Set(a), seed, Set()), seed + 1)
-
+      case Prim(CPrim("timer", _, _, _), List(a), List(b),extra) =>
+        throw new GenerationException(s"Connector with time to be interpreted only as an IFTA instance")
       // unknown name with type 1->1 -- behave as identity
       case Prim(CPrim(name, _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
 
+      // variable connectors only ment for ifta
       case Prim(CPrim("node",_,_,extra), _, _, _) if extra.intersect(Set("vdupl","vmrg","vxor")).nonEmpty =>
         throw new GenerationException(s"Connector with variable parts ${extra.mkString(",")}, to be interpreted only as an IFTA instance")
       // new version uses nodes instead of dupl/merger
