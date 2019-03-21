@@ -215,7 +215,7 @@ trait Parser extends RegexParsers {
     "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Set("component"))} |
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
-    "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to"->ival.n))} |
+    "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to:"+ival.n))} |
     identifier ^^ inferPrim
 
   ////////////////
