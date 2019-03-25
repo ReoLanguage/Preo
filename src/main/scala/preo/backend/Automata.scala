@@ -39,27 +39,27 @@ object Automata {
 
   private var seed = 0
 
-  def apply[A<:Automata](str:String)
+  def apply[A<:Automata](str:String, mirrors: Mirrors)
                         (implicit builder: AutomataBuilder[A]): A = {
     val c = preo.DSL.parse(str)
     val cc = preo.DSL.reduce(c)
-    apply(cc)(builder)
+    apply(cc,mirrors)(builder)
   }
 
-  def apply[A<:Automata](cc:CoreConnector)
+  def apply[A<:Automata](cc:CoreConnector, mirrors: Mirrors = new Mirrors())
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
-    val gr = Network(cc,hideClosed = false)
+    val gr = Network(cc,hideClosed = false,mirrors)
 //    println("about to create automata from\n"+gr)
     buildAutomata[A](gr)(builder)
   }
 
-  def toAutWithRedundandy[A<:Automata](cc:CoreConnector)
-                                      (implicit builder: AutomataBuilder[A]): (A,Map[Int,Int]) = {
+  def toAutWithRedundandy[A<:Automata](cc:CoreConnector, mirrors: Mirrors = new Mirrors())
+                                      (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
-    val (gr,ext) = Network.toNetwWithRedundancy(cc,hideClosed = false)
+    val gr = Network.toNetwWithRedundancy(cc,hideClosed = false, mirrors)
     //    println("about to create automata from\n"+gr)
-    (buildAutomata[A](gr)(builder),ext)
+    buildAutomata[A](gr)(builder)
   }
 
 

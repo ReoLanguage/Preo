@@ -1,7 +1,7 @@
 package preo.backend
 
 import preo.ast.{CPrim, CoreConnector}
-import preo.backend.Network.Prim
+import preo.backend.Network.{Mirrors, Prim}
 
 import scala.collection.mutable
 
@@ -78,10 +78,10 @@ case object Mixed  extends NodeType {def dual = Mixed }
 object Circuit {
 
 
-  def apply(c:CoreConnector,hideClosed: Boolean = true): Circuit = {
+  def apply(c:CoreConnector,hideClosed: Boolean = true, mirrors: Mirrors=new Mirrors): Circuit = {
     //    val g = Automata.toAutomata(ReoGraph(c)).toGraph
-    val (n1,_) = Network.toNetwWithRedundancy(c, hideClosed)
-    apply(n1)
+    val n1 = Network.toNetwWithRedundancy(c, hideClosed,mirrors)
+    apply(n1,mirrors)
   }
 
 //  def connToNodeGraph(c:CoreConnector,hideClosed: Boolean = true): Graph = {
@@ -93,7 +93,7 @@ object Circuit {
     toVirtuoso(Network(c, hideClose))
   }
 
-  def apply(g:Network): Circuit = {
+  def apply(g:Network, mirrors: Mirrors): Circuit = {
     var seed:Int = (0::(g.ins ++ g.outs ++ g.prims.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
@@ -171,11 +171,20 @@ object Circuit {
       // start by looking at nodes (some ports may have to be remapped)
       if (e.prim.name == "node") {
         e.outs:::e.ins match {
-          case somePort::rest =>
-            addNode(somePort,None,Sink,e.prim.extra)
-            for (p <- rest) addRemap(p -> somePort, e.ins)
-            toRemap += somePort->somePort // adding self loop in the end on purpose
-          case _ =>
+//          case somePort::rest =>
+//            addNode(somePort,None,Sink,e.prim.extra)
+//            for (p <- rest) addRemap(p -> somePort, e.ins)
+//            toRemap += somePort->somePort // adding self loop in the end on purpose
+//          case _ =>
+          case Nil =>
+          case lst =>
+            seed += 1
+            addNode(seed,None,Sink,e.prim.extra)
+            for (p <- lst) {
+              addRemap(p -> seed, e.ins)
+              mirrors += seed -> p
+            }
+            toRemap += seed->seed // adding self loop in the end on purpose
         }
       } else
 
@@ -193,10 +202,18 @@ object Circuit {
         for (i <- e.ins) {
           addReoChannel(i, seed, NoArrow, inArrow, "", Set()) // extras are in the main node
           addNode(i, None, Source, Set())
+          mirrors += seed -> i
         }
         for (o <- e.outs) {
           addReoChannel(seed, o, NoArrow, ArrowOut, "", Set()) // extras are in the main node
           addNode(o, None, Sink, Set())
+          mirrors += seed -> o
+        }
+        for (ext <- extra) ext match {
+          case ("ports",ports:Set[Int]) =>
+            //println(s"adding mirrors ${ports.mkString(".")}->$seed")
+            for (p <- ports) mirrors += seed -> p
+          case _ =>
         }
       } else {
       // Normal channel //

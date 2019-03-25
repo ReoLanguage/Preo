@@ -1,6 +1,7 @@
 package preo.frontend.mcrl2
 
 import preo.ast._
+import preo.common.GenerationException
 import preo.frontend.mcrl2
 
 import scala.collection.mutable
@@ -380,7 +381,7 @@ object Model {
     //      channel_count += 1
     //      (Nil, Nil, Nil, List(out_node))
 
-    case CPrim(name, _, _, _) =>
+    case CPrim(name, CoreInterface(1), CoreInterface(1), _) =>
       val inAction = Action(name, In(1), Some(channel_count))
       val outAction = Action(name, Out(1), Some(channel_count))
       val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
@@ -388,6 +389,9 @@ object Model {
 
       channel_count += 1
       channel
+
+    case _ =>
+      throw new GenerationException(s"Unknown connector ${prim.name}.")
 
   }
 
