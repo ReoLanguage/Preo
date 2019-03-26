@@ -63,14 +63,15 @@ object ParserUtils {
     */
   def hideBasedOnFormula(form: Formula, conn: CoreConnector): Either[String, (Model, String)] = {
     // we can collect hide info here...
-//    println(s"# have ${Show(conn)}")
+    //println(s"# have ${Show(conn)}")
     val prefixes = Formula.notToHide(form)
-//    println(s"# not hiding ${prefixes.map(_.mkString("[", "/", "]")).mkString(",")}")
+    //println(s"# not hiding ${prefixes.map(_.mkString("[", "/", "]")).mkString(",")}")
     // we can override hide info here...
     val c2 = Model.unhideUntilPrefix(conn, prefixes)
-//    println(s"# got ${Show(c2)}")
+    //println(s"# got ${Show(c2)}")
     var err = ""
     val model = preo.frontend.mcrl2.Model(c2)
+    //println(s"# getMulti ${model.getMultiActionsMap}")
     val mcrl2form = Formula.formula2mCRL2(form, model.getMultiActionsMap, err = _)
     if (err == "")
       Right((model, mcrl2form))

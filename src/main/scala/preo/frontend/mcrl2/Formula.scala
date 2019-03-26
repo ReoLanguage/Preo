@@ -107,20 +107,21 @@ object Formula {
 //    */
   private def getMNames(str: String, names: mutable.Map[String, Set[Set[Action]]],
                         error: String => Unit): String = {
-    val actions = str.split(" *[_] *")
+    val actions = str.split(" *[|] *")
     var res: Option[Set[Set[Action]]] = None
-    //println(s"getting names: ${actions.mkString(",")}")
+    //println(s"actions: $actions, getting names: ${actions.mkString(",")}")
     for (a <- actions) {
+      //println(s"action $a")
       (names.get(a),res) match {
         case (Some(mas),Some(acc)) =>
           res = Some(acc intersect mas)
-        //          println(s"updated res - ${res.mkString(".")}")
+          //println(s"updated - names($a) = $mas, acc=$acc, res=${res.mkString(".")}")
         case (Some(mas),None) =>
           res = Some(mas)
-        //          println(s"reset res - ${res.mkString(".")}")
+          //println(s"reset - names($a)=$mas. res=${res.mkString(".")}")
         case (None,_) =>
           if (a=="id") Some("sync")
-        //          println(s"## left res - ${res.mkString(".")}")
+          //println(s"## left res - ${res.mkString(".")}")
       }
     }
     res match {

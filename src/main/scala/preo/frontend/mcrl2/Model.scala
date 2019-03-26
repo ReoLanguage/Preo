@@ -261,10 +261,12 @@ object Model {
     * @param connector
     * @return new connector
     */
-  def hideAllSubConn(connector: CoreConnector) =
-    CoreConnector.visit(connector,{
-      case CSubConnector(name, c, anns) => CSubConnector(name,c,Annotation("hide",None)::anns)
+  def hideAllSubConn(connector: CoreConnector) = {
+    //println(s"hiding all ${preo.frontend.Show(connector)}")
+    CoreConnector.visit(connector, {
+      case CSubConnector(name, c, anns) => CSubConnector(name, c, Annotation("hide", None) :: anns)
     })
+  }
 
   /**
     * Hide all sub connectors not in the given list of prefixes, and unhides the remaining ones.
@@ -272,24 +274,30 @@ object Model {
     * @param conts prefixes that should be exposed
     * @return updated connector with different 'hide' annotations
     */
-  def unhideUntilPrefix(conn: CoreConnector, conts: List[List[Container]]): CoreConnector = conn match {
-    case CSeq(c1, c2) => CSeq(unhideUntilPrefix(c1,conts),unhideUntilPrefix(c2,conts))
-    case CPar(c1, c2) => CPar(unhideUntilPrefix(c1,conts),unhideUntilPrefix(c2,conts))
-    case CTrace(i,c) => CTrace(i,unhideUntilPrefix(c,conts))
-    case CSubConnector(name, c, anns) =>
-      if (conts.exists(_.headOption.contains(Container(name))))
-        CSubConnector(name,unhideUntilPrefix(c,enterPrefix(name,conts)),rmHide(anns))
-      else
-        hideAllSubConn(conn)
-    case _ => conn
+  def unhideUntilPrefix(conn: CoreConnector, conts: List[List[Container]]): CoreConnector = {
+    //println(s"unhiding... ${preo.frontend.Show(conn)} - conts:${conts.mkString(".")}")
+    conn match {
+      case CSeq(c1, c2) => CSeq(unhideUntilPrefix(c1,conts),unhideUntilPrefix(c2,conts))
+      case CPar(c1, c2) => CPar(unhideUntilPrefix(c1,conts),unhideUntilPrefix(c2,conts))
+      case CTrace(i,c) => CTrace(i,unhideUntilPrefix(c,conts))
+      case CSubConnector(name, c, anns) =>
+        if (conts.exists(_.headOption.contains(Container(name))))
+          CSubConnector(name,unhideUntilPrefix(c,enterPrefix(name,conts)),rmHide(anns))
+        else
+          hideAllSubConn(conn)
+      case _ => conn
+    }
   }
 
   private def rmHide(annotations: List[Annotation]): List[Annotation] =
     annotations.filter(_.name.toLowerCase != "hide")
   private def addHide(annotations: List[Annotation]): List[Annotation] =
     Annotation("hide",None) :: annotations
-  private def enterPrefix(str: String, list: List[List[Container]]): List[List[Container]] =
-    for (cts <- list if cts.headOption.contains(str)) yield cts.tail
+  private def enterPrefix(str: String, list: List[List[Container]]): List[List[Container]] = {
+    val res = for (cts <- list if cts.headOption.contains(Container(str))) yield cts.tail
+    //println(s"enter prefix $str of $list gets $res")
+    res
+  }
 
 
   /**
