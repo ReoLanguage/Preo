@@ -49,8 +49,13 @@ class TestModel {
     }
 
     def testActions(model: Model, ccon: CoreConnector): Unit ={
-      assert(2 * model.getChannels.length <= model.getActions.size)
-      assert(3.5* model.getChannels.length >= model.getActions.size)
+      assert(model.getChannels.length <= model.getActions.size,
+        s"actions (${model.getActions.mkString(",")}) should be at least the " +
+        s"channels (${model.getChannels.map(_.getName).mkString(",")})")
+      assert(3.5* model.getChannels.length >= model.getActions.size,
+        s"actions (${model.getActions.mkString(",")}) should be at most 3.5x the " +
+        s"channels (${model.getChannels.map(_.getName).mkString(",")})")
+
     }
 
   /**
