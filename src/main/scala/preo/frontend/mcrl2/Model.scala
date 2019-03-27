@@ -376,6 +376,24 @@ object Model {
       channel_count += 1
       channel
 
+    case CPrim("writer", _, _, _) =>
+      //channel
+      val outAction = Action("writer", Out(1), Some(channel_count))
+      val channel = Channel("Writer", Some(channel_count), Nil, List(outAction),
+        MultiAction(List(outAction)))
+      //updating
+      channel_count += 1
+      channel
+
+    case CPrim("reader", _, _, _) =>
+      //channel
+      val inAction = Action("reader", In(1), Some(channel_count))
+      val channel = Channel("Reader", Some(channel_count), List(inAction), Nil,
+        MultiAction(List(inAction)))
+      //updating
+      channel_count += 1
+      channel
+
     //todo: either remove the reader and writer making them not do nothing, or create a syncronizing entrance and exit Channel with them
     //    case CPrim("reader", _, _, _) =>
     //      val in_node = Mcrl2Node(channel_count, Action.nullAction, Action("reader", var_count,NoLine, Nothing))

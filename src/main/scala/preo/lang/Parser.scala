@@ -47,39 +47,51 @@ trait Parser extends RegexParsers {
   val identifierCap: Parser[String] = """[a-zA-Z][a-zA-Z0-9_]*""".r
   val nameP: Parser[String] = "[a-zA-Z0-9.-_!$]+".r
 
+  val keywords = Set("if","then","else")
+
   /** Parses basic primitives */
-  def inferPrim(s:String): Connector = s match {
-    case "fifo"     => fifo
-    case "fifofull" => fifofull
-    case "drain"    => drain
-    case "id"       => id
-    case "ids"      => lam(n,id^n)
-    case "dupl"     => dupl
-    case "vdupl"    => vdupl
-    case "lossy"    => lossy
-    case "merger"   => merger
-    case "vmerger"  => vmerger
-//    case "timer"    => timer
-    case "swap"     => swap
-    case "noSrc"    => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
-    case "noSnk"    => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
-    case "writer"   => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component"))
-    case "reader"   => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
-    case "node"     => SubConnector(s,Repository.node, Nil)
-    case "dupls"    => SubConnector(s,Repository.dupls, Nil)
-    case "vdupls"   => SubConnector(s,Repository.vdupls, Nil)
-    case "mergers"  => SubConnector(s,Repository.mergers, Nil)
-    case "vmergers" => SubConnector(s,Repository.vmergers, Nil)
-    case "zip"      => SubConnector(s,Repository.zip, Nil)
-    case "unzip"    => SubConnector(s,Repository.unzip, Nil)
-    case "exrouter" => SubConnector(s,Repository.exrouter, Nil)
-    case "exrouters"=> SubConnector(s,Repository.nexrouter, Nil)
-    case "fifoloop" => SubConnector(s,Repository.fifoloop, Nil)
-    case "sequencer"=> SubConnector(s,Repository.sequencer, Nil)
-    case "barrier"  => SubConnector(s,Repository.barrier, Nil)
-    case "barriers" => SubConnector(s,Repository.barriers, Nil)
-    case _          => str2conn(s)
+  def inferPrim(s:String): Connector =
+    inferCorePrim.applyOrElse(s,str2conn)
+
+  def inferCorePrim: PartialFunction[String,Connector] =  {
+    case "fifo"       => fifo
+    case "fifofull"   => fifofull
+    case "drain"      => drain
+    case "id"         => id
+    case "ids"        => lam(n,id^n)
+    case "dupl"       => dupl
+    case "vdupl"      => vdupl
+    case "lossy"      => lossy
+    case "merger"     => merger
+    case "vmerger"    => vmerger
+//    case "timer"      => timer
+    case "swap"       => swap
+    case "noSrc"      => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
+    case "noSnk"      => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
+    case "writer"     => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component"))
+    case "reader"     => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
+    case s@"node"     => SubConnector(s,Repository.node, Nil)
+    case s@"dupls"    => SubConnector(s,Repository.dupls, Nil)
+    case s@"vdupls"   => SubConnector(s,Repository.vdupls, Nil)
+    case s@"mergers"  => SubConnector(s,Repository.mergers, Nil)
+    case s@"vmergers" => SubConnector(s,Repository.vmergers, Nil)
+    case s@"zip"      => SubConnector(s,Repository.zip, Nil)
+    case s@"unzip"    => SubConnector(s,Repository.unzip, Nil)
+    case s@"exrouter" => SubConnector(s,Repository.exrouter, Nil)
+    case s@"exrouters"=> SubConnector(s,Repository.nexrouter, Nil)
+    case s@"fifoloop" => SubConnector(s,Repository.fifoloop, Nil)
+    case s@"sequencer"=> SubConnector(s,Repository.sequencer, Nil)
+    case s@"barrier"  => SubConnector(s,Repository.barrier, Nil)
+    case s@"barriers" => SubConnector(s,Repository.barriers, Nil)
+//    case _          => str2conn(s)
   }
+
+  // rejects keywords
+  def primitiveName: Parser[Connector] =
+    identifier ^? ({
+      case s if !keywords.contains(s) => inferPrim(s)
+    },
+      s => s"'$s' cannot be a connector name - reserved keyword")
 
 
   ///////////////
@@ -162,8 +174,18 @@ trait Parser extends RegexParsers {
     }
 
   def seq: Parser[Connector] =
-    prod~opt(";"~>seq) ^^ {
+    ite~opt(";"~>seq) ^^ {
       case co ~ Some(p) => co & p
+      case co ~ None => co
+    }
+
+  def ite: Parser[Connector] =
+    "if"~bexpr~"then"~connP~"else"~connP ^^ { case _~e~_~c1~_~c2 => (e ? c1) + c2 }    |
+    sum
+
+  def sum: Parser[Connector] =
+    prod~opt("+"~>sum) ^^ {
+      case co ~ Some(co2) => lam(b,Choice(b,co,co2))
       case co ~ None => co
     }
 
@@ -206,7 +228,7 @@ trait Parser extends RegexParsers {
     "("~>exponP<~")"
 
   def elemP: Parser[Connector] =
-    bexpr~"?"~connP~"+"~connP        ^^ { case e~_~c1~_~c2 => (e ? c1) + c2 }    |
+//    bexpr~"?"~connP~"+"~connP        ^^ { case e~_~c1~_~c2 => (e ? c1) + c2 }    |
     litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
 
   def litP: Parser[Connector] =
@@ -216,7 +238,7 @@ trait Parser extends RegexParsers {
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
     "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to:"+ival.n))} |
-    identifier ^^ inferPrim
+    primitiveName
 
   ////////////////
   // expression //
@@ -229,10 +251,10 @@ trait Parser extends RegexParsers {
     iexpr | bexpr
 
   def identifierOrBool: Parser[Expr] =
-    identifier ^^ {
+    identifier ^? {
       case "true" => BVal(true)
       case "false" => BVal(false)
-      case x => Var(x)}
+      case x if !keywords.contains(x) => Var(x)}
 
   // boolean expressions
   def bexpr: Parser[BExpr] =
@@ -264,8 +286,8 @@ trait Parser extends RegexParsers {
   def blit: Parser[BExpr] =
 //    booleanVal |
     "!" ~> bexpr ^^ Not          |
-    identifier<~(":"~"B") ^^ Var |
-    identifierOrBool ^? ({
+//    identifier<~(":"~"B") ^^ Var |
+    identifierOrBool<~opt(":"~"B") ^? ({
       case be: BExpr => be
     },
       ie => s"Integer not expected: $ie")       |

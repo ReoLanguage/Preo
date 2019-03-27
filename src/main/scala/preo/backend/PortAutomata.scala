@@ -32,8 +32,8 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
         , es.map(getName(_,fire))
             .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
             .foldRight[Set[String]](Set())(cleanDir)
-            .mkString(".") +"~"+
-          fire.mkString("~")
+            .mkString(".") +"§"+
+          fire.mkString("§")
         , (fire,es).hashCode().toString
         , to)
 
