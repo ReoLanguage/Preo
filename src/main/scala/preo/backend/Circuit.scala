@@ -174,7 +174,7 @@ object Circuit {
           case Nil =>
           case lst =>
             seed += 1
-            addNode(seed,None,Sink,e.prim.extra,(e.ins++e.outs).toSet)
+            addNode(seed,None,Mixed,e.prim.extra,(e.ins++e.outs).toSet)
             for (p <- lst) {
               addRemap(p -> seed, e.ins)
               mirrors += seed -> p
