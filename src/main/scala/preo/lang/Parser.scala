@@ -66,6 +66,7 @@ trait Parser extends RegexParsers {
     case "vmerger"    => vmerger
 //    case "timer"      => timer
     case "swap"       => swap
+    case "xor"        => xor
     case "noSrc"      => Prim("noSrc",Port(IVal(1)),Port(IVal(0)))
     case "noSnk"      => Prim("noSnk",Port(IVal(0)),Port(IVal(1)))
     case "writer"     => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component"))
@@ -75,6 +76,7 @@ trait Parser extends RegexParsers {
     case s@"vdupls"   => SubConnector(s,Repository.vdupls, Nil)
     case s@"mergers"  => SubConnector(s,Repository.mergers, Nil)
     case s@"vmergers" => SubConnector(s,Repository.vmergers, Nil)
+    case s@"xors"     => SubConnector(s,Repository.xors, Nil)
     case s@"zip"      => SubConnector(s,Repository.zip, Nil)
     case s@"unzip"    => SubConnector(s,Repository.unzip, Nil)
     case s@"exrouter" => SubConnector(s,Repository.exrouter, Nil)

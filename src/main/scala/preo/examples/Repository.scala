@@ -64,6 +64,9 @@ object Repository {
   def duplsGen(d:Connector): Connector =
     lam (n, Tr(n-1,(id * (d^(n-1))) & sym(1,(n-1)*2)))
 
+  /** n-ary xor */
+  val xors = lam (n, Tr(n-1,(id * (xor^(n-1))) & sym(1,(n-1)*2)))
+
   /** n-ary variable duplicator */
   val vdupls = lam (n, Tr(n-1,(id * (vdupl^(n-1))) & sym(1,(n-1)*2)))
 

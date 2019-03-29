@@ -92,6 +92,7 @@ object DSL {
   val vdupl = Prim("vdupl",1,2)
   val merger = Prim("merger",2,1)
   val vmerger = Prim("vmerger",2,1)
+  val xor = Prim("xor",1,2)
   val timer = Prim("timer",1,1)
   val drain = Prim("drain",2,0)
   val noSrc = Prim("noSrc",1,0)

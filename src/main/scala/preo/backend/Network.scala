@@ -209,7 +209,7 @@ object Network {
     */
   private def addRedundancy(g:Network,ms:Mirrors): Network = {
     //println("Mirrors after traversal: "+ms)
-    val g2  = fixLoops2(g,ms)
+    val g2  = fixLoops(g,ms)
     //println("ReoGraph after loops: "+g2+s"\nmirrors: $ms")
     val g3 = addBorderSyncs(g2,ms)
     //println("Mirrors after redundancy: "+ms)
@@ -334,17 +334,17 @@ object Network {
   private def toNode(e:Prim): Prim =
     if (e.prim.extra contains "box") e
     else e match {
-      case Prim(CPrim("dupl", i, j, e), ins1, outs1, ps1) =>
-        Prim(CPrim("node", i, j, e + "dupl"), ins1, outs1, ps1)
-      case Prim(CPrim("vdupl", i, j, e), ins1, outs1, ps1) =>
-        Prim(CPrim("node", i, j, e + "vdupl"), ins1, outs1, ps1)
-      case Prim(CPrim("xor", i, j, e), ins1, outs1, ps1) =>
-        Prim(CPrim("node", i, j, e + "xor"), ins1, outs1, ps1)
-      case Prim(CPrim("merger", i, j, e), ins1, outs1, ps1) =>
-        Prim(CPrim("node", i, j, e + "mrg"), ins1, outs1, ps1)
-      case Prim(CPrim("vmerger", i, j, e), ins1, outs1, ps1) =>
-        Prim(CPrim("node", i, j, e + "vmrg"), ins1, outs1, ps1)
-      case e => e
+      case Prim(CPrim("dupl", i, j, ex), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, ex + "dupl"), ins1, outs1, ps1)
+      case Prim(CPrim("vdupl", i, j, ex), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, ex + "vdupl"), ins1, outs1, ps1)
+      case Prim(CPrim("xor", i, j, ex), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, ex + "xor"), ins1, outs1, ps1)
+      case Prim(CPrim("merger", i, j, ex), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, ex + "mrg"), ins1, outs1, ps1)
+      case Prim(CPrim("vmerger", i, j, ex), ins1, outs1, ps1) =>
+        Prim(CPrim("node", i, j, ex + "vmrg"), ins1, outs1, ps1)
+      case _ => e
     }
 
   // Original approach, quite ad hoc.
@@ -469,9 +469,10 @@ object Network {
 //      (e::es,m)
 //  }
 
-  private def fixLoops2(graph: Network, mirrors: Mirrors): Network = {
+  private def fixLoops(graph: Network, mirrors: Mirrors): Network = {
     //println("$$ fixing loops "+graph)
-    val (inmap, outmap) = collectInsOuts(graph)
+    var (inmap, outmap) = collectInsOuts(graph)
+    //println(s"(fixloops) io: ${inmap.mkString(",")}\n   ${outmap.mkString(",")}")
     //println(s"-- inmap: ${inmap.mkString(",")}\n-- outmap: ${outmap.mkString(",")}")
     //    var newPorts = Map[Port,Port]()
     var missing = graph.prims.toSet
@@ -480,12 +481,26 @@ object Network {
       val next = missing.head
       missing = missing.tail
       var updated = false
+      // collect neighbour nodes
+      var nbNodes = Map[Network.Prim,Set[Port]]()
       // for all neighbours of "next"
-      for (nb <- next.ins.flatMap(outmap.getOrElse(_,Set[Network.Prim]())) ++
-                 next.outs.flatMap(inmap.getOrElse(_,Set[Network.Prim]()))) {
+      //println(s"next: $next :: ${missing.mkString(",")}")
+      for ((port,nbs) <- getConnectedPrims(next,inmap,outmap);
+           nb         <- nbs) {
+        // get neighbour nodes
+        if (next.prim.name == "node")
+          for ((_,prims) <- getConnectedPrims(nb,inmap,outmap);
+                prim <-prims if prim!=next && prim.prim.name=="node") {
+            nbNodes += prim -> (nbNodes.getOrElse(prim,Set[Port]()) + port)
+          }
+        if (nb.prim.name=="node")
+          nbNodes += nb -> (nbNodes.getOrElse(nb,Set[Port]())+port)
+        print("c ")
         // case 1: self-loop
         if (!updated && nb==next) {
-          missing ++= makeSelfLoop(next, mirrors)
+          val nextExpanded = makeSelfLoop(next, mirrors)
+          //println(s"(1) adding prims: ${nextExpanded.mkString(",")}")
+          missing ++= nextExpanded
           updated = true
         }
         // case 2: more than 1 shared ports (and not visited)
@@ -493,23 +508,47 @@ object Network {
           val shared = (next.ins ++ next.outs).toSet intersect (nb.ins ++ nb.outs).toSet
           if (!updated && shared.size > 1 && missing.contains(nb)) {
             //println(s"expanding pair via ${shared.mkString(",")} : ${next} -- ${nb} ")
-            val nextExpanded = expandShared(next,shared,mirrors)
-            //println(s"got: ${nextExpanded}")
+            val (nextExpanded,io) = expandShared(next,shared,inmap,outmap,mirrors)
+            inmap  = io._1
+            outmap = io._2
+            //println(s"(2) adding prims: ${nextExpanded.mkString(",")}")
+            //println(s"(2) io: ${inmap.mkString(",")}\n   ${outmap.mkString(",")}")
             missing ++= nextExpanded
             updated = true
           }
         }
+      } // end for loop for neighbours
+
+      // case 3: next is a node connected with more than 1 port to another node
+      if (!updated) for ((node,ports) <- nbNodes) {
+        //println(s"node $node")
+        if (!updated && ports.size>1 && missing.contains(node)) {
+          //println(s"expanding $ports")
+          val (nextExpanded,io) = expandShared(next,ports,inmap,outmap,mirrors)
+          inmap  = io._1
+          outmap = io._2
+          //println(s"(3) adding prims: ${nextExpanded.mkString(",")}")
+          //println(s"(3) io: ${inmap.mkString(",")}\n   ${outmap.mkString(",")}")
+          missing ++= nextExpanded
+          updated = true
+        }
       }
+      //println(s"updated $updated")
+
       if (!updated) {
         //println(s"nothing more to expand with ${next}.")
         done ::= next
       }
-    }
+    }// end while loop
     Network(done,graph.ins,graph.outs)
   }
 
+  private def getConnectedPrims(p:Prim,inmap:IOMap,outmap:IOMap):List[(Port,Set[Prim])] =
+    p.ins.map(port => (port,outmap.getOrElse(port,Set[Network.Prim]()))) ++
+    p.outs.map(port => (port,inmap.getOrElse(port,Set[Network.Prim]())))
+
   private def makeSelfLoop(prim: Network.Prim, mirrors: Network.Mirrors): List[Network.Prim] = {
-    println(s"making self loop ${prim}")
+    println(s"making self loop $prim")
     var res = List[Network.Prim]()
     var ins = prim.ins
     var outs = prim.outs
@@ -527,69 +566,79 @@ object Network {
   }
 
   private def expandShared(from: Network.Prim, ports: Set[Network.Port],
-                           mirrors: Network.Mirrors) : List[Network.Prim] = {
-    var res = List[Network.Prim]()
-    var ins = from.ins
-    var outs = from.outs
+                           inmap:IOMap, outmap:IOMap,
+                           mirrors: Network.Mirrors) : (List[Network.Prim],(IOMap,IOMap)) = {
+    var syncs = List[Network.Prim]()
+    var (ins,outs)        = (from.ins,from.outs) // new input and output ports
+    var (inmap2,outmap2)  = (inmap,outmap)       // updated in/out-maps
     for (p <- ports) {
       if (from.ins contains p) {
-        res ::= mkSync(p,seed)
+        val syn = mkSync(p,seed)
+        inmap2   = inmap2 + (p->Set(syn)) + (seed->Set(from))
+        outmap2 += (seed->Set(syn))
         ins = replace(ins,p->seed)//ins.map(x => if(x==p)seed else x)
         mirrors += seed -> p
+        syncs ::= syn
       }
       else {
-        res ::= mkSync(seed,p)
+        val syn = mkSync(seed,p)
+        outmap2   = outmap2 + (p->Set(syn)) + (seed->Set(from))
+        inmap2 += seed->Set(syn)
         outs = replace(outs,p->seed) //outs.map(x => if(x==p)seed else x)
         mirrors += seed -> p
+        syncs ::= syn
       }
       seed += 1
     }
-    Prim(from.prim,ins,outs,from.parents) :: res
+    val newFrom = Prim(from.prim,ins,outs,from.parents)
+    inmap2  =  inmap2.mapValues(set => if (set contains from) set-from+newFrom else set)
+    outmap2 = outmap2.mapValues(set => if (set contains from) set-from+newFrom else set)
+    (newFrom :: syncs, (inmap2,outmap2))
   }
 
-  private def fixLoops(graph: Network, mirrors: Mirrors): Network = {
-    //println("$$ fixing loops "+graph)
-    val (inmap,outmap) = collectInsOuts(graph)
-    //println(s"-- inmap: ${inmap.mkString(",")}\n-- outmap: ${outmap.mkString(",")}")
-//    var newPorts = Map[Port,Port]()
-    var res = graph
-    for ((p,es) <- inmap; e <- es) {
-      // found a direct loop
-      if (e.outs contains p) {
-        val e1 = mkSync(p,seed)
-        val e2 = Prim(e.prim,e.ins.map(x=>if(x==p)seed else p),e.outs.map(x=>if(x==p)seed+1 else p),e.parents)
-        val e3 = mkSync(seed+1,p)
-        mirrors += seed -> p
-        mirrors += seed+1 -> p
-        res = Network(e1::e2::e3:: res.prims.diff(List(e)),res.ins,res.outs)
-        seed += 2
-      }
-      // found a 2-way loop
-      for ( pj <- e.outs;
-            ej <- inmap.getOrElse(pj,Set())
-            if pj!=p && ej.outs.contains(p)) {
-          val e1 = Prim(e.prim,e.ins,e.outs.map(x=>if(x==pj)seed else p),e.parents)
-          val e2 = mkSync(seed,pj)
-          mirrors += seed -> pj
-          res = Network(e1::e2:: res.prims.diff(List(e)),res.ins,res.outs)
-          seed += 1
-        }
-      // found 2 edges going to the same place
-      for ( pj <- e.outs;
-            ej <- outmap.getOrElse(pj,Set())
-            if (ej!=e || res.prims.count(_==e)>1) && ej.ins.contains(p)) {
-        for (_ <- 1 to res.prims.count(_==e)) {
-          val e1 = Prim(e.prim, e.ins, e.outs.map(x => if (x == pj) seed else p), e.parents)
-          val e2 = mkSync(seed, pj)
-          mirrors += seed -> pj
-          res = Network(e1 :: e2 :: res.prims.diff(List(e)), res.ins, res.outs)
-          seed += 1
-        }
-      }
-    }
-    //println("fixed loops "+res)
-    res
-  }
+//  private def fixLoops(graph: Network, mirrors: Mirrors): Network = {
+//    //println("$$ fixing loops "+graph)
+//    val (inmap,outmap) = collectInsOuts(graph)
+//    //println(s"-- inmap: ${inmap.mkString(",")}\n-- outmap: ${outmap.mkString(",")}")
+////    var newPorts = Map[Port,Port]()
+//    var res = graph
+//    for ((p,es) <- inmap; e <- es) {
+//      // found a direct loop
+//      if (e.outs contains p) {
+//        val e1 = mkSync(p,seed)
+//        val e2 = Prim(e.prim,e.ins.map(x=>if(x==p)seed else p),e.outs.map(x=>if(x==p)seed+1 else p),e.parents)
+//        val e3 = mkSync(seed+1,p)
+//        mirrors += seed -> p
+//        mirrors += seed+1 -> p
+//        res = Network(e1::e2::e3:: res.prims.diff(List(e)),res.ins,res.outs)
+//        seed += 2
+//      }
+//      // found a 2-way loop
+//      for ( pj <- e.outs;
+//            ej <- inmap.getOrElse(pj,Set())
+//            if pj!=p && ej.outs.contains(p)) {
+//          val e1 = Prim(e.prim,e.ins,e.outs.map(x=>if(x==pj)seed else p),e.parents)
+//          val e2 = mkSync(seed,pj)
+//          mirrors += seed -> pj
+//          res = Network(e1::e2:: res.prims.diff(List(e)),res.ins,res.outs)
+//          seed += 1
+//        }
+//      // found 2 edges going to the same place
+//      for ( pj <- e.outs;
+//            ej <- outmap.getOrElse(pj,Set())
+//            if (ej!=e || res.prims.count(_==e)>1) && ej.ins.contains(p)) {
+//        for (_ <- 1 to res.prims.count(_==e)) {
+//          val e1 = Prim(e.prim, e.ins, e.outs.map(x => if (x == pj) seed else p), e.parents)
+//          val e2 = mkSync(seed, pj)
+//          mirrors += seed -> pj
+//          res = Network(e1 :: e2 :: res.prims.diff(List(e)), res.ins, res.outs)
+//          seed += 1
+//        }
+//      }
+//    }
+//    //println("fixed loops "+res)
+//    res
+//  }
 
   /**
     * Add extra Sync channels when having mergers or dupls in the borders

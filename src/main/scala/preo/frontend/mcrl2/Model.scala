@@ -307,7 +307,7 @@ object Model {
     * @return The output mentioned above
     */
   def primToChannel(prim: CPrim): Channel = prim match {
-    case CPrim("fifo", _, _, _) =>
+    case CPrim("fifo",  CoreInterface(1),  CoreInterface(1), _) =>
 
       //channel
       val inAction = Action("fifo", In(1), Some(channel_count))
@@ -318,7 +318,7 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("fifofull", _, _, _) =>
+    case CPrim("fifofull",  CoreInterface(1),  CoreInterface(1), _) =>
       //channel
       val inAction = Action("fifofull", In(1), Some(channel_count))
       val outAction = Action("fifofull", Out(1), Some(channel_count))
@@ -329,7 +329,7 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("lossy", _, _, _) =>
+    case CPrim("lossy",  CoreInterface(1),  CoreInterface(1), _) =>
       //channel
       val inAction = Action("lossy", In(1), Some(channel_count))
       val outAction = Action("lossy", Out(1), Some(channel_count))
@@ -340,7 +340,7 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("merger", _, _, _) =>
+    case CPrim("merger",  CoreInterface(2),  CoreInterface(1), _) =>
       //channel
       val inAction1 = Action("merger", In(1), Some(channel_count))
       val inAction2 = Action("merger", In(2), Some(channel_count))
@@ -352,7 +352,7 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("dupl", _, _, _) =>
+    case CPrim("dupl",  CoreInterface(1),  CoreInterface(2), _) =>
       //channel
       val inAction = Action("dupl", In(1), Some(channel_count))
       val outAction1 = Action("dupl", Out(1), Some(channel_count))
@@ -365,7 +365,19 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("drain", _, _, _) =>
+    case CPrim("xor", CoreInterface(1), CoreInterface(2), _) =>
+      //channel
+      val inAction = Action("xor", In(1), Some(channel_count))
+      val outAction1 = Action("xor", Out(1), Some(channel_count))
+      val outAction2 = Action("xor", Out(2), Some(channel_count))
+
+      val channel = Channel("Xor", Some(channel_count), List(inAction), List(outAction1, outAction2),
+        preo.frontend.mcrl2.Choice(MultiAction(List(inAction, outAction1)), MultiAction(inAction, outAction2)))
+      //updating
+      channel_count += 1
+      channel
+
+    case CPrim("drain",  CoreInterface(2),  CoreInterface(0), _) =>
       //channel
       val inAction1 = Action("drain", In(1), Some(channel_count))
       val inAction2 = Action("drain", In(2), Some(channel_count))
@@ -376,7 +388,7 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("writer", _, _, _) =>
+    case CPrim("writer",  CoreInterface(0),  CoreInterface(1), _) =>
       //channel
       val outAction = Action("writer", Out(1), Some(channel_count))
       val channel = Channel("Writer", Some(channel_count), Nil, List(outAction),
@@ -385,7 +397,7 @@ object Model {
       channel_count += 1
       channel
 
-    case CPrim("reader", _, _, _) =>
+    case CPrim("reader",  CoreInterface(1),  CoreInterface(0), _) =>
       //channel
       val inAction = Action("reader", In(1), Some(channel_count))
       val channel = Channel("Reader", Some(channel_count), List(inAction), Nil,
