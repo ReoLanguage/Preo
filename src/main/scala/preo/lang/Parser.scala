@@ -100,6 +100,8 @@ trait Parser extends RegexParsers {
   /// Program ///
   ///////////////
 
+  /** Top rule - already performs some semantic analysis (TreoLite.expand)
+    * to replace primitives denoting Treo definitions by ther Preo counterparts. */
   def preo: Parser[Connector] =
     prog ^^ {p => TreoLite.expand(p,inferPrim,"dupl")}
 

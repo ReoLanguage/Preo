@@ -20,7 +20,7 @@ object TreoLite {
     * @return updated Treo connector with typed arguments
     */
   def inferTypes(c:TConnAST,inferPrim:String=>Connector): TConn = {
-    val preoConn: Connector = c.name.fold(inferPrim,(x:Connector)=>x) // inferPrim(c.name)
+    val preoConn: Connector = c.name.fold(inferPrim,(x:Connector)=>x) // either(inferPr,id) c.name
     // TODO: changing here
     preo.DSL.unsafeTypeOf(preoConn) match {
       case (Type(args, Port(IVal(i)),Port(IVal(j)),BVal(true),_),BVal(true)) if args.vars.isEmpty =>
@@ -36,7 +36,7 @@ object TreoLite {
     }
   }
 
-  def inferTypes(c:TreoLiteAST,inferPrim:String=>Connector): TreoLite =
+  private def inferTypes(c:TreoLiteAST,inferPrim:String=>Connector): TreoLite =
     TreoLite(c.args,c.conns.map(inferTypes(_,inferPrim)))
 
   /**

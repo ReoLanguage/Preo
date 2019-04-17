@@ -62,8 +62,8 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
   private def primName(prim: CPrim): String = (prim.name,prim.extra.toList) match {
     case ("writer",List(s:String)) => s"wr($s)"
     case ("reader",List(s:String)) => s"rd($s)"
-    case (n,List(s:String)) => s"$n($s)"
-    case (n,_) => n
+    case (n,Nil) => n
+    case (n,l) => s"$n(${l.mkString(",")})"
   }
   private def cleanDir(s:String,rest:Set[String]): Set[String] = (s.init,s.last) match {
     case (name,'↓') if rest.contains(name + '↑') || rest.contains(name + '↕') =>
