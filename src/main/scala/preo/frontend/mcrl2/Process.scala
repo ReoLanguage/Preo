@@ -8,7 +8,6 @@ abstract class Process {
 }
 
 
-
 object Process{
   def toString(act: List[Action]): String = act.mkString(", ")
 }
@@ -24,8 +23,8 @@ object Process{
   * @param expression the operator that defines the channel. This should include the before and after actions
   */
 //todo: do we need prev and next?
-case class Channel(name:String = "Channel", number: Option[Int], var in: List[Action], var out: List[Action],
-                   expression: ProcessExpr)
+abstract class Channel(var name:String = "Channel", var number: Option[Int], var in: List[Action], var out: List[Action],
+                   expression: ProcessExpr,params:Map[String,String]=Map())
   extends Process{
 
   if(expression == null){
@@ -33,9 +32,13 @@ case class Channel(name:String = "Channel", number: Option[Int], var in: List[Ac
   }
 
   //should not be used when it has no number
-  override def toString: String = s"$name${if(number.isDefined) number.get else ""} = (${expression.toString}) . $name${if(number.isDefined) number.get else ""}"
+  override def toString: String =
+    s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1+":"+p._2).mkString("(",",",")") else ""}"+
+//      s"${getName} " +
+      s"= (${expression.toString}) . ${getName}" //$name${if(number.isDefined) number.get else ""}"
 
-  def getName:ProcessName = ProcessName(s"$name${if(number.isDefined) number.get else ""}")
+  def getName:ProcessName = ProcessName(s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1).mkString("(",",",")") else ""}")
+//  def getSignature:ProcessName = ProcessName(s"${getName.toString}${if (params.nonEmpty) params.map(p => p._1+ ":"+ p._2).mkString("(",",",")") else ""}")
 
   def getActions: Set[Action] = in.toSet ++ out.toSet
 
@@ -52,6 +55,10 @@ case class Channel(name:String = "Channel", number: Option[Int], var in: List[Ac
 
   override def getOperation: ProcessExpr = expression
 }
+
+case class ReoChannel(rname:String = "Channel", rnumber: Option[Int], ins: List[Action], outs: List[Action],
+                      expression: ProcessExpr) extends Channel(rname,rnumber,ins,outs,expression) {}
+
 
 
 /**

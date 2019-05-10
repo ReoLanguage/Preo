@@ -7,6 +7,11 @@ abstract class ProcessExpr {
   override def toString: String
 
   def getActions: Set[Action]
+
+  def ||(other:ProcessExpr) = Par(this,other)
+  def &(other:ProcessExpr) = Seq(this,other)
+  def +(other:ProcessExpr) = Choice(this,other)
+
 }
 
 /**
@@ -42,6 +47,18 @@ case class Par(left: ProcessExpr, right:ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${left.toString}) || (${right.toString})"
 
   override def getActions: Set[Action] = left.getActions ++ right.getActions
+}
+
+
+case class Sum(vars:Map[String,String],procExpr:ProcessExpr) extends ProcessExpr {
+  override def toString: String = s"(sum ${vars.map(v => v._1 +":"+ v._2).mkString(",")} . (${procExpr}))"
+  override def getActions: Set[Action] = procExpr.getActions
+}
+
+case class ITE(cond:String, thenProc:ProcessExpr, elseProc:Option[ProcessExpr]=None) extends ProcessExpr {
+  override def toString: String = s"(${cond}) -> ((${thenProc}) ${if (elseProc.isDefined) s"<> ${elseProc.get}" else "" })"
+  override def getActions: Set[Action] =
+    thenProc.getActions ++ (if (elseProc.isDefined) elseProc.get.getActions else Set())
 }
 
 /**
