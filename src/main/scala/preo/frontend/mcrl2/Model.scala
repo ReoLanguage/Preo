@@ -23,9 +23,9 @@ abstract class Model(procs:List[Process],init:ProcessExpr) {
   }
 
   protected def getMultiActions(e: ProcessExpr, procs_map: Map[String, Process]): List[Set[Action]] = e match{
-    case a@Action(_, _, _) => List(Set(a))
+    case a@Action(_, _, _,_) => List(Set(a))
     case MultiAction(actions) => List(actions.toSet)
-    case ProcessName(name) => getMultiActions(procs_map(name).getOperation, procs_map)
+    case ProcessName(name,_) => getMultiActions(procs_map(name).getOperation, procs_map)
     case mcrl2.Seq(before, after) => getMultiActions(before, procs_map) ++ getMultiActions(after, procs_map)
     case mcrl2.Choice(left, right) => getMultiActions(left, procs_map) ++ getMultiActions(right, procs_map)
     case mcrl2.Par(left, right) => {
@@ -327,6 +327,7 @@ object Model {
       (in, namesIn, procs, namesOut, out)
 
     case x@CPrim(_, _, _, _) =>
+      println(x)
       val channel = primBuilder.buildPrimChannel(x,channel_count) // primToChannel(x)
       channel_count+=1
       (channel.in, channel.in.map(_ => channel.getName), List(channel), channel.out.map(_ => channel.getName), channel.out)
@@ -389,7 +390,7 @@ object Model {
         val inAction = Action("fifo", In(1), Some(chCount))
         val outAction = Action("fifo", Out(1), Some(chCount))
 
-        val channel = ReoChannel("Fifo", Some(chCount), List(inAction), List(outAction),
+        val channel = Channel("Fifo", Some(chCount), List(inAction), List(outAction),
           preo.frontend.mcrl2.Seq(inAction, outAction))
 //        channel_count += 1
         channel
@@ -399,7 +400,7 @@ object Model {
         val inAction = Action("fifofull", In(1), Some(chCount))
         val outAction = Action("fifofull", Out(1), Some(chCount))
 
-        val channel = ReoChannel("FifoFull", Some(chCount), List(inAction), List(outAction),
+        val channel = Channel("FifoFull", Some(chCount), List(inAction), List(outAction),
           preo.frontend.mcrl2.Seq(outAction, inAction))
         //updating
 //        channel_count += 1
@@ -410,7 +411,7 @@ object Model {
         val inAction = Action("lossy", In(1), Some(chCount))
         val outAction = Action("lossy", Out(1), Some(chCount))
 
-        val channel = ReoChannel("Lossy", Some(chCount), List(inAction), List(outAction),
+        val channel = Channel("Lossy", Some(chCount), List(inAction), List(outAction),
           preo.frontend.mcrl2.Choice(inAction, MultiAction(inAction, outAction)))
         //updating
 //        channel_count += 1
@@ -422,7 +423,7 @@ object Model {
         val inAction2 = Action("merger", In(2), Some(chCount))
         val outAction = Action("merger", Out(1), Some(chCount))
 
-        val channel = ReoChannel("Merger", Some(chCount), List(inAction1, inAction2), List(outAction),
+        val channel = Channel("Merger", Some(chCount), List(inAction1, inAction2), List(outAction),
           preo.frontend.mcrl2.Choice(MultiAction(List(inAction1, outAction)), MultiAction(inAction2, outAction)))
         //updating
 //        channel_count += 1
@@ -434,7 +435,7 @@ object Model {
         val outAction1 = Action("dupl", Out(1), Some(chCount))
         val outAction2 = Action("dupl", Out(2), Some(chCount))
 
-        val channel = ReoChannel("Dupl", Some(chCount), List(inAction), List(outAction1, outAction2),
+        val channel = Channel("Dupl", Some(chCount), List(inAction), List(outAction1, outAction2),
           MultiAction(List(inAction, outAction1, outAction2)))
         //updating
 
@@ -447,7 +448,7 @@ object Model {
         val outAction1 = Action("xor", Out(1), Some(chCount))
         val outAction2 = Action("xor", Out(2), Some(chCount))
 
-        val channel = ReoChannel("Xor", Some(chCount), List(inAction), List(outAction1, outAction2),
+        val channel = Channel("Xor", Some(chCount), List(inAction), List(outAction1, outAction2),
           preo.frontend.mcrl2.Choice(MultiAction(List(inAction, outAction1)), MultiAction(inAction, outAction2)))
         //updating
 //        channel_count += 1
@@ -457,7 +458,7 @@ object Model {
         //channel
         val inAction1 = Action("drain", In(1), Some(chCount))
         val inAction2 = Action("drain", In(2), Some(chCount))
-        val channel = ReoChannel("Drain", Some(chCount), List(inAction1, inAction2), Nil,
+        val channel = Channel("Drain", Some(chCount), List(inAction1, inAction2), Nil,
           MultiAction(List(inAction1, inAction2)))
         //updating
 
@@ -467,7 +468,7 @@ object Model {
       case CPrim("writer",  CoreInterface(0),  CoreInterface(1), _) =>
         //channel
         val outAction = Action("writer", Out(1), Some(chCount))
-        val channel = ReoChannel("Writer", Some(chCount), Nil, List(outAction),
+        val channel = Channel("Writer", Some(chCount), Nil, List(outAction),
           MultiAction(List(outAction)))
         //updating
 //        channel_count += 1
@@ -476,7 +477,7 @@ object Model {
       case CPrim("reader",  CoreInterface(1),  CoreInterface(0), _) =>
         //channel
         val inAction = Action("reader", In(1), Some(chCount))
-        val channel = ReoChannel("Reader", Some(chCount), List(inAction), Nil,
+        val channel = Channel("Reader", Some(chCount), List(inAction), Nil,
           MultiAction(List(inAction)))
         //updating
 //        channel_count += 1
@@ -498,7 +499,7 @@ object Model {
       case CPrim(name, CoreInterface(1), CoreInterface(1), _) =>
         val inAction = Action(name, In(1), Some(chCount))
         val outAction = Action(name, Out(1), Some(chCount))
-        val channel = ReoChannel(rnumber = Some(chCount), ins = List(inAction), outs = List(outAction),
+        val channel = Channel(number = Some(chCount), in = List(inAction), out = List(outAction),
           expression = MultiAction(inAction, outAction))
 
 //        channel_count += 1
@@ -656,7 +657,7 @@ object Model {
     else {
       val inAction = Action("sync", In(1), Some(channel_count))
       val outAction = Action("sync", Out(1), Some(channel_count))
-      val channel = ReoChannel(rnumber = Some(channel_count), ins = List(inAction), outs = List(outAction),
+      val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
         expression = MultiAction(inAction, outAction))
       channel_count += 1
       channel :: makeSyncs(i - 1)

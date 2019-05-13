@@ -23,7 +23,7 @@ object Process{
   * @param expression the operator that defines the channel. This should include the before and after actions
   */
 //todo: do we need prev and next?
-abstract class Channel(var name:String = "Channel", var number: Option[Int], var in: List[Action], var out: List[Action],
+case class Channel(name:String = "Channel", number: Option[Int], in: List[Action], out: List[Action],
                    expression: ProcessExpr,params:Map[String,String]=Map())
   extends Process{
 
@@ -35,12 +35,18 @@ abstract class Channel(var name:String = "Channel", var number: Option[Int], var
   override def toString: String =
     s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1+":"+p._2).mkString("(",",",")") else ""}"+
 //      s"${getName} " +
-      s"= (${expression.toString}) . ${getName}" //$name${if(number.isDefined) number.get else ""}"
+      s"= (${expression.toString}) . ${getNameWithActualParam}" //$name${if(number.isDefined) number.get else ""}"
 
-  def getName:ProcessName = ProcessName(s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1).mkString("(",",",")") else ""}")
+  def toStringNoRecursion =
+    s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1+":"+p._2).mkString("(",",",")") else ""}"+
+      s"= (${expression.toString})"
+
+  def getNameWithActualParam = ProcessName(s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1).mkString("(",",",")") else ""}")
+  def getName:ProcessName = ProcessName(s"$name${if(number.isDefined) number.get else ""}")//${if (params.nonEmpty) params.map(p => p._1).mkString("(",",",")") else ""}")
 //  def getSignature:ProcessName = ProcessName(s"${getName.toString}${if (params.nonEmpty) params.map(p => p._1+ ":"+ p._2).mkString("(",",",")") else ""}")
 
   def getActions: Set[Action] = in.toSet ++ out.toSet
+
 
 
   override def equals(o: scala.Any): Boolean = {
@@ -56,8 +62,8 @@ abstract class Channel(var name:String = "Channel", var number: Option[Int], var
   override def getOperation: ProcessExpr = expression
 }
 
-case class ReoChannel(rname:String = "Channel", rnumber: Option[Int], ins: List[Action], outs: List[Action],
-                      expression: ProcessExpr) extends Channel(rname,rnumber,ins,outs,expression) {}
+//case class ReoChannel(rname:String = "Channel", rnumber: Option[Int], ins: List[Action], outs: List[Action],
+//                      expression: ProcessExpr) extends Channel(rname,rnumber,ins,outs,expression) {}
 
 
 

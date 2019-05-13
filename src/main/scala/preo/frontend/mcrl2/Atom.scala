@@ -22,8 +22,9 @@ case object Nothing extends State
   * @param name name of the action
   * @param state the state defines if it is an input or output action, or neither
   * @param number identification number, or None in case of families
+  * @param params list of parameters (var,type) (for now, until we have proper Data Types)
   */
-case class Action(var name: String,var state: State, number: Option[Int] = None) extends Atom{
+case class Action(var name: String,var state: State, number: Option[Int] = None,params:List[(String,String)]=List()) extends Atom{
 
   def getActions: Set[Action] = Set(this)
 
@@ -35,8 +36,9 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
       case Out(n) => "o" + n.toString
       case Sync => "sync"
     }
-    s"$name${if(number.isDefined) "_"+number.get else ""}$state_name"
+    s"$name${if(number.isDefined) "_"+number.get else ""}$state_name${if (params.nonEmpty) params.map(_._1).mkString("(",",",")") else ""}"
   }
+
 
 
   override def equals(o: scala.Any): Boolean =
@@ -50,6 +52,8 @@ case class Action(var name: String,var state: State, number: Option[Int] = None)
 
   //joins actions in our new nodeless model
   def join(a: Action): Action = Action(this.toString +"_"+ a.toString, Nothing, None)
+
+  def |(other:Action):MultiAction = MultiAction(List(this,other))
 
 }
 
@@ -75,7 +79,7 @@ object Action{
   * A process name is just a name of a process (useful when we have a Mcrl2Process agglomeration)
   * @param name the name of the process this represents
   */
-case class ProcessName(name: String) extends Atom{
+case class ProcessName(name: String,actualParam:List[String]=List()) extends Atom{
   override def getActions: Set[Action] = Set()
 
   override def toString: String = name
@@ -97,6 +101,9 @@ case class MultiAction(actions: List[Action]) extends Atom{
   def getHead: Action = if(actions.nonEmpty) actions.head else null
 
   def getLast: Action = if(actions.nonEmpty) actions.last else null
+
+  def |(a:Action): MultiAction = MultiAction(actions++List(a))
+  def |(ma:MultiAction):MultiAction = MultiAction(actions++ma.actions)
 
   override def getActions: Set[Action] = actions.toSet
 
