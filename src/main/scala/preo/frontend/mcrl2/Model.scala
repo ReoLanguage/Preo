@@ -262,7 +262,12 @@ object Model {
       (in1 ++ in2, namesIn1 ++ namesIn2, procs1 ++ procs2, namesOut1 ++ namesOut2, out1 ++ out2)
 
     case CSymmetry(CoreInterface(i), CoreInterface(j)) =>
-      val channels = makeSyncs(i + j)
+//      val channels = makeSyncs(i + j)
+      val channels = (for (j <- 1 to i+j) yield {
+        val res = primBuilder.buildPrimChannel(CPrim("sync", CoreInterface(1), CoreInterface(1)), channel_count)
+        channel_count +=1
+        res
+      }).toList
       val ins: List[Action] = channels.flatMap(f => f.in)
       val outs: List[Action] = channels.flatMap(f => f.out)
       val namesIn: List[ProcessName] = channels.flatMap(f => f.in.map(_ => f.getName))
@@ -284,7 +289,12 @@ object Model {
       (in.dropRight(i), replaced1, procs ++ inits.values.toSet.toList, replaced2, out.dropRight(i))
 
     case CId(CoreInterface(i)) =>
-      val channels = makeSyncs(i)
+      val channels = (for (j <- 1 to i) yield {
+        val res = primBuilder.buildPrimChannel(CPrim("sync", CoreInterface(1), CoreInterface(1)), channel_count)
+        channel_count +=1
+        res
+      }).toList
+//      val channels = makeSyncs(i)
       val ins: List[Action]           = channels.flatMap(f => f.in)
       val outs: List[Action]          = channels.flatMap(f => f.out)
       val namesIn: List[ProcessName]  = channels.flatMap(f => f.in.map(_ => f.getName))
@@ -327,7 +337,6 @@ object Model {
       (in, namesIn, procs, namesOut, out)
 
     case x@CPrim(_, _, _, _) =>
-      println(x)
       val channel = primBuilder.buildPrimChannel(x,channel_count) // primToChannel(x)
       channel_count+=1
       (channel.in, channel.in.map(_ => channel.getName), List(channel), channel.out.map(_ => channel.getName), channel.out)
@@ -384,6 +393,13 @@ object Model {
       ReoModel(proc,init)
 
     def buildPrimChannel(prim: CPrim,chCount:Int): Channel = prim match {
+      case CPrim("sync",  CoreInterface(1),  CoreInterface(1), _) =>
+        //channel
+        val inAction = Action("sync", In(1), Some(channel_count))
+        val outAction = Action("sync", Out(1), Some(channel_count))
+        val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
+          expression = MultiAction(inAction, outAction))
+        channel
       case CPrim("fifo",  CoreInterface(1),  CoreInterface(1), _) =>
 
         //channel

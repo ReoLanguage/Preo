@@ -1,5 +1,7 @@
 package preo.frontend.mcrl2
 
+
+
 /**
   * A process expression can be a sequence, a choice, a parallem, a communication, or an atomic action (Atom)
   */
@@ -55,7 +57,7 @@ case class Sum(vars:Map[String,String],procExpr:ProcessExpr) extends ProcessExpr
   override def getActions: Set[Action] = procExpr.getActions
 }
 
-case class ITE(cond:String, thenProc:ProcessExpr, elseProc:Option[ProcessExpr]=None) extends ProcessExpr {
+case class ITE(cond:BoolDT, thenProc:ProcessExpr, elseProc:Option[ProcessExpr]=None) extends ProcessExpr {
   override def toString: String = s"(${cond}) -> ((${thenProc}) ${if (elseProc.isDefined) s"<> ${elseProc.get}" else "" })"
   override def getActions: Set[Action] =
     thenProc.getActions ++ (if (elseProc.isDefined) elseProc.get.getActions else Set())
