@@ -39,7 +39,7 @@ case class Action(var name: String,var state: State, number: Option[Int] = None,
     s"$name${if(number.isDefined) "_"+number.get else ""}$state_name${if (params.nonEmpty) params.map(_._1).mkString("(",",",")") else ""}"
   }
 
-
+  override def getProcNames: Set[ProcessName] = Set()
 
   override def equals(o: scala.Any): Boolean =
     if (o == null)
@@ -54,6 +54,8 @@ case class Action(var name: String,var state: State, number: Option[Int] = None,
   def join(a: Action): Action = Action(this.toString +"_"+ a.toString, Nothing, None)
 
   def |(other:Action):MultiAction = MultiAction(List(this,other))
+
+
 
 }
 
@@ -83,6 +85,7 @@ case class ProcessName(name: String,actualParam:List[String]=List()) extends Ato
   override def getActions: Set[Action] = Set()
 
   override def toString: String = name
+  override def getProcNames: Set[ProcessName] = Set(this)
 }
 
 /**
@@ -107,6 +110,7 @@ case class MultiAction(actions: List[Action]) extends Atom{
 
   override def getActions: Set[Action] = actions.toSet
 
+  override def getProcNames: Set[ProcessName] = Set()
 }
 
 object MultiAction{

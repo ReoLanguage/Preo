@@ -14,6 +14,7 @@ abstract class ProcessExpr {
   def &(other:ProcessExpr) = Seq(this,other)
   def +(other:ProcessExpr) = Choice(this,other)
 
+  def getProcNames:Set[ProcessName]
 }
 
 /**
@@ -25,6 +26,8 @@ case class Seq(before: ProcessExpr, after: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${before.toString}) . (${after.toString})"
 
   override def getActions: Set[Action] = before.getActions ++ after.getActions
+
+  override def getProcNames: Set[ProcessName] = before.getProcNames ++ after.getProcNames
 }
 
 
@@ -37,6 +40,8 @@ case class Choice(left: ProcessExpr, right: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${left.toString}) + (${right.toString})"
 
   override def getActions: Set[Action] = left.getActions ++ right.getActions
+
+  override def getProcNames: Set[ProcessName] = left.getProcNames ++ right.getProcNames
 }
 
 
@@ -49,18 +54,22 @@ case class Par(left: ProcessExpr, right:ProcessExpr) extends ProcessExpr{
   override def toString: String = s"(${left.toString}) || (${right.toString})"
 
   override def getActions: Set[Action] = left.getActions ++ right.getActions
+
+  override def getProcNames: Set[ProcessName] = left.getProcNames ++ right.getProcNames
 }
 
 
 case class Sum(vars:Map[String,String],procExpr:ProcessExpr) extends ProcessExpr {
   override def toString: String = s"(sum ${vars.map(v => v._1 +":"+ v._2).mkString(",")} . (${procExpr}))"
   override def getActions: Set[Action] = procExpr.getActions
+  override def getProcNames: Set[ProcessName] = procExpr.getProcNames
 }
 
 case class ITE(cond:BoolDT, thenProc:ProcessExpr, elseProc:Option[ProcessExpr]=None) extends ProcessExpr {
   override def toString: String = s"(${cond}) -> ((${thenProc}) ${if (elseProc.isDefined) s"<> ${elseProc.get}" else "" })"
   override def getActions: Set[Action] =
     thenProc.getActions ++ (if (elseProc.isDefined) elseProc.get.getActions else Set())
+  override def getProcNames: Set[ProcessName] = thenProc.getProcNames ++ (if(elseProc.isDefined) elseProc.get.getProcNames else Set())
 }
 
 /**
@@ -68,12 +77,17 @@ case class ITE(cond:BoolDT, thenProc:ProcessExpr, elseProc:Option[ProcessExpr]=N
   * @param syncActions the actions to communicate
   * @param in the process where the communication will happen
   */
-case class Comm(syncActions: List[Action], resultingAction: Action, in: ProcessExpr) extends ProcessExpr{
-  override def toString: String = s"""comm({${multiAction} -> $resultingAction}, ${in.toString})"""
+case class Comm(syncActions: List[(List[Action],Action)], in: ProcessExpr) extends ProcessExpr{
+//case class Comm(syncActions: List[Action], resultingAction: Action, in: ProcessExpr) extends ProcessExpr{
 
-  def multiAction: MultiAction = MultiAction(syncActions)
+//  override def toString: String = s"""comm({${multiAction} -> $resultingAction}, ${in.toString})"""
+  override def toString: String = s"""comm({${syncActions.map(sa => s"${MultiAction(sa._1)} -> ${sa._2}" ).mkString(",")}}, ${in.toString})"""
 
-  override def getActions: Set[Action] =  in.getActions ++ syncActions.toSet ++ Set(resultingAction)
+//  def multiAction: MultiAction = MultiAction(List())
+
+//  override def getActions: Set[Action] =  in.getActions ++ syncActions.toSet ++ Set(resultingAction)
+  override def getActions: Set[Action] =  in.getActions ++ syncActions.flatMap(sa => sa._1.toSet+sa._2)
+  override def getProcNames: Set[ProcessName] = in.getProcNames
 }
 
 ///**
@@ -96,6 +110,7 @@ case class Block(actions: List[Action], in: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"""block({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet
+  override def getProcNames: Set[ProcessName] = in.getProcNames
 }
 
 /**
@@ -107,6 +122,7 @@ case class Hide(actions: List[Action], in: ProcessExpr) extends ProcessExpr{
   override def toString: String = s"""hide({${Process.toString(actions)}}, ${in.toString})"""
 
   override def getActions: Set[Action] = in.getActions ++ actions.toSet
+  override def getProcNames: Set[ProcessName] = in.getProcNames
 }
 
 

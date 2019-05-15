@@ -33,14 +33,27 @@ abstract class Model(procs:List[Process],init:ProcessExpr) {
       val mright = getMultiActions(right, procs_map)
       mleft ++ mright ++ mleft.flatMap(ml => mright.map(mr => ml ++ mr))
     }
-    case Comm(syncActions, resultingAction, expr) => {
+    case Comm(syncActions,expr) =>
       val m = getMultiActions(expr, procs_map)
-      val syncActionsSet = syncActions.toSet
-      m.map(f =>
-        if(syncActionsSet.subsetOf(f)) (f -- syncActionsSet) ++ Set(resultingAction)
-        else f
-      )
-    }
+      val syncActionsSets = syncActions.map(sa => sa._1.toSet)
+      var res:List[Set[Action]] = List()
+      for (f <- m) {
+        for (s <- syncActionsSets) {
+          if (s.subsetOf(f))
+            res ::= (f -- s)
+          else
+            res ::= (f)
+        }
+      }
+      res
+//    case Comm(syncActions, resultingAction, expr) => {
+//      val m = getMultiActions(expr, procs_map)
+//      val syncActionsSet = syncActions.toSet
+//      m.map(f =>
+//        if(syncActionsSet.subsetOf(f)) (f -- syncActionsSet) ++ Set(resultingAction)
+//        else f
+//      )
+//    }
     case Block(actions, expr) => getMultiActions(expr, procs_map).filter(f => f.intersect(actions.toSet).isEmpty)
     case Hide(actions, expr)  => getMultiActions(expr, procs_map).map(f => f -- actions.toSet)
   }
@@ -246,13 +259,14 @@ object Model {
       val (in1, namesIn1, procs1, namesOut1, out1) = conToChannels(c1)
       val (in2, namesIn2, procs2, namesOut2, out2) = conToChannels(c2)
 
-      val inits: Map[ProcessName, Process] = makeInits(namesOut1, out1, namesIn2, in2)
+      val (inits,initCount) = primBuilder.buildInits(namesOut1, out1, namesIn2, in2,init_count)
       val replaced1 = namesIn1.map(name => {
         getRealName(inits, name)
       })
       val replaced2 = namesOut2.map(name => {
         getRealName(inits, name)
       })
+      init_count = initCount
 
       (in1, replaced1, procs1 ++ procs2 ++ inits.values.toSet.toList, replaced2, out2) //inits1.values == inits2.values
 
@@ -278,13 +292,14 @@ object Model {
     case CTrace(CoreInterface(i), c) =>
       val (in, namesIn, procs, namesOut, out) = conToChannels(c)
 
-      val inits: Map[ProcessName, Process] = makeInits(namesOut.takeRight(i), out.takeRight(i), namesIn.takeRight(i), in.takeRight(i))
+      val (inits,initCount) = primBuilder.buildInits(namesOut.takeRight(i), out.takeRight(i), namesIn.takeRight(i), in.takeRight(i),init_count)
       val replaced1 = namesIn.dropRight(i).map(name => {
         getRealName(inits, name)
       })
       val replaced2 = namesOut.dropRight(i).map(name => {
         getRealName(inits, name)
       })
+      init_count = initCount
 
       (in.dropRight(i), replaced1, procs ++ inits.values.toSet.toList, replaced2, out.dropRight(i))
 
@@ -524,6 +539,29 @@ object Model {
       case _ =>
         throw new GenerationException(s"Unknown connector ${prim.name}.")
     }
+
+    def buildInits(names1: List[ProcessName], actions1: List[Action], names2: List[ProcessName], actions2: List[Action],initCount:Int):
+      (Map[ProcessName, Process], Int) = {
+      var map: Map[ProcessName, Process] = Map()
+      var newCount = initCount
+
+      actions1.zip(actions2).zip(names1.zip(names2)).foreach { case ((a1, a2), (n1, n2)) =>
+        val real_name1 = getRealName(map, n1)
+        val real_name2 = getRealName(map, n2)
+        val init = Init(Some(newCount), a1, a2, if(real_name1 != real_name2) List(real_name1, real_name2) else List(real_name1), false)
+
+        map += (real_name1 -> init)
+        map += (real_name2 -> init)
+
+        newCount += 1
+      }
+      (map,newCount)
+    }
+
+    private def getRealName(map: Map[ProcessName, Process],name: ProcessName): ProcessName =
+      if(map.contains(name)) getRealName(map, map(name).getName)
+      else name
+
   }
 
 //  /**
@@ -660,43 +698,43 @@ object Model {
 //  }
 
 
-  /**
-    * Makes some sync channels
-    *
-    * @param i the number of channels to make
-    * @return the list of channels created
-    */
-  private def makeSyncs(i: Int): List[Channel] =
-    if (i == 0) {
-      Nil
-    }
-    else {
-      val inAction = Action("sync", In(1), Some(channel_count))
-      val outAction = Action("sync", Out(1), Some(channel_count))
-      val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
-        expression = MultiAction(inAction, outAction))
-      channel_count += 1
-      channel :: makeSyncs(i - 1)
-    }
+//  /**
+//    * Makes some sync channels
+//    *
+//    * @param i the number of channels to make
+//    * @return the list of channels created
+//    */
+//  private def makeSyncs(i: Int): List[Channel] =
+//    if (i == 0) {
+//      Nil
+//    }
+//    else {
+//      val inAction = Action("sync", In(1), Some(channel_count))
+//      val outAction = Action("sync", Out(1), Some(channel_count))
+//      val channel = Channel(number = Some(channel_count), in = List(inAction), out = List(outAction),
+//        expression = MultiAction(inAction, outAction))
+//      channel_count += 1
+//      channel :: makeSyncs(i - 1)
+//    }
 
 
-  private def makeInits(names1: List[ProcessName], actions1: List[Action], names2: List[ProcessName], actions2: List[Action])
-  : Map[ProcessName, Process] = {
-    var map: Map[ProcessName, Process] = Map()
-
-    actions1.zip(actions2).zip(names1.zip(names2)).foreach { case ((a1, a2), (n1, n2)) =>
-      val real_name1 = getRealName(map, n1)
-      val real_name2 = getRealName(map, n2)
-      val init = Init(Some(init_count), a1, a2, if(real_name1 != real_name2) List(real_name1, real_name2) else List(real_name1), false)
-
-      map += (real_name1 -> init)
-      map += (real_name2 -> init)
-
-      init_count += 1
-    }
-    map
-  }
-
+//  private def makeInits(names1: List[ProcessName], actions1: List[Action], names2: List[ProcessName], actions2: List[Action])
+//  : Map[ProcessName, Process] = {
+//    var map: Map[ProcessName, Process] = Map()
+//
+//    actions1.zip(actions2).zip(names1.zip(names2)).foreach { case ((a1, a2), (n1, n2)) =>
+//      val real_name1 = getRealName(map, n1)
+//      val real_name2 = getRealName(map, n2)
+//      val init = Init(Some(init_count), a1, a2, if(real_name1 != real_name2) List(real_name1, real_name2) else List(real_name1), false)
+//
+//      map += (real_name1 -> init)
+//      map += (real_name2 -> init)
+//
+//      init_count += 1
+//    }
+//    map
+//  }
+//
   private def getRealName(map: Map[ProcessName, Process],name: ProcessName): ProcessName =
     if(map.contains(name)) getRealName(map, map(name).getName)
     else name
@@ -707,4 +745,6 @@ object Model {
 trait PrimBuilder[M<:Model] {
   def buildModel(proc:List[Process],init:ProcessExpr):M
   def buildPrimChannel(e:CPrim,chCount:Int): Channel
+  def buildInits(names1: List[ProcessName], actions1: List[Action], names2: List[ProcessName], actions2: List[Action],initCount:Int)
+  : (Map[ProcessName, Process],Int)
 }

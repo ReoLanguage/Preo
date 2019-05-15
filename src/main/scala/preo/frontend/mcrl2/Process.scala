@@ -76,7 +76,7 @@ case class Init(number: Option[Int], action1 :Action, action2: Action, procs: Li
   def getOperation: ProcessExpr = {
     val sync_action = action1 join action2
     val basicProc = procs.tail.foldRight(procs.head : ProcessExpr)((base, p) => Par(base, p))
-    val operator =  Block(List(action1, action2), Comm(List(action1, action2), sync_action, basicProc))
+    val operator =  Block(List(action1, action2), Comm(List((List(action1, action2), sync_action)), basicProc))
 
     if(toHide) Hide(List(sync_action), operator)
     else operator
