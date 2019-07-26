@@ -12,6 +12,9 @@ case class TConn(cc:CoreConnector,args:List[TVar])
 case class TreoLiteAST(args:List[TVar],conns:List[TConnAST])
 case class TConnAST(name:Either[String,Connector],args:List[String])
 
+// New notion of TreoLite - Work in Progress!
+case class TreoLiteConn(args:List[TVar], conns:List[(String,List[TVar])])
+
 object TreoLite {
   /**
     * add In/Out fields to a connector, by trying to infer its type.

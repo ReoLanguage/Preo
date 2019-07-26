@@ -1,6 +1,7 @@
 package preo.ast
 
 import preo.ast
+import preo.frontend.TreoLiteConn
 
 sealed abstract class CoreConnector {
   // helpers for the DSL
@@ -26,6 +27,9 @@ case class CId(i:CoreInterface) extends CoreConnector
 case class CSymmetry(i:CoreInterface,j:CoreInterface) extends CoreConnector
 case class CTrace(i:CoreInterface,c:CoreConnector) extends CoreConnector
 case class CPrim(name:String,i:CoreInterface,j:CoreInterface,extra:Set[Any]=Set()) extends CoreConnector
+//// ADDING TREO HERE!!
+case class Treo(treo:TreoLiteConn) extends CoreConnector
+
 
 case class CSubConnector(name:String, c:CoreConnector, annotation: List[Annotation]) extends CoreConnector
 
