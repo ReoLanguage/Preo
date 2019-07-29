@@ -103,7 +103,7 @@ trait Parser extends RegexParsers {
   /** Top rule - already performs some semantic analysis (TreoLite.expand)
     * to replace primitives denoting Treo definitions by ther Preo counterparts. */
   def preo: Parser[Connector] =
-    prog ^^ {p => TreoLite.expand(p,inferPrim,"dupl")}
+    prog ^^ {p => TreoLite.treoASTToTreo(p,inferPrim,"dupl")}
 
   def prog: Parser[Connector] =
     opt(annotate)~connP~opt("{"~>whereP<~"}")  ^^ {

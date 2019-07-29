@@ -16,7 +16,8 @@ object Show {
     case Id(x)          => s"Id(${apply(x)})"
     case Symmetry(i, j) => s"sym(${apply(i)},${apply(j)})"
     case Trace(i, c)    => s"loop(${apply(i)})(${show(c,isShort)})"
-    case Prim(name,_,_,_) => name
+    case Prim(name,_,_,a) => name
+       //+(if(a.nonEmpty) a.mkString("[",",","]") else "")
     case Exp(a, c)  => s"${showP(c,isShort)}^${showP(a)}"
     case ExpX(x, a, c)  => s"${showP(c,isShort)}^{${apply(x:IExpr)}<--${apply(a)}}"
     case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1,isShort)} ⊕ ${showP(c2,isShort)}"

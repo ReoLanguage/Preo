@@ -4,13 +4,20 @@ import preo.DSL
 import preo.ast._
 import preo.common.{GenerationException, TypeCheckException}
 
+// TreoLite maps [IO arguments] to [CoreConnectors with IO arguments]
 case class TreoLite(args:List[TVar],conns:List[TConn])
 case class TVar(name:String,isIn:Boolean) {def isOut: Boolean = !isIn}
 case class TConn(cc:CoreConnector,args:List[TVar])
 
 // before type inference
+// TreoLiteAST maps [IO Arguments] to [[names or connectors] with port names]
 case class TreoLiteAST(args:List[TVar],conns:List[TConnAST])
-case class TConnAST(name:Either[String,Connector],args:List[String])
+case class TConnAST(name:Either[String,Connector],args:List[String]) {
+  def getName:String = name match {
+    case Left(value) => value
+    case Right(value) => Show(value)
+  }
+}
 
 // New notion of TreoLite - Work in Progress!
 case class TreoLiteConn(args:List[TVar], conns:List[(String,List[TVar])])
@@ -22,14 +29,27 @@ object TreoLite {
     * @param inferPrim function that infers the type of te primitive name
     * @return updated Treo connector with typed arguments
     */
-  def inferTypes(c:TConnAST,inferPrim:String=>Connector): TConn = {
-    val preoConn: Connector = c.name.fold(inferPrim,(x:Connector)=>x) // either(inferPr,id) c.name
+  def inferTypes(c:TConnAST, inferPrim:String=>Connector, scope:TreoASTs, split:String): TConn = {
+    def inferPrim2(s:String): Connector = {
+      //println(s"inferring type of $s in scope ${scope}")
+      val res = scope.get(s) match {
+        case Some((in, out)) => Prim(s, Port(IVal(in)), Port(IVal(out)))
+        case _ => inferPrim(s)
+      }
+      //println(s" got $res")
+      res
+    }
+    //println("getting preoConn")
+    val preoConn1: Connector = c.name.fold(inferPrim2,(x:Connector)=>x) // either(inferPr,id) c.name
+    //println(s"got1: ${Show(preoConn1)}")
+    val (preoConn,_) = expandTreoAST(preoConn1,scope,inferPrim,split)
+    //println(s"got2: ${Show(preoConn)}")
     // TODO: changing here
     preo.DSL.unsafeTypeOf(preoConn) match {
       case (Type(args, Port(IVal(i)),Port(IVal(j)),BVal(true),_),BVal(true)) if args.vars.isEmpty =>
         if (c.args.size != i+j)
 //          fail(s"${c.name} has ${c.args.size} arguments, but found ${i+j}.")
-          throw new TypeCheckException(s"${c.name} has ${c.args.size} arguments, but found ${i+j}.")
+          throw new TypeCheckException(s"${c.getName} has ${c.args.size} arguments, but expected ${i+j}.")
         else
           TConn(Eval.unsafeReduce(preoConn), // must work with given type
                 c.args.zipWithIndex.map(pair => TVar(pair._1,pair._2 < i)))
@@ -39,8 +59,36 @@ object TreoLite {
     }
   }
 
-  private def inferTypes(c:TreoLiteAST,inferPrim:String=>Connector): TreoLite =
-    TreoLite(c.args,c.conns.map(inferTypes(_,inferPrim)))
+  private def inferTypes(c:TreoLiteAST, inferPrim:String=>Connector,
+                         scope:TreoASTs, split:String): TreoLite =
+    TreoLite(c.args,c.conns.map(inferTypes(_,inferPrim,scope,split)))
+
+  /**
+    * Unfolds a TreoLiteConn (also a CoreConnector) into a CoreConnector without TreoLiteConn
+    * @param c CoreConnector with possible treoLiteConns
+    * @param split Split operator - dupl or xor usually
+    * @return CoreConnector with no TreoLiteConns
+    */
+  def unfoldTreoLiteConn(c:CoreConnector, split: String): CoreConnector = c match {
+    case CTreo(treo) =>
+      def insOuts(as:List[TVar]) = as.partition(_.isIn)
+      val treolite = TreoLite(treo.args,treo.conns.map(c => {
+        val (in,out) = insOuts(c._2)
+        TConn(CPrim(c._1, CoreInterface(in.size), CoreInterface(out.size)), c._2)
+      }))
+      unfoldTreoLiteConn(treo2preo(treolite, split),split)
+
+    case CSeq(c1, c2) => CSeq(unfoldTreoLiteConn(c1,split),unfoldTreoLiteConn(c2,split))
+    case CPar(c1, c2) => CPar(unfoldTreoLiteConn(c1,split),unfoldTreoLiteConn(c2,split))
+    case CId(i) => c
+    case CSymmetry(i, j) => c
+    case CTrace(i, c2) => CTrace(i,unfoldTreoLiteConn(c2,split))
+    case CPrim(name, i, j, extra) => c
+    case CSubConnector(name, c2, ann) => CSubConnector(name,unfoldTreoLiteConn(c2,split),ann)
+  }
+
+
+
 
   /**
     * Converts a [[TreoLite]] into a [[CoreConnector]].
@@ -107,7 +155,6 @@ object TreoLite {
     * Generates a matrix of connectors to be applied, including mergers, dupls, ids, noSrc, and noSnk.
     * @param from starting point
     * @param to ending point
-    * @param acc transformations made so far
     * @return list of transformations until the "to" is reached
     */
   private def buildPath(from: List[String], to: List[String])
@@ -200,29 +247,127 @@ object TreoLite {
 
   /////////////////
 
-  def expand(conn: Connector,infer: String=>Connector, split: String): Connector = conn match {
-    case Prim(name, i, j, trs) => trs.toList match {
-      case List(tr:TreoLiteAST) =>
-        val treo = inferTypes(tr,infer)
-        treo2preo(treo,split).toConnector
-      case _ => conn
+  def expandTreoAST(conn:Connector,scope:TreoASTs, infer: String=>Connector,
+                    split: String): (Connector,TreoASTs) = {
+    //println(s"expanding ${Show(conn)}")
+    conn match {
+      case Prim(name, i, j, trs) => trs.toList match {
+        case List(tr:TreoLiteAST) =>
+          //println(s"found treoAST $name")
+          val (ins,outs) = tr.args.partition(_.isIn)
+          val toScope = name -> (ins.size,outs.size)
+          //println(s" - new scope = ${scope+toScope}")
+          val treo = inferTypes(tr, infer, scope, split) // get TreoLite
+          //println(s" - new treo: ${treo}")
+          expandTreoAST(treo2preo(treo, split).toConnector,
+            scope+toScope, infer, split)
+
+        case _ =>
+          //println(s"found another prim: ${Show(conn)}")
+          (conn,scope)
+      }
+
+      case Seq(c1, c2) =>
+        val nc1 = expandTreoAST(c1,scope,infer,split)
+        val nc2 = expandTreoAST(c2,nc1._2,infer,split)
+        (Seq(nc1._1,nc2._1),nc2._2)
+      case Par(c1, c2) =>
+        val nc1 = expandTreoAST(c1,scope,infer,split)
+        val nc2 = expandTreoAST(c2,nc1._2,infer,split)
+        (Par(nc1._1,nc2._1),nc2._2)
+      case Choice(b, c1, c2) =>
+        val nc1 = expandTreoAST(c1,scope,infer,split)
+        val nc2 = expandTreoAST(c2,nc1._2,infer,split)
+        (Choice(b,nc1._1,nc2._1),nc2._2)
+      case Exp(a, c) =>
+        val nc = expandTreoAST(c,scope,infer,split)
+        (Exp(a,nc._1),nc._2)
+      case ExpX(x, a, c) =>
+        val nc = expandTreoAST(c,scope,infer,split)
+        (ExpX(x,a,nc._1),nc._2)
+      case Abs(x, et, c) =>
+        val nc = expandTreoAST(c,scope,infer,split)
+        (Abs(x,et,nc._1),nc._2)
+      case App(c, a) =>
+        val nc = expandTreoAST(c,scope,infer,split)
+        (App(nc._1,a),nc._2)
+      case Restr(c, phi) =>
+        val nc = expandTreoAST(c,scope,infer,split)
+        (Restr(nc._1,phi),nc._2)
+      case Trace(i, c) =>
+        val nc = expandTreoAST(c,scope,infer,split)
+        (Trace(i,nc._1),nc._2)
+
+      case SubConnector(name, c1, annotations) =>
+        val nc = expandTreoAST(c1,scope,infer,split)
+        (SubConnector(name,nc._1,annotations),nc._2)
+      case _ => (conn,scope)
     }
-    case Seq(c1, c2) => Seq(expand(c1,infer,split),expand(c2,infer,split))
-    case Par(c1, c2) => Par(expand(c1,infer,split),expand(c2,infer,split))
-    case Trace(i, c) => Trace(i,expand(c,infer,split))
-
-    case SubConnector(name, c1, anns) => SubConnector(name,expand(c1,infer,split),anns)
-
-    case Exp(a,c) => Exp(a,expand(c,infer,split))
-    case ExpX(x,a,c) => ExpX(x,a,expand(c,infer,split))
-    case Choice(b,c1,c2) => Choice(b,expand(c1,infer,split),expand(c2,infer,split))
-    case Abs(x,et,c) => Abs(x,et,expand(c,infer,split))
-    case App(c,a) => App(expand(c,infer,split),a)
-
-    case Restr(c,phi) => Restr(expand(c,infer,split),phi)
-
-    case _ => conn
   }
+
+
+
+
+//  def collectTreoAST(conn:Connector,past:List[String]): TreoASTsOld =
+//    conn match {
+//      case Prim(name, i, j, trs) => trs.toList match {
+//        case List(tr:TreoLiteAST) =>
+//          val (ins,outs) = tr.args.partition(_.isIn)
+//          Map((name::past) -> (ins.size,outs.size))
+//        case _ => Map()
+//      }
+//
+//      case SubConnector(name, c1, annotations) =>
+//        collectTreoAST(c1,name::past)
+//
+//      case Id(i) => Map()
+//      case Symmetry(i, j) => Map()
+//      case Seq(c1, c2) => collectTreoAST(c1,past)++collectTreoAST(c2,past)
+//      case Par(c1, c2) => collectTreoAST(c1,past)++collectTreoAST(c2,past)
+//      case Trace(i, c) => collectTreoAST(c,past)
+//      case Exp(a, c) => collectTreoAST(c,past)
+//      case ExpX(x, a, c) => collectTreoAST(c,past)
+//      case Choice(b, c1, c2) => collectTreoAST(c1,past)++collectTreoAST(c2,past)
+//      case Abs(x, et, c) => collectTreoAST(c,past)
+//      case App(c, a) => collectTreoAST(c,past)
+//      case Restr(c, phi) => collectTreoAST(c,past)
+//    }
+
+
+  type TreoASTs = Map[String,(Int,Int)]
+//  type TreoASTsOld = Map[List[String],(Int,Int)]
+
+  def treoASTToTreo(conn: Connector, infer: String=>Connector, split: String): Connector = {
+    //treoASTToTreo(conn,collectTreoAST(conn,Nil),infer,split,Nil)
+    expandTreoAST(conn,Map(),infer,split)._1
+  }
+
+
+//  def treoASTToTreo(conn: Connector, treos:TreoASTsOld,
+//                    infer: String=>Connector, split: String, past:List[String]): Connector =
+//    conn match {
+//      case Prim(name, i, j, trs) => trs.toList match {
+//        case List(tr: TreoLiteAST) =>
+//          val treo = inferTypes(tr, treos, infer, past)
+//          treo2preo(treo, split).toConnector
+//        case _ => conn
+//      }
+//      case Seq(c1, c2) => Seq(treoASTToTreo(c1, infer, split), treoASTToTreo(c2, infer, split))
+//      case Par(c1, c2) => Par(treoASTToTreo(c1, infer, split), treoASTToTreo(c2, infer, split))
+//      case Trace(i, c) => Trace(i, treoASTToTreo(c, infer, split))
+//
+//      case SubConnector(name, c1, anns) => SubConnector(name, treoASTToTreo(c1, infer, split), anns)
+//
+//      case Exp(a, c) => Exp(a, treoASTToTreo(c, infer, split))
+//      case ExpX(x, a, c) => ExpX(x, a, treoASTToTreo(c, infer, split))
+//      case Choice(b, c1, c2) => Choice(b, treoASTToTreo(c1, infer, split), treoASTToTreo(c2, infer, split))
+//      case Abs(x, et, c) => Abs(x, et, treoASTToTreo(c, infer, split))
+//      case App(c, a) => App(treoASTToTreo(c, infer, split), a)
+//
+//      case Restr(c, phi) => Restr(treoASTToTreo(c, infer, split), phi)
+//
+//      case _ => conn
+//    }
 
 
 
