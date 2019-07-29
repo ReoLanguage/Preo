@@ -179,6 +179,7 @@ class Substitution(private val items:List[Item], private val isGeneral:Boolean =
     }
     case App(c, a)     => App(subst(it,c),subst(it,a))
     case Restr(c, phi) => Restr(subst(it,c),substB(it,phi))
+    case Treo(t) =>  Treo(t.map(c=>subst(it,c)))
   }
 
   /**

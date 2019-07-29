@@ -2,7 +2,7 @@ package preo.ast
 
 import preo.DSL
 import preo.common.TypeCheckException
-import preo.frontend.Show
+import preo.frontend.{Show, TreoLiteConn}
 
 sealed abstract class Connector {
   // helpers for the DSL
@@ -32,6 +32,7 @@ case class Id(i:Interface) extends Connector
 case class Symmetry(i:Interface,j:Interface) extends Connector
 case class Trace(i:Interface,c:Connector) extends Connector
 case class Prim(name:String,i:Interface,j:Interface,extra:Set[Any]=Set()) extends Connector
+case class Treo(treo:TreoLiteConn) extends Connector
 
 case class SubConnector(name:String, c1:Connector, annotations: List[Annotation]) extends Connector
 

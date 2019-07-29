@@ -1,6 +1,6 @@
 package preo.ast
 
-import preo.frontend.Show
+import preo.frontend.{Show, TVar}
 
 /**
   * Created by jose on 26/05/15.
@@ -27,7 +27,7 @@ case class Type(args:Arguments, i:Interface, j:Interface, const:BExpr, isGeneral
  *
  * @param vars pars of variables (name,type).
  */
-case class Arguments(vars:List[(Var,ExprType)]) {
+case class Arguments(vars:List[(Var,ExprType)]) { //, treos:Map[String,List[TVar]]) {
   def ++(that:Arguments): Arguments = Arguments(vars ::: that.vars)
   def +(that:Var,exprType: ExprType) = Arguments((that,exprType) :: vars)
   def disjoint(that:Arguments): Boolean = {
@@ -36,12 +36,15 @@ case class Arguments(vars:List[(Var,ExprType)]) {
     true
   }
 
-  override def toString: String = vars.map(x=>x._1.x+":"+x._2).mkString(",")
+  override def toString: String = vars.map(x=>x._1.x+":"+x._2)
+//    .:::(treos.map(kv=>kv._1+":"+kv._2.mkString(" ")).toList)
+    .mkString(",")
 }
 
 // empty constructure for arguments
 object Arguments{
   def apply():Arguments = Arguments(List())
+  //def apply(vars:List[(Var,ExprType)]):Arguments = Arguments(vars,Map())
 }
 
 

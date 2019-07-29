@@ -109,6 +109,8 @@ object Utils {
     case Prim(_,i,j,_) => freeVars(i) ++ freeVars(j)
     case Symmetry(i,j) => freeVars(i) ++ freeVars(j)
     case Id(i) => freeVars(i)
+    case Treo(t) => t.conns.flatMap(kv =>
+      kv._1.fold[Set[Var]](_=>Set(),usedVars)).toSet
   }
 
   /**

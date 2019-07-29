@@ -15,7 +15,7 @@ object ParserUtils {
       case Right(result) =>
         try {
           val reduced: Connector = Eval.instantiate(result)
-          Right(Eval.reduce(reduced))
+          Right(DSL.unfoldTreo(Eval.reduce(reduced),"dupl"))
         } catch {
           case e: TypeCheckException =>
             Left("Type error: " + e.getMessage)

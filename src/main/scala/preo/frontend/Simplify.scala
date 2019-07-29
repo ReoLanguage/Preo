@@ -411,6 +411,10 @@ object Simplify {
       case (c2,And(List())) => c2
       case (c2,phi2) => Restr(c,phi2)
     }
+
+    case Treo(t) =>  Treo(TreoLiteConn(t.args, t.conns.map(kv =>(
+      kv._1.map(c=>simplifyWithTypeChk(c,tcheck)),kv._2))))
+
   }
 
 

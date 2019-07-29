@@ -511,6 +511,16 @@ object DSL {
     */
   def unsafeReduce(c:Connector):CoreConnector = Eval.unsafeReduce(c)
 
+  /**
+    * Replaces all occurences of treo blocks by a corresponding
+    * CoreConnector in Preo that has no Treo references.
+    * @param c core connector to be unfolded
+    * @param split name of the splitting function (usually xor or dupl)
+    * @return a new CoreConnector with no Treo blocks
+    */
+  def unfoldTreo(c:CoreConnector,split:String) =
+    TreoLite.treo2preo(c,split)
+
 //  def stepwiseTyping(c:Connector,typing: Connector => (Type,BExpr),ctx: List[Var]): (Type,BExpr) = c match {
 //    case Seq(c1, c2) =>
 //      stepwiseTyping(c1,typing,ctx) // try to type c1

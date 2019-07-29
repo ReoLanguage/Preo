@@ -13,12 +13,8 @@ object TypeCheck {
   private class Context {
     private type Ctx = Map[String,ExprType]
     protected val vars: Ctx = Map()
-//    protected val ints: Set[String]  = Set()
-//    protected val bools: Set[String] = Set()
     private def build(i:Set[String],b:Set[String]) = new Context {
       override val vars: Ctx = i.map(_->IntType).toMap ++ b.map(_->BoolType).toMap
-//      override val bools = b
-//      override val conns = c
     }
 
     /** checks if a variable is in the context. */
@@ -55,12 +51,6 @@ object TypeCheck {
 
     override def toString: String =
       vars.map(et=>et._1+":"+Show(et._2)).mkString("[",",","]")
-//      "["+bools.map(_+":Bool").mkString(",") +
-//        (if (bools.nonEmpty) ",") +
-//         ints.map(_+":Int").mkString(",") +
-//        (if (conns.nonEmpty) ",") +
-//        conns.map(_+":Conn").mkString(",") +
-//    "]"
   }
 
 
@@ -75,7 +65,10 @@ object TypeCheck {
    */
   def check(con:Connector): Type = {
     seed = 0
-    check(new Context,con)
+    //print(s"typing ${Show(con)}")
+    val res = check(new Context,con)
+    //println(s": ${Show(res)}")
+    res
   }
 
   private def nonNeg(e:IExpr): BExpr = e >= IVal(0)
@@ -161,7 +154,17 @@ object TypeCheck {
       check(gamma,phi,BoolType)
       val Type(args,i,j,psi,isG) = check(gamma,c)
       Type(args,i,j,psi & phi,isG)
+
+    case Treo(t@TreoLiteConn(args,conns)) =>
+      val (in,out) = args.partition(_.isIn)
+//      t.map((c:Connector)=>{check(gamma,c);c})
+      var const: BExpr = BVal(true)
+      conns.foreach(c => const = const & check(gamma,c))
+      Type(Arguments(),Port(IVal(in.size)),Port(IVal(out.size)),BVal(true),true)
   }
+
+
+
 
   def isIExpr(gamma:Context,a:Expr): Boolean = a match {
     case Var(x) => gamma(Var(x))
@@ -169,6 +172,26 @@ object TypeCheck {
     case _: BExpr => false
   }
 
+
+  def check(gamma: TypeCheck.Context, use: TreoLite.TConnUse): BExpr = {
+    use._1 match {
+      case Left(name) =>
+        throw new TypeCheckException(s"unexpectedly typing $name(${use._2.mkString(",")})")
+      case Right(conn) =>
+        val t = check(gamma,conn)
+        t.const
+//        check(gamma,conn) match {
+//          case Type(_,Port(IVal(i)),Port(IVal(j)),_,isGen) =>
+//            val (in,out) = use._2.partition(_.isIn)
+//            if (i != in.size || j != out.size)
+//              throw new TypeCheckException(s"Wrong argument type of ${Show(conn)}(${use._2.mkString(",")}). " +
+//                s" Inferred $i->$j but found ${in.size}->${out.size}")
+//          case t =>
+//            throw new TypeCheckException(s"Unexpected type of connector used in Treo: ${
+//              Show(conn)}: ${Show(t)}")
+//        }
+    }
+  }
 
   private def isInt(e:Expr,t:ExprType): Unit =
     if (t!=IntType) throw new TypeCheckException(s"${Show(e)} is not type Int")

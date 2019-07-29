@@ -252,7 +252,8 @@ object Eval {
     * @param c connector to be reduced
     * @return reduced connector
     */
-  def reduce(c: Connector): CoreConnector = conn2CoreConn(Simplify(instantiate(c)),reduce)
+  def reduce(c: Connector): CoreConnector =
+    conn2CoreConn(Simplify(instantiate(c)),reduce)
 
   def simpleReduce(c: Connector): CoreConnector = conn2CoreConn(Simplify(c), reduce)
 
@@ -276,6 +277,8 @@ object Eval {
     case Trace(i, c) => CTrace(reduce(i), red(c))
     case Prim(name, i, j, extra) => CPrim(name, reduce(i), reduce(j), extra)
     case SubConnector(name, sub, a) => CSubConnector(name, red(sub), a)
+    case Treo(treo) => CTreo(TreoLiteCConn(treo.args,treo.conns.map(use =>
+      use._1.map(conn2CoreConn(_,red)) -> use._2)))
     case c2 => throw new TypeCheckException("Failed to reduce connector " + Show(c2))
   }
 

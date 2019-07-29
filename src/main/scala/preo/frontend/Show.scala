@@ -17,7 +17,7 @@ object Show {
     case Symmetry(i, j) => s"sym(${apply(i)},${apply(j)})"
     case Trace(i, c)    => s"loop(${apply(i)})(${show(c,isShort)})"
     case Prim(name,_,_,a) => name
-       //+(if(a.nonEmpty) a.mkString("[",",","]") else "")
+       //.+(if(a.nonEmpty) a.mkString("[",",","]") else "")
     case Exp(a, c)  => s"${showP(c,isShort)}^${showP(a)}"
     case ExpX(x, a, c)  => s"${showP(c,isShort)}^{${apply(x:IExpr)}<--${apply(a)}}"
     case Choice(b, c1, c2) => s"${showP(b)} ? ${showP(c1,isShort)} ⊕ ${showP(c2,isShort)}"
@@ -28,6 +28,7 @@ object Show {
     case Restr(c,b)     => s"${showP(c,isShort)} | ${showP(b)}"
     case SubConnector(name, c, a) if  isShort => if (name=="") showP(c,isShort) else name
     case SubConnector(name, c, a) if !isShort => (if (name=="") "" else name) + show(a) + s"{${show(c,isShort)}}"
+    case Treo(TreoLiteConn(args,conns)) => s"[${args.mkString(",")}]=>${conns.map{show(_,isShort)}.mkString("  ")}"
   }
 
   private def showP(con:Connector,isShort:Boolean): String = con match {
@@ -36,6 +37,8 @@ object Show {
 
     case _ => show(con,isShort)
   }
+  private def show(c:TreoLite.TConnUse,isShort:Boolean): String =
+    c._1.fold(s=>s"'$s'",show(_,isShort))+c._2.mkString("(",",",")")
   private def show(as:List[Annotation]): String = {
     if (as.isEmpty) "" else as.map(a=>a.name+(if (a.value.isDefined) s":${Show(a.value.get)}" else "")).mkString("[",",","]")
   }
@@ -156,6 +159,9 @@ object Show {
     case Restr(c,b)     => s"${showSP(c)} | ${showP(b)}"
 
     case SubConnector(name, c, _) => if (name=="") showSP(c) else name + s"{${showSP(c)}}"
+
+    case Treo(t) => s"(${t.args.map(f=>f.name+(if(f.isIn)"?" else "!")).mkString(",")}) = "+
+      s"${t.conns.map(f => f._1.fold(s=>s, showSP)).mkString("  ")}"
   }
 
   private def showSP(con:Connector): String = con match {
