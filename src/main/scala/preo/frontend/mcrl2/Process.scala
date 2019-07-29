@@ -33,7 +33,7 @@ case class Channel(name:String = "Channel", number: Option[Int], in: List[Action
 
   //should not be used when it has no number
   override def toString: String =
-    s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1+":"+p._2).mkString("(",",",")") else ""}"+
+    s"$name${if(number.isDefined) number.get else ""}${if (params.nonEmpty) params.map(p => p._1+":"+p._2).mkString("(",",",")") else ""} "+
 //      s"${getName} " +
       s"= (${expression.toString}) . ${getNameWithActualParam}" //$name${if(number.isDefined) number.get else ""}"
 
