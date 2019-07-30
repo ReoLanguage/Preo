@@ -518,7 +518,7 @@ object DSL {
     * @param split name of the splitting function (usually xor or dupl)
     * @return a new CoreConnector with no Treo blocks
     */
-  def unfoldTreo(c:CoreConnector,split:String) =
+  def unfoldTreo(c:CoreConnector,split:String = "dupl") =
     TreoLite.treo2preo(c,split)
 
 //  def stepwiseTyping(c:Connector,typing: Connector => (Type,BExpr),ctx: List[Var]): (Type,BExpr) = c match {
