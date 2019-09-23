@@ -206,9 +206,12 @@ object Circuit {
           mirrors += seed -> o
         }
         for (ext <- extra) ext match {
-          case ("ports",ports:Set[Int]) =>
+          case ("ports",ports:Set[_]) =>
             //println(s"adding mirrors ${ports.mkString(".")}->$seed")
-            for (p <- ports) mirrors += seed -> p
+            for (pr <- ports) pr match {
+              case p:Int => mirrors += seed -> p
+              case _ =>
+            }
           case _ =>
 
         }
