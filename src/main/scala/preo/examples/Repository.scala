@@ -59,6 +59,8 @@ object Repository {
     Tr(n, sym(n-1,1) & ((fifofull & dupl) * ((fifo & dupl)^(n-1))) & unzip(n) ) ) &
     (zip(n) & (drain^n)))
 
+  val eventSequencer = lam(n,Tr(n, sym(n-1,1) & ((eventFull & dupl) * ((event & dupl)^(n-1))) & unzip(n) ))
+
   /** n-ary duplicator */
   val dupls = lam (n, Tr(n-1,(id * (dupl^(n-1))) & sym(1,(n-1)*2)))
   def duplsGen(d:Connector): Connector =

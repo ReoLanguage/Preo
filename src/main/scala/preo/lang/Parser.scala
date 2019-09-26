@@ -1,8 +1,10 @@
 package preo.lang
 
+import preo.DSL
 import preo.DSL._
 import preo.ast._
 import preo.examples.Repository
+import preo.examples.Repository.unzip
 import preo.frontend._
 
 import scala.util.matching.Regex
@@ -242,7 +244,43 @@ trait Parser extends RegexParsers {
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
     "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to:"+ival.n))} |
+    "task"~"("~ taskParam ~")" ^^ {case _~_~ps~_ =>SubConnector("Task",ps,List(Annotation("hide",None)))}|
     primitiveName
+
+//  def taskParams: Parser[Connector] =
+//    taskParam ~ rep(","~> taskParams) ^^ {case p~ps => )/*ps.foldLeft(p)(_*_)*/}
+
+//  def makeSequencerTask(cons:List[(String,String)]):Connector = {
+//    val sequencer:Connector = Repository.eventSequencer(cons.size)
+//    sequencer & (cons.map(c=>mkConFromOut(c)))
+//  }
+
+//  def mkConFromOut(c: (String, String)):Connector = c match {
+//    case ("NW","!") => Prim("nbtimer",1,1,Set("to:"+0))
+//    case ("NW","?") => (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
+//    case ("W","?") => (id * dupl) & (drain * id)
+//    case ("W","!") => id
+//    case (n,"!") if n.matches("""[0-9]+""") => Prim("nbtimer",1,1,Set("to:"+n.toInt))
+//    case (n,">") if n.matches("""[0-9]+""") => (Prim("nbtimer",1,1,Set("to:"+n.toInt)) * id) & drain
+//  }
+
+  def taskParam: Parser[Connector] =
+    "NW"~ "\\?|\\!".r ^^ {
+      case _~"!" => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+0))
+      case _~"?" => (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) &
+          (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
+    } |
+    "W"~ "\\?|\\!".r ^^ {
+      case _~"!" => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) // Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & fifo
+      case _~"?" => /*fifo & */ Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
+    } |
+    intVal~"\\?|\\!".r ^^ {
+      case ival~"!" => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+ival.n))
+      case ival~"?" => (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) &
+        (Prim("nbtimer",1,1,Set("to:"+ival.n)) * id) & drain
+    }
+
+
 
   ////////////////
   // expression //

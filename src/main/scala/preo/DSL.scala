@@ -97,7 +97,8 @@ object DSL {
   val drain = Prim("drain",2,0)
   val noSrc = Prim("noSrc",1,0)
   val noSnk = Prim("noSnk",0,1)
-
+  val event = Prim("event",1,1)
+  val eventFull = Prim("eventFull",1,1)
   // included for the demo at FACS'15
   val x:I="x"; val y:I="y"; val z:I="z"; val n:I="n"; val b:B="b"; val c:B="c"
 
