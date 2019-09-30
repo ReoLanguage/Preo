@@ -97,8 +97,17 @@ object DSL {
   val drain = Prim("drain",2,0)
   val noSrc = Prim("noSrc",1,0)
   val noSnk = Prim("noSnk",0,1)
+  // hubs
   val event = Prim("event",1,1)
   val eventFull = Prim("eventFull",1,1)
+  // tasks channels
+  val nwput = Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+0))
+  val nwget = (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
+  val wput = Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component"))
+  val wget = Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
+  val toput = (to:Int) => {Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+to))}
+  val toget = (to:Int) => {(Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+to)) * id) & drain}
+
   // included for the demo at FACS'15
   val x:I="x"; val y:I="y"; val z:I="z"; val n:I="n"; val b:B="b"; val c:B="c"
 

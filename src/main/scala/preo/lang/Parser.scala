@@ -111,7 +111,7 @@ trait Parser extends RegexParsers {
     opt(annotate)~connP~opt("{"~>whereP<~"}")  ^^ {
       case Some(annotation) ~ co ~ Some(p) => SubConnector("", p(co), annotation)
       case Some(annotation) ~co ~ None     => SubConnector("", co, annotation)
-      case None~ co ~ Some(p) => p(co)
+      case None~ co ~ Some(p) =>  p(co)
       case None~ co ~ None    => co
     }
 
@@ -152,6 +152,12 @@ trait Parser extends RegexParsers {
       case a~inout => TVar(a,inout=="?")}
   def trConns: Parser[List[TConnAST]] = rep(trExpr)
   def trExpr: Parser[TConnAST] =
+    "task"~"<"~identifier~">"~"("~taskTreoParams~")" ^^ {
+      case _~_~name~_~_~ps~_ =>
+        val args = ps.map(p=> p._2)
+        val conn = ps.map(p=>p._1)
+        TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None)))),args)
+    }|
     identifier~"("~opt(trArgs)~")" ^^ {
       case name~_~args~_ => TConnAST(Left(name),args.getOrElse(Nil))
     }
@@ -159,6 +165,15 @@ trait Parser extends RegexParsers {
     identifier~rep(","~>identifier) ^^ {
       case name~more => name :: more
     }
+
+  def taskTreoParams:Parser[List[(Connector,String)]] =
+    taskTreoParam ~ rep("," ~> taskTreoParam) ^^ { case p~ps => p::ps}
+
+  def taskTreoParam:Parser[(Connector,String)] =
+    "NW"~ identifier ~ "\\?|\\!".r ^^ { case _~name~inout => if (inout =="!") (nwput,name) else (nwget,name)} |
+    "W"~ identifier ~ "\\?|\\!".r ^^ { case _~name~inout => if (inout =="!") (wput,name) else (wget,name)} |
+    intVal~identifier~"\\?|\\!".r ^^ { case to~name~inout => if (inout =="!") (toput(to.n),name) else (toget(to.n),name)}
+
 
   ///////////////
   // Connector //
@@ -244,11 +259,11 @@ trait Parser extends RegexParsers {
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
     "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to:"+ival.n))} |
-    "task"~"("~ taskParam ~")" ^^ {case _~_~ps~_ =>SubConnector("Task",ps,List(Annotation("hide",None)))}|
+    "task"~"("~ taskParams ~")" ^^ {case _~_~ps~_ =>SubConnector("Task",ps,List(Annotation("hide",None)))}|
     primitiveName
 
-//  def taskParams: Parser[Connector] =
-//    taskParam ~ rep(","~> taskParams) ^^ {case p~ps => )/*ps.foldLeft(p)(_*_)*/}
+  def taskParams: Parser[Connector] =
+    taskParam ~ rep(","~> taskParams) ^^ {case p~ps => ps.foldLeft(p)(_*_)}
 
 //  def makeSequencerTask(cons:List[(String,String)]):Connector = {
 //    val sequencer:Connector = Repository.eventSequencer(cons.size)
@@ -265,20 +280,9 @@ trait Parser extends RegexParsers {
 //  }
 
   def taskParam: Parser[Connector] =
-    "NW"~ "\\?|\\!".r ^^ {
-      case _~"!" => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+0))
-      case _~"?" => (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) &
-          (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
-    } |
-    "W"~ "\\?|\\!".r ^^ {
-      case _~"!" => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) // Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & fifo
-      case _~"?" => /*fifo & */ Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
-    } |
-    intVal~"\\?|\\!".r ^^ {
-      case ival~"!" => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+ival.n))
-      case ival~"?" => (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) &
-        (Prim("nbtimer",1,1,Set("to:"+ival.n)) * id) & drain
-    }
+    "NW" ~ "\\?|\\!".r   ^^ { case _~inout => if (inout =="!") nwput else nwget} |
+    "W" ~ "\\?|\\!".r    ^^ { case _~inout => if (inout =="!") wput else wget} |
+    intVal ~ "\\?|\\!".r ^^ { case to~inout => if (inout =="!") toput(to.n) else toget(to.n)}
 
 
 
