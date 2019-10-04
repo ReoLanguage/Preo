@@ -101,12 +101,14 @@ object DSL {
   val event = Prim("event",1,1)
   val eventFull = Prim("eventFull",1,1)
   // tasks channels
-  val nwput = Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+0))
-  val nwget = (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
-  val wput = Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component"))
+  val nwput = (v:Option[Int]) => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component",if (v.isDefined) "writes:"+v.get else "")) & Prim("nbtimer",1,1,Set("to:"+0))
+  val wput = (v:Option[Int]) => Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component",if (v.isDefined) "writes:"+v.get else ""))
+  val toput = (to:Int,v:Option[Int]) => {Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component",if (v.isDefined) "writes:"+v.get else "")) & Prim("nbtimer",1,1,Set("to:"+to))}
+//  val nwget = (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
+  val nwget = Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","to:"+0))
   val wget = Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component"))
-  val toput = (to:Int) => {Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) & Prim("nbtimer",1,1,Set("to:"+to))}
-  val toget = (to:Int) => {(Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+to)) * id) & drain}
+  val toget = (to:Int) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","to:"+to))
+//  val toget = (to:Int) => {(Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+to)) * id) & drain}
 
   // included for the demo at FACS'15
   val x:I="x"; val y:I="y"; val z:I="z"; val n:I="n"; val b:B="b"; val c:B="c"
