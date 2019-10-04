@@ -1,7 +1,7 @@
 package preo.backend
 
 import preo.ast.CPrim
-import preo.backend.PortAutomata.Trans
+import preo.backend.PortAutomata.{Port, State, Trans}
 import preo.backend.Network.Prim
 import preo.common.{GenerationException, TimeoutException, TypeCheckException}
 import preo.frontend.Show
@@ -14,43 +14,46 @@ import preo.frontend.Show
   * @param trans Transitions - Relation between input and output states, with associated
   *              sets of actions and of edges (as in [[Network.Prim]]).
   */
-case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
+case class PortAutomata(ports:Set[Port],init:Int,trans:Trans)
   extends Automata {
 
   /** Collects all states, seen as integers */
-  override def getStates: Set[Int] = (for((x,(y,_,_)) <- trans) yield Set(x,y)).flatten + init
+  override def getStates: Set[State] = (for((x,(y,_,_,_)) <- trans) yield Set(x,y)).flatten + init
   // states: ints, transitions: maps from states to (new state,ports fired, primitives involved)
 
   /** Returns the initial state */
-  override def getInit: Int = init
+  override def getInit: State = init
 
   /** Returns the transitions to be displayed */
   override def getTrans(fullName:Boolean = false): Automata.Trans =
-    for ((from, (to, fire, es)) <- trans)
+    for ((from, (to, fire, es, anim)) <- trans)
       yield (
           from
         , es.map(getName(_,fire))
             .filterNot(s => s=="sync" || s=="sync↓" || s=="sync↑" || s=="sync↕")
             .foldRight[Set[String]](Set())(cleanDir)
-            .mkString(".") +"§"+
+            .mkString(".") +
+          //"~"+anim.mkString(" ")+ // TODO: uncomment to share animation
+          "§"+
           fire.mkString("§")
+//          fire.map(_.toString+"§").mkString + anim
         , (fire,es).hashCode().toString
         , to)
 
-  private def getName2(edge: Prim, fire:Set[Int]):String =
+  private def getName2(edge: Prim, fire:Set[Port]):String =
     s"${edge.prim.name}-${edge.prim.extra}-${edge.parents.mkString("/")}-${fire.mkString(":")}"
 
-  private def getName3(edge: Prim, fire:Set[Int]):String = {
+  private def getName3(edge: Prim, fire:Set[Port]):String = {
     getName(edge,fire)+"~"+(edge.ins:::edge.outs).toSet.mkString("~")
   }
-  private def getName(edge: Prim, fire:Set[Int]):String = (edge.parents match {
+  private def getName(edge: Prim, fire:Set[Port]):String = (edge.parents match {
     case Nil     => primName(edge.prim)
     case ""::_   => primName(edge.prim)
     case head::_ => head
   }) + getDir(edge,fire) //+
   //  s"[${edge.ins.toSet.intersect(fire).mkString("|")}->${edge.outs.toSet.intersect(fire).mkString("|")}]"
   //  fire.mkString("|")
-  private def getDir(edge: Prim, fire:Set[Int]): String = {
+  private def getDir(edge: Prim, fire:Set[Port]): String = {
     val src = (edge.ins.toSet intersect fire).nonEmpty
     val snk = (edge.outs.toSet intersect fire).nonEmpty
     (src,snk) match {
@@ -89,7 +92,7 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
       val next = missing.head
       missing = missing.tail
       done += next
-      for (t@(from, (to, _, _)) <- trans if from == next) {
+      for (t@(from, (to, _, _,_)) <- trans if from == next) {
         ntrans += t
         if (!(done contains to)) missing += to
       }
@@ -111,7 +114,26 @@ case class PortAutomata(ports:Set[Int],init:Int,trans:Trans)
 
 object PortAutomata {
 
-  type Trans = Set[(Int,(Int,Set[Int],Set[Prim]))]
+  type Trans = Set[(State,(State,Set[Port],Set[Prim],Animation))]
+  type Port = Int
+  type State = Int
+
+  case class Loc(p:Port*) {
+    override def toString: String = p.mkString(".")
+  }
+  sealed abstract class AnimStep {
+    override def toString: String = this match {
+      case Move(from, to) => from+">"+to
+      case Dupl(at) => at+"*2"
+      case Del(at) => at+"*0"
+      case Create(at) => at+"!"
+    }
+  }
+  case class Move(from:Loc,to:Loc) extends AnimStep
+  case class Dupl(at:Loc) extends AnimStep
+  case class Del(at:Loc) extends AnimStep
+  case class Create(at:Loc) extends AnimStep
+  type Animation = List[AnimStep]
 
   /** How to build basic Port automata */
   implicit object PortAutomataBuilder extends AutomataBuilder[PortAutomata] {
@@ -125,27 +147,35 @@ object PortAutomata {
       */
     def buildAutomata(e: Prim, seed: Int): (PortAutomata, Int) = e match {
       case Prim(CPrim("sync", _, _, _), List(a), List(b),_) =>
-        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e), List(Move(Loc(a),Loc(b)))))), seed + 1)
       case Prim(CPrim("id", _, _, _), List(a), List(b),_) =>
-        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e), List(Move(Loc(a),Loc(b)))))), seed + 1)
       case Prim(CPrim("lossy", _, _, _), List(a), List(b),_) =>
-        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)), seed -> (seed, Set(a), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e), List(Move(Loc(a),Loc(a,b)))),
+                                           seed -> (seed, Set(a), Set(e), List(Move(Loc(a),Loc(a,b)),Del(Loc(a,b)))))), seed + 1)
       case Prim(CPrim("fifo", _, _, _), List(a), List(b),_) =>
-        (PortAutomata(Set(a, b), seed - 1, Set(seed - 1 -> (seed, Set(a), Set(e)), seed -> (seed - 1, Set(b), Set(e)))), seed + 2)
+        (PortAutomata(Set(a, b), seed - 1, Set(seed - 1 -> (seed, Set(a), Set(e), List(Move(Loc(a),Loc(a,b)),Del(Loc(a,b)))),
+                                               seed -> (seed - 1, Set(b), Set(e), List(Create(Loc(a,b)),Move(Loc(a,b),Loc(a)))))), seed + 2)
       case Prim(CPrim("fifofull", _, _, _), List(a), List(b),_) =>
-        (PortAutomata(Set(a, b), seed, Set(seed - 1 -> (seed, Set(a), Set(e)), seed -> (seed - 1, Set(b), Set(e)))), seed + 2)
+        (PortAutomata(Set(a, b), seed, Set(seed - 1 -> (seed, Set(a), Set(e),List(Create(Loc(a,b)),Move(Loc(a,b),Loc(a)))),
+                                           seed -> (seed - 1, Set(b), Set(e),List(Move(Loc(a),Loc(a,b)),Del(Loc(a,b)))) )), seed + 2)
       case Prim(CPrim("drain", _, _, _), List(a, b), List(),_) =>
-        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e),
+             List(Move(Loc(a),Loc(a,b)),Move(Loc(b),Loc(a,b)),Del(Loc(a,b)),Del(Loc(a,b)))))), seed + 1)
       // deprecated - using nodes instead
       case Prim(CPrim("merger", _, _, _), List(a, b), List(c),_) =>
-        (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, c), Set(e)), seed -> (seed, Set(b, c), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, c), Set(e),
+             List(Move(Loc(a),Loc(c)))), seed -> (seed, Set(b, c), Set(e), List(Move(Loc(b),Loc(c)))))), seed + 1)
       // deprecated - using nodes instead
       case Prim(CPrim("dupl", _, _, _), List(a), List(b, c),_) =>
-        (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, b, c), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b, c), seed, Set(seed -> (seed, Set(a, b, c), Set(e),
+             List(Dupl(Loc(a)),Move(Loc(a),Loc(b)),Move(Loc(a),Loc(c)))))), seed + 1)
       case Prim(CPrim("writer", _, _, _), List(), List(a),_) =>
-        (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
+        (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e),
+             List(Create(Loc(a)))))), seed + 1)
       case Prim(CPrim("reader", _, _, _), List(a), List(),_) =>
-        (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e)))), seed + 1)
+        (PortAutomata(Set(a), seed, Set(seed -> (seed, Set(a), Set(e),
+             List(Del(Loc(a)))))), seed + 1)
       case Prim(CPrim("noSnk", _, _, _), List(), List(a),_) =>
         (PortAutomata(Set(a), seed, Set()), seed + 1)
       case Prim(CPrim("noSrc", _, _, _), List(a), List(),_) =>
@@ -154,25 +184,29 @@ object PortAutomata {
         throw new GenerationException(s"Connector with time to be interpreted only as an IFTA instance")
       // unknown name with type 1->1 -- behave as identity
       case Prim(CPrim(name, _, _, _), List(a), List(b),_) =>
-        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e)))), seed + 1)
+        (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e),
+             List(Move(Loc(a),Loc(b)))))), seed + 1)
 
       // variable connectors only ment for ifta
       case Prim(CPrim("node",_,_,extra), _, _, _) if extra.intersect(Set("vdupl","vmrg","vxor")).nonEmpty =>
         throw new GenerationException(s"Connector with variable parts ${extra.mkString(",")}, to be interpreted only as an IFTA instance")
       // new version uses nodes instead of dupl/merger
       case Prim(CPrim("node",_,_,extra), ins, outs, _) if extra contains "dupl" =>
-        val i = ins.toSet
-        val o = outs.toSet
-        (PortAutomata(i ++ o, seed
-          , for (xi <- i) yield
-            seed -> (seed, o+xi, Set(e)))
+        val is = ins.toSet
+        val os = outs.toSet
+        (PortAutomata(is ++ os, seed
+          , for (i <- is) yield
+            seed -> (seed, os+i, Set(e),
+              (for (_<-1 until os.size) yield Dupl(Loc(i))).toList ++
+              (for (o<-os) yield Move(Loc(i),Loc(o))).toList))
           , seed + 1)
       case Prim(CPrim("node",_,_,extra), ins, outs, _)  => // xor node - only for virtuoso so far...
         val i = ins.toSet
         val o = outs.toSet
         (PortAutomata(i ++ o, seed
           , for (xi <- i; xo <- o) yield
-            seed -> (seed, Set(xi,xo), Set(e)))
+            seed -> (seed, Set(xi,xo), Set(e),
+              List(Move(Loc(xi),Loc(xo)))))
           , seed + 1)
 
 
@@ -197,7 +231,7 @@ object PortAutomata {
       var seed = 0
       var steps = timeout
       val shared = a1.ports.intersect(a2.ports)
-      var restrans = Set[(Int,(Int,Set[Int],Set[Prim]))]()
+      var restrans = Set[(Int,(Int,Set[Int],Set[Prim],Animation))]()
       var newStates = Map[(Int,Int),Int]()
       def mkState(i1:Int,i2:Int) = if (newStates.contains((i1,i2)))
         newStates((i1,i2))
@@ -221,17 +255,17 @@ object PortAutomata {
       }
 
       // just 1
-      for ((from1,(to1,fire1,es1)) <- a1.trans; p2 <- a2.getStates)
+      for ((from1,(to1,fire1,es1,anim1)) <- a1.trans; p2 <- a2.getStates)
         if (ok(fire1))
-          restrans += mkState(from1,p2) -> (mkState(to1,p2),fire1,es1)
+          restrans += mkState(from1,p2) -> (mkState(to1,p2),fire1,es1,anim1)
       // just 2
-      for ((from2,(to2,fire2,es2)) <- a2.trans; p1 <- a1.getStates)
+      for ((from2,(to2,fire2,es2,anim2)) <- a2.trans; p1 <- a1.getStates)
         if (ok(fire2))
-          restrans += mkState(p1,from2) -> (mkState(p1,to2),fire2,es2)
+          restrans += mkState(p1,from2) -> (mkState(p1,to2),fire2,es2,anim2)
       // communication
-      for ((from1,(to1,fire1,es1)) <- a1.trans; (from2,(to2,fire2,es2)) <- a2.trans) {
+      for ((from1,(to1,fire1,es1,anim1)) <- a1.trans; (from2,(to2,fire2,es2,anim2)) <- a2.trans) {
         if (ok2(fire1,fire2))
-          restrans += mkState(from1,from2) -> (mkState(to1,to2),fire1++fire2,es1++es2)
+          restrans += mkState(from1,from2) -> (mkState(to1,to2),fire1++fire2,es1++es2, anim1++anim2)
       }
       // println(s"ports: $newStates")
       val res1 = PortAutomata(a1.ports++a2.ports,mkState(a1.init,a2.init),restrans)
