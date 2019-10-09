@@ -1,6 +1,6 @@
 package preo.backend
 
-import hub.DSL
+//import hub.DSL
 import preo.ast.CoreConnector
 import preo.backend.Network.{Mirrors, Port}
 
@@ -274,17 +274,18 @@ object Circuit {
   }
 
 
-//  private val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port",
-//    "eventFull","dataEventFull","fifoFull","blackboardFull")
+  private val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port",
+    "eventFull","dataEventFull","fifoFull","blackboardFull")
   private def isAHub(n:String): Boolean = {
 //    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
-    DSL.hubs.contains(n)
+//    DSL.hubs.contains(n)
+      hubs.contains(n)
   }
 
   /** checks if any of the given name is from a hub. */
   private def isAHub(set: Set[Any]):Boolean = {
     var res = false
-    for (h <- DSL.hubs ) res = res || set.contains(h)
+    for (h <- hubs ) res = res || set.contains(h)
     res
   }
 
