@@ -1,5 +1,6 @@
 package preo.backend
 
+//import hub.DSL
 import preo.ast.CoreConnector
 import preo.backend.Network.{Mirrors, Port}
 
@@ -279,7 +280,8 @@ object Circuit {
     "eventFull","dataEventFull","fifoFull","blackboardFull")
   private def isAHub(n:String): Boolean = {
 //    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
-    hubs.contains(n)
+//    DSL.hubs.contains(n)
+      hubs.contains(n)
   }
 
   /** checks if any of the given name is from a hub. */
@@ -292,6 +294,7 @@ object Circuit {
 
   // todo: fix drains
   private def toVirtuoso(g:Network): Circuit = {
+    println(g)
     var seed:Int = (0::(g.ins ++ g.outs ++ g.prims.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
@@ -299,6 +302,24 @@ object Circuit {
 
     var remap: Map[Int,Set[Int]] = Map()
     var nodeEdges: Map[Int,(List[Int],List[Int])] = Map()
+
+    var edgeNames:Map[Int,String] = Map()
+    var inSeed:Int = 0
+    var outSeed:Int = 0
+
+    def mkEdgeName(port:Int,in:Boolean):String =
+      if (edgeNames.contains(port)) edgeNames(port)
+      else if (in) {
+        edgeNames += (port -> s"in$inSeed?")
+        inSeed += 1
+        s"in${inSeed - 1}?"
+      } else {
+        edgeNames += (port -> s"out$outSeed!")
+        outSeed += 1
+        s"out${outSeed - 1}!"
+      }
+
+
 //    def mkPort(i:Int): Int = remap.getOrElse(i,i)
     // update the "nodes" set
     /**
@@ -338,11 +359,11 @@ object Circuit {
         seed += 1
         addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
         for (i <- e.ins) {
-          edges ::= ReoChannel(i, seed, NoArrow, inArrow, "", Set()) // extras are in the main node
+          edges ::= ReoChannel(i, seed, NoArrow, inArrow, "" /*mkEdgeName(i,true)*/, Set()) // extras are in the main node
           addNode(i, None, Source, Set(),Set(i))
         }
         for (o <- e.outs) {
-          edges ::= ReoChannel(seed, o, NoArrow, ArrowOut, "", Set()) // extras are in the main node
+          edges ::= ReoChannel(seed, o, NoArrow, ArrowOut, ""/*mkEdgeName(o,false)*/, Set()) // extras are in the main node
           addNode(o, None, Sink, Set(),Set(o))
         }
       } else
@@ -387,15 +408,50 @@ object Circuit {
       }
     }
 
-    var g1 = changeDrains(remapGraph(Circuit(edges,nodes.toList),remap,nodeEdges,seed))
-    addBorderSyncs(g1,remap,nodeEdges)
+    val g1 = changeDrains(remapGraph(Circuit(edges,nodes.toList),remap,nodeEdges))
+//    println("After changing drains:\n"+g1)
+    val g2 = expandCollidingChannels(g1,seed)
+//    println("After expanding colliding channels:\n"+g2)
+    val g3 = addBorderSyncs(g2,remap,nodeEdges)
+//    println("After adding border syncs:\n"+g3)
+    g3
   }
 
-  private def remapGraph(g:Circuit, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])], currentSeed:Int):Circuit = {
+  private def expandCollidingChannels(g:Circuit, currentSeed:Int):Circuit = {
     var seed = currentSeed
-    var newEdges = Set[ReoChannel]()
+    var newEdges = List[ReoChannel]()
+    var newNodes = List[ReoNode]()
+
+    val collide = g.edges.groupBy(e=> if (e.src<=e.trg) (e.src,e.trg) else (e.trg,e.src))
+      .toList
+      .filter(p=>p._2.size>1)
+      .map(_._1)
+
+    var portsOf:Map[(Int,Int),Set[Port]]=
+      collide.map(p=> p-> g.nodes.find(n=> n.id==p._1).get.ports.intersect(g.nodes.find(n=>n.id==p._2).get.ports)).toMap
+
+    for( e <- g.edges) {
+      if (collide.contains(if (e.src<=e.trg) (e.src,e.trg) else (e.trg,e.src))) {
+        newEdges ::= ReoChannel(e.src, seed + 1, e.srcType, e.trgType, if (e.srcType == NoArrow) e.name else "", e.extra)
+        newEdges ::= ReoChannel(seed + 1, e.trg, e.srcType, e.trgType, if (e.srcType == NoArrow) "" else e.name, e.extra)
+        var portsOfNode:Set[Port] = portsOf.getOrElse(if (e.src<=e.trg) (e.src,e.trg) else (e.trg,e.src),Set())
+        val port:Set[Port] = if (portsOfNode.nonEmpty) Set(portsOfNode.head) else Set()
+        portsOf+= (if (e.src<=e.trg) (e.src,e.trg) else (e.trg,e.src))->(portsOfNode--port)
+        newNodes::= ReoNode(seed+1,None,Mixed,Set(),port)
+        seed += 1
+      } else newEdges::=e
+    }
+    Circuit(newEdges,g.nodes++newNodes)
+  }
+
+  private def remapGraph(g:Circuit, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])]):Circuit = {
+    var newEdges = List[ReoChannel]()
     var newNodes = List[ReoNode]()
     var nodesToRm = Set[Int]()
+    var linksAdded = Set[Int]()
+    var edgesFromNode:List[ReoChannel]= List()
+//    var linksWithNodes:Set[Int]=Set()
+//    var linksToExpand:Map[Int,Int]=Map()
 
 
     // remap edges to correspnding nodes
@@ -406,56 +462,68 @@ object Circuit {
         var nt = if (remap.contains(trg)) {nodesToRm ++= Set(trg); remap(trg).head} else trg
         // remap.head should always be one in this case
         ReoChannel(ns, nt,sT,tT,name,extra)
-    }).toSet
+    })
 
-    // add extra links between dupl/xor/mrg nodes and hubs (don't merge two nodes into one) //todo box and commponent
-    for (n <- g.nodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra) || n.extra.contains("component") || n.extra.contains("box") )) {
+    // add extra links between dupl/xor/mrg nodes and hubs (don't merge two nodes into one)
+    for (n <- g.nodes; if n.extra.intersect(Set("xor","dupl","mrg","component","box")).nonEmpty || isAHub(n.extra)) {
+//      linksWithNodes = Set()
+      edgesFromNode = List()
+//      linksToExpand = Map()
       val (ins, outs) = nodeEdges.getOrElse(n.id,(List(),List()))
-      for (i <- ins ) {
+      for (i <- ins if !linksAdded.contains(i)) {
+        linksAdded+=i
         if (remap.contains(i) && remap(i).size >1){ // is mixed
           var src = (remap(i) - n.id).head
-          newEdges += ReoChannel(src,n.id, NoArrow,ArrowOut,"",Set())//n.extra)
-        } //else //if (remap.contains(i) ) { //has one only
-//          newEdges::= ReoChannel(i,n.id, NoArrow,ArrowOut,"",n.extra)
-        //}
+//          newEdges ::= ReoChannel(src,n.id, NoArrow,ArrowOut,"",Set())//n.extra)
+          edgesFromNode::= ReoChannel(src,n.id, NoArrow,ArrowOut,"",Set())//n.extra)
+//          if (linksWithNodes.contains(src)) linksToExpand+=src->i
+//          linksWithNodes+=src
+        }
       }
-      for (o <- outs) {
+      for (o <- outs; if !linksAdded.contains(o)) {
+        linksAdded+=o
         if (remap.contains(o) && remap(o).size >1){ // is mixed
           var trg = (remap(o) - n.id).head
-          newEdges += ReoChannel(n.id,trg, NoArrow,ArrowOut,"",Set())//n.extra)
-        } //else if (remap.contains(o)) {
-        //}
+//          newEdges ::= ReoChannel(n.id,trg, NoArrow,ArrowOut,"",Set())//n.extra)
+          edgesFromNode::=ReoChannel(n.id,trg, NoArrow,ArrowOut,"",Set())//n.extra)
+//          if (linksWithNodes.contains(trg)) linksToExpand+=trg->o
+//          linksWithNodes+=trg
+        }
       }
-      //}
+//      if (linksToExpand.isEmpty)
+//        newEdges++=edgesFromNode
+//      else {
+//        for( e <- edgesFromNode) {
+//          if (linksToExpand.contains(e.src)|| linksToExpand.contains(e.trg)) {
+//            newEdges ::= ReoChannel(e.src, seed + 1, e.srcType, e.trgType, if(e.srcType==NoArrow) e.name else "", e.extra)
+//            newEdges ::= ReoChannel(seed + 1, e.trg, e.srcType, e.trgType, if (e.srcType==NoArrow) "" else e.name, e.extra)
+//            var ports:Set[Int] =
+//              if (e.srcType==NoArrow && linksToExpand.isDefinedAt(e.src))
+//                Set(linksToExpand(e.src))
+//              else if (linksToExpand.isDefinedAt(e.trg)) {
+//               Set(linksToExpand(e.trg))
+//              } else Set()
+//            newNodes::= ReoNode(seed+1,None,Mixed,Set(),ports)
+//            seed += 1
+//          } else newEdges::=e
+//        }
+      newEdges++=edgesFromNode
+//      }
     }
     // remove unused nodes
-    newNodes = g.nodes.filterNot(n => nodesToRm.contains(n.id))
+    newNodes = g.nodes.filterNot(n => nodesToRm.contains(n.id))++newNodes
 
-    //add border syncs to xor, dupl, mrg
-//    for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
-//      var currentIns = newEdges.filter(e => e.outputs.contains(n.id))
-//      var currentOuts = newEdges.filter(e => e.inputs.contains(n.id))
-//      if (n.extra.contains("xor") || n.extra.contains("dupl")) {
-//
-//      }
-//      for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
-//        seed += 1
-//        newEdges += ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
-//        newNodes ::= ReoNode(seed, None, Source, Set())
-//      }
-//      for ( missing <- 1 to (nodeEdges(n.id)._2.size) - (currentOuts.size)){
-//        seed += 1
-//        newEdges += ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
-//        newNodes ::= ReoNode(seed, None, Sink, Set())
-//      }
-//    }
-    Circuit(newEdges.toList,newNodes)
+    // for nodes with more than one channel in between them, add extra mix node, e.g. dupl;merger to avoid collading channels
+
+    val res = Circuit(newEdges,newNodes)
+//    println("afterremap:"+res)
+    res
   }
 
   private def changeDrains(g:Circuit):Circuit = {
     var drains = g.edges.filter(e => e.name == "drain")
-    var newNodes = g.nodes.toSet
-    var newEdges = g.edges.toSet //Set[ReoChannel]()
+    var newNodes = g.nodes
+    var newEdges = g.edges //Set[ReoChannel]()
     //todo: fix writers when connected to drains
 
     var seed:Int = (Set(0) ++ g.nodes.map(_.id) ++ g.edges.flatMap(e => e.inputs ++ e.outputs)).max
@@ -463,30 +531,30 @@ object Circuit {
     for (d <- drains) d match {
       case c@ReoChannel(src, trg, srcType, trgType, name, extra) if (src == trg) =>
         seed += 3
-        newNodes += ReoNode(seed-2, None, Mixed, Set("hidden"),Set(src)) //hiden1
-        newNodes += ReoNode(seed-1, None, Mixed, Set("hidden"),Set(src)) //hiden 2
-        newNodes += ReoNode(seed, None, Mixed, Set("drain"),Set(src)) //hiden 2
-        newEdges += ReoChannel(src,seed-2,NoArrow,NoArrow,"",Set()) // src to h1
-        newEdges += ReoChannel(src,seed-1,NoArrow,NoArrow,"",Set()) // src to h2
-        newEdges += ReoChannel(seed-2,seed,NoArrow,ArrowOut,"",Set()) // h1 to drain
-        newEdges += ReoChannel(seed-1,seed,NoArrow,ArrowOut,"",Set()) // h2 to drain
+        newNodes ::= ReoNode(seed-2, None, Mixed, Set("hidden"),Set(src)) //hiden1
+        newNodes ::= ReoNode(seed-1, None, Mixed, Set("hidden"),Set(src)) //hiden 2
+        newNodes ::= ReoNode(seed, None, Mixed, Set("drain"),Set(src)) //hiden 2
+        newEdges ::= ReoChannel(src,seed-2,NoArrow,NoArrow,"",Set()) // src to h1
+        newEdges ::= ReoChannel(src,seed-1,NoArrow,NoArrow,"",Set()) // src to h2
+        newEdges ::= ReoChannel(seed-2,seed,NoArrow,ArrowOut,"",Set()) // h1 to drain
+        newEdges ::= ReoChannel(seed-1,seed,NoArrow,ArrowOut,"",Set()) // h2 to drain
         // remove drain channel
-        newEdges -= c
+        newEdges = newEdges.filterNot(ch=> ch==c)
       case c@ReoChannel(src, trg, srcType, trgType, name, extra) if (src != trg) =>
         seed += 1
-        newEdges += ReoChannel(src,seed,NoArrow,ArrowOut,name,Set()) // src to drain
-        newEdges += ReoChannel(trg,seed,NoArrow,ArrowOut,name,Set()) // trg to drain
-        newNodes += ReoNode(seed, None, Mixed, Set("drain"),Set(src,trg)) //hiden 2
+        newEdges ::= ReoChannel(src,seed,NoArrow,ArrowOut,name,Set()) // src to drain
+        newEdges ::= ReoChannel(trg,seed,NoArrow,ArrowOut,name,Set()) // trg to drain
+        newNodes ::= ReoNode(seed, None, Mixed, Set("drain"),Set(src,trg)) //hiden 2
         // remove drain channel
-        newEdges -= c
+        newEdges = newEdges.filterNot(ch=>ch==c)
     }
-    Circuit(newEdges.toList,newNodes.toList)
+    Circuit(newEdges,newNodes)
     //g
   }
 
   private def addBorderSyncs(g:Circuit, remap:Map[Int,Set[Int]], nodeEdges:Map[Int,(List[Int],List[Int])]):Circuit = {
     var newNodes = g.nodes
-    var newEdges = g.edges.toSet
+    var newEdges = g.edges
     var seed:Int = (Set(0) ++ g.nodes.map(_.id) ++ g.edges.flatMap(e => e.inputs ++ e.outputs)).max
      //add border syncs to xor, dupl, mrg
     for (n <- newNodes; if (n.extra.contains("xor") || n.extra.contains("dupl") || n.extra.contains("mrg") || isAHub(n.extra))) {
@@ -497,16 +565,16 @@ object Circuit {
 //      }
       for (missing <- 1 to (nodeEdges(n.id)._1.size - currentIns.size)){
         seed += 1
-        newEdges += ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
+        newEdges ::= ReoChannel(seed, n.id, NoArrow, ArrowOut, "", Set())
         newNodes ::= ReoNode(seed, None, Source, Set(),Set(n.id)) // todo: find correct port
       }
       for ( missing <- 1 to (nodeEdges(n.id)._2.size) - (currentOuts.size)){
         seed += 1
-        newEdges += ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
+        newEdges ::= ReoChannel(n.id, seed, NoArrow, ArrowOut, "", Set())
         newNodes ::= ReoNode(seed, None, Sink, Set(),Set(n.id)) // todo: find correct port
       }
     }
-    Circuit(newEdges.toList,newNodes)
+    Circuit(newEdges,newNodes)
   }
 
 }
