@@ -207,7 +207,7 @@ object Network {
     * @param g Network to be extended
     * @return new network
     */
-  private def addRedundancy(g:Network,ms:Mirrors): Network = {
+  def addRedundancy(g:Network,ms:Mirrors): Network = {
     //println("Mirrors after traversal: "+ms)
     val g2  = fixLoops(g,ms)
     //println("ReoGraph after loops: "+g2+s"\nmirrors: $ms")

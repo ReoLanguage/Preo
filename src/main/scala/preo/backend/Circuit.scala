@@ -94,6 +94,8 @@ object Circuit {
   }
 
   def apply(g:Network, mirrors: Mirrors): Circuit = {
+    //println(s"- about to draw Net - $g")
+
     var seed:Int = (0::(g.ins ++ g.outs ++ g.prims.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
