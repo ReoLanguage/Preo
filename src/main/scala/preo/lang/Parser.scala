@@ -156,7 +156,7 @@ trait Parser extends RegexParsers {
       case _~_~name~_~_~ps~_ =>
         val args = ps.map(p=> p._2)
         val conn = ps.map(p=>p._1)
-        TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None)))),args)
+        TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None),Annotation("task",None)))),args)
     }|
     identifier~"("~opt(trArgs)~")" ^^ {
       case name~_~args~_ => TConnAST(Left(name),args.getOrElse(Nil))
@@ -175,14 +175,14 @@ trait Parser extends RegexParsers {
 
   def taskTreoParam:Parser[(Connector,String)] =
     syncmode ~ identifier ~ "?" ^^ {
-      case Left(m)~name~_   => (if (m =="W") wget else nwget,name)
-      case Right(to)~name~_ => (toget(to.n),name)
+      case Left(m)~name~_   => (if (m =="W") wget(Some(name)) else nwget(Some(name)),name)
+      case Right(to)~name~_ => (toget(to.n,Some(name)),name)
     } |
     syncmode ~ identifier ~ "!" ~ opt("="~>intVal) ^^ {
-      case Left(m)~name~_~Some(intval)    => (if (m =="W") wput(Some(intval.n)) else nwput(Some(intval.n)),name)
-      case Left(m)~name~_~None            => (if (m =="W") wput(None) else nwput(None),name)
-      case Right(to)~name~_~Some(intval)  => (toput(to.n,Some(intval.n)),name)
-      case Right(to)~name~_~None          => (toput(to.n,None),name)
+      case Left(m)~name~_~Some(intval)    => (if (m =="W") wput(Some(intval.n),Some(name)) else nwput(Some(intval.n),Some(name)),name)
+      case Left(m)~name~_~None            => (if (m =="W") wput(None,Some(name)) else nwput(None,Some(name)),name)
+      case Right(to)~name~_~Some(intval)  => (toput(to.n,Some(intval.n),Some(name)),name)
+      case Right(to)~name~_~None          => (toput(to.n,None,Some(name)),name)
     }
 
 
@@ -292,14 +292,14 @@ trait Parser extends RegexParsers {
 
   def taskParam: Parser[Connector] =
     syncmode ~ "?" ^^ {
-      case Left(m)~_   => if (m =="W") wget else nwget
-      case Right(to)~_ => toget(to.n)
+      case Left(m)~_   => if (m =="W") wget(None) else nwget(None)
+      case Right(to)~_ => toget(to.n,None)
     } |
     syncmode ~ "!" ~ opt("="~>intVal) ^^ {
-      case Left(m)~_~Some(intval)   => if (m =="W") wput(Some(intval.n)) else nwput(Some(intval.n))
-      case Left(m)~_~None           => if (m =="W") wput(None) else nwput(None)
-      case Right(to)~_~Some(intval) => toput(to.n,Some(intval.n))
-      case Right(to)~_~None         => toput(to.n,None)
+      case Left(m)~_~Some(intval)   => if (m =="W") wput(Some(intval.n),None) else nwput(Some(intval.n),None)
+      case Left(m)~_~None           => if (m =="W") wput(None,None) else nwput(None,None)
+      case Right(to)~_~Some(intval) => toput(to.n,Some(intval.n),None)
+      case Right(to)~_~None         => toput(to.n,None,None)
     }
   //    "NW" ~ "\\?|\\!".r   ^^ { case _~inout => if (inout =="!") nwput else nwget} |
 //    "W" ~ "\\?|\\!".r    ^^ { case _~inout => if (inout =="!") wput else wget} |

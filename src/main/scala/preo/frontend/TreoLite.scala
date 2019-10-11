@@ -56,7 +56,10 @@ object TreoLite {
     * @return new connector with no TreoLiteAST references
     */
   def treoASTToTreo(conn: Connector, infer: String=>Connector): Connector = {
-    expandTreoAST(conn,Map(),infer)._1
+//    println("Connector, before applying treoAST2Treo:\n"+conn)
+    val res = expandTreoAST(conn,Map(),infer)._1
+//    println("Connector, after applying treoAST2Treo:\n"+res)
+    res
   }
 
   private def expandTreoAST(conn:Connector,scope:TreoASTs, infer: String=>Connector): (Connector,TreoASTs) = {
@@ -64,11 +67,11 @@ object TreoLite {
     val res = conn match {
       case Prim(name, i, j, trs) => trs.toList match {
         case List(tr:TreoLiteAST) =>
-          //println(s"found treoAST $name")
+//          println(s"found treoAST $name")
           val toScope = name -> tr.args
-          //println(s" - new scope = ${scope+toScope}")
+//          println(s" - new scope = ${scope+toScope}")
           val treo = inferTArgs(tr, infer, scope) // get TreoLiteConn
-          //println(s" - new treo: ${treo}")
+//          println(s" - new treo: ${treo}")
           expandTreoAST(Treo(treo),scope+toScope,infer)
         //          (Treo(treo),scope+toScope)
 
@@ -143,14 +146,22 @@ object TreoLite {
         s"${c.getName} has ${c.args.size} arguments, but expected ${c.args.size}.")
 
     def inferFromConn(conn: Connector): List[TVar] =
-      preo.DSL.unsafeTypeOf(expandTreoAST(conn,scope,inferPrim)._1) match {
-        case (Type(args, Port(IVal(i)), Port(IVal(j)), BVal(true), _), BVal(true))
-          if args.vars.isEmpty =>
-          updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
-        case _ =>
-          throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
-            s"But non concrete primitive found: ${Show(conn)}")
-      }
+        preo.DSL.unsafeTypeOf(expandTreoAST(conn, scope, inferPrim)._1) match {
+          case m@(Type(args, Port(IVal(i)), Port(IVal(j)), BVal(true), _), BVal(true))
+            if args.vars.isEmpty =>
+          /* to track all port names from treo to the Connector ------> */
+//            conn match {
+//              case SubConnector(n,c1,ann) if ann.exists(e=> e.name == "task") =>
+//              println("SubConnector type"+m._1)
+//              mkPortNames(conn,c.args)
+//              case _ => updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
+//            }
+          /* -----> to track all port names from treo to the Connector */
+            updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
+          case _ =>
+            throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
+              s"But non concrete primitive found: ${Show(conn)}")
+        }
 
     c.name match {
       case Left(name) => scope.get(name) match {
@@ -163,6 +174,68 @@ object TreoLite {
     }
   }
 
+//  /**
+//    * Given a connector that is actually a SubConnector with a task,
+//    * and given a list of arguments names to that connector/task
+//    * Creates a list of TVar, this is necesary because the order is not necesarally inputs then outputs
+//    * they can be mixed.
+//    * @param c
+//    * @param names
+//    * @return
+//    */
+//  private def mkPortNames(c:Connector,names:List[String]):List[TVar] = {
+//    c match {
+//      case SubConnector(name,c1,ann)=> mkPortNames(c1,names)
+//      case Prim(name,i,j,extra) =>
+//        val (ins,outs) = getInterfacePorts(c)
+//        val res = names.take(ins).map(n=>TVar(n,true))++names.drop(ins).take(outs).map(n=> TVar(n,false))
+//        res
+//      case Par(c1,c2) =>
+//        val (i1,o1) = getInterfacePorts(c1)
+//        mkPortNames(c1,names.take(i1+o1))++mkPortNames(c2,names.drop(i1+o1))
+//      case Seq(c1,c2) =>
+//        val (i1,o1) = getInterfacePorts(c1)
+//        mkPortNames(c1,names.take(i1))++mkPortNames(c2,names.drop(i1))
+//      case Trace(i,c2) => mkPortNames(c2,names)
+//      case conn => List()
+//    }
+//  }
+
+//  /**
+//    * Given a connector of any type, it returns the number of inputs and ouputs
+//    * @param c
+//    * @return
+//    */
+//  private def getInterfacePorts(c:Connector):(Int,Int) = c match {
+//    case SubConnector(name,c1,ann) => getInterfacePorts(c1)
+//    case Prim(n,i,j,e)=> preo.DSL.unsafeTypeOf(c) match {
+//      case (Type(args, Port(IVal(i)), Port(IVal(j)), BVal(true), _),BVal(true))
+//        if args.vars.isEmpty => (i,j)
+//      case _=> throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
+//        s"But non concrete primitive found: ${Show(c)}")
+//    }
+//    case Par(c1,c2) =>
+//      val (i1,o1) = getInterfacePorts(c1)
+//      val (i2,o2) = getInterfacePorts(c2)
+//      (i1+i2,o1+o2)
+//    case Seq(c1,c2)=>
+//      val (i1,o1) = getInterfacePorts(c1)
+//      val (i2,o2) = getInterfacePorts(c2)
+//      (i1,o2)
+//    case Id(i) => preo.DSL.unsafeTypeOf(c) match {
+//      case (Type(args, Port(IVal(i)), Port(IVal(j)), BVal(true), _),BVal(true))
+//        if args.vars.isEmpty => (i,j)
+//      case _=> throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
+//        s"But non concrete primitive found: ${Show(c)}")
+//    }
+//    case Symmetry(i,j) => preo.DSL.unsafeTypeOf(c) match {
+//      case (Type(args, Port(IVal(i1)), Port(IVal(j1)), BVal(true), _),BVal(true))
+//        if args.vars.isEmpty => (i1,j1)
+//      case _=> throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
+//        s"But non concrete primitive found: ${Show(c)}")
+//    }
+//    case Trace(i,c2) => getInterfacePorts(c2)
+//  }
 
   /////////////////////////////////////////////
   /// 2nd part: replacing TreoLiteCConn   /////
@@ -178,8 +251,10 @@ object TreoLite {
     */
   def treo2preo(c:CoreConnector, split: String): CoreConnector = c match {
     case CTreo(treo) =>
-      treo2preo(treo2preo(treo, split),split)
-
+//      println("connectore before removing treoliteconn:\n"+CTreo(treo))
+      val res = treo2preo(treo2preo(treo, split),split)
+//      println("connectore after removing treoliteconn:\n"+res)
+      res
     case CSeq(c1, c2) => CSeq(treo2preo(c1,split),treo2preo(c2,split))
     case CPar(c1, c2) => CPar(treo2preo(c1,split),treo2preo(c2,split))
     case CId(i) => c
@@ -190,7 +265,58 @@ object TreoLite {
   }
 
 
-
+//  /**
+//    * Given a core connector it returns the number of inputs and outputs
+//    * @param c
+//    * @return
+//    */
+//  def getInterfacePorts(c:CoreConnector):(Int,Int) = c match {
+//    case CSubConnector(name,c1,ann) => getInterfacePorts(c1)
+//    case CPrim(n,i,j,e)=> (i.ports,j.ports)
+//    case CPar(c1,c2) =>
+//      val (i1,o1) = getInterfacePorts(c1)
+//      val (i2,o2) = getInterfacePorts(c2)
+//      (i1+i2,o1+o2)
+//    case CSeq(c1,c2)=>
+//      val (i1,o1) = getInterfacePorts(c1)
+//      val (i2,o2) = getInterfacePorts(c2)
+//      (i1,o2)
+//    case CId(i) => (i.ports,0) //?
+//    case CSymmetry(i,j) => (i.ports,j.ports)
+//    case CTrace(i,c2) =>
+//      val (i2,o2) = getInterfacePorts(c2)
+//      (i.ports,o2) // ??
+//  }
+//
+//  /**
+//    * Given a core connector and a list of inputs and outputs tvars, it
+//    * returns the same core connector where each prim stores the name information
+//    * of its corresponding parameters.
+//    * To be used if it is desired to keep track of all ports names
+//    * @param c
+//    * @param names
+//    * @return
+//    */
+//  def mkPortNames(c:CoreConnector,names:(List[TVar],List[TVar])):CoreConnector = {
+////    println("ins:"+names._1)
+////    println("outs:"+names._2)
+//    c match {
+//      case CSubConnector(name,c,ann)=>CSubConnector(name,mkPortNames(c,names),ann)
+//      case CPrim(name,i,j,extra) =>
+////        println("bfore naming:"+c)
+//        val res = CPrim(name,i,j,extra++Set(names._1.take(i.ports)++names._2.take(j.ports)))
+////        println("after naming:"+res)
+//        res
+//      case CPar(c1,c2) =>
+//        val (i1,o1) = getInterfacePorts(c1)
+//        CPar(mkPortNames(c1,(names._1.take(i1),names._2.take(o1))),mkPortNames(c2,(names._1.drop(i1),names._2.drop(o1))))
+//      case CSeq(c1,c2) =>
+//        val (i1,o1) = getInterfacePorts(c1)
+//        CSeq(mkPortNames(c1,(names._1.take(i1),names._2)),mkPortNames(c2,(names._1.drop(i1),names._2)))
+//      case CTrace(i,c2) => CTrace(i,mkPortNames(c2,names))
+//      case conn => conn
+//    }
+//  }
 
   /**
     * Converts a [[TreoLiteCConn]] into a pure [[CoreConnector]].
@@ -210,8 +336,9 @@ object TreoLite {
     def getCC(x:TCConnUse) = x._1 match {
       case Left(name) =>
         val (ins,outs) = x._2.partition(_.isIn)
+//        mkPortNames(CPrim(name,CoreInterface(ins.size),CoreInterface(outs.size)),(ins,outs))
         CPrim(name,CoreInterface(ins.size),CoreInterface(outs.size))
-      case Right(conn) => conn
+      case Right(conn) => conn //mkPortNames(conn,x._2.partition(_.isIn))
     }
     // 1. build core in parallel
     val core = t.conns

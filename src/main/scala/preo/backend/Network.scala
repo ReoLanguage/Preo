@@ -1,7 +1,7 @@
 package preo.backend
 
 import preo.ast._
-import preo.frontend.Show
+import preo.frontend.{Show, TVar}
 import preo.common.TypeCheckException
 
 import scala.collection.mutable
@@ -137,8 +137,12 @@ object Network {
       val dummy = toGraph(sub,false) // generating everything, but using only the port names
       val (i,j) = (dummy.ins,dummy.outs)
       val allPorts = dummy.prims.flatMap(prim => prim.ins:::prim.outs).toSet
+//      val portNames = dummy.prims.flatMap(prim => prim.prim.extra.filter(e=> e.isInstanceOf[List[TVar]]))//.asInstanceOf[TVar]
+      var portNames1:List[String] = dummy.prims.flatMap(prim=> prim.prim.extra.filter(e=> e.isInstanceOf[String])).asInstanceOf[List[String]]
+      portNames1 = portNames1.filter(e=>e.startsWith("portName:")).map(e=>e.drop(9))
       val p = CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),
-                    Set("box",("ports",allPorts)))
+                   if(anns.exists(e=>e.name=="task")) Set("box","task",("ports",allPorts),/*portNames.asInstanceOf[List[List[TVar]]].flatten,*/portNames1)
+                   else Set("box",("ports",allPorts)))
       Network(List(Prim(p,i,j,Nil)),i,j)
 
 //      toGraph(CPrim(s"[$name]",preo.frontend.Eval.reduce(preo.frontend.Simplify(t.i)),preo.frontend.Eval.reduce(preo.frontend.Simplify(t.j))))
@@ -311,7 +315,7 @@ object Network {
     // 2nd is a port/sync/id
     case (Prim(CPrim(name1,ip1,op1,ex1),is1,os1,ps1)
          ,Prim(CPrim(name2,CoreInterface(1),CoreInterface(1),ex2),List(i2),List(o2),_))
-         if Set("sync","id","port").contains(name2) =>
+        if Set("sync","id","port").contains(name2) =>
       if (is1 contains o2) {
         ms += o2 -> i2
         Prim(CPrim(name1,ip1,op1,ex1++ex2),replace(is1,o2->i2),os1,ps1)
@@ -325,7 +329,10 @@ object Network {
          if Set("sync","id","port").contains(name) =>
       joinPrimtitives(e2,e1,ms)
     //
-    case _ => throw new RuntimeException(s"Failed to combine edges $e1 and $e2.")
+    case _ =>
+//      println("e1:\n"+e1)
+//      println("e2:\n"+e2)
+      throw new RuntimeException(s"Failed to combine edges $e1 and $e2.")
   }
 
   private def replace(ints: List[Int], mp: (Int, Int)): List[Int] =

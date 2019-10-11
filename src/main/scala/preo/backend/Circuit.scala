@@ -3,6 +3,7 @@ package preo.backend
 //import hub.DSL
 import preo.ast.CoreConnector
 import preo.backend.Network.{Mirrors, Port}
+import preo.frontend.TVar
 
 import scala.collection.mutable
 
@@ -294,7 +295,7 @@ object Circuit {
 
   // todo: fix drains
   private def toVirtuoso(g:Network): Circuit = {
-    println(g)
+    //println(g)
     var seed:Int = (0::(g.ins ++ g.outs ++ g.prims.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
@@ -358,12 +359,26 @@ object Circuit {
         val inArrow = if (isComp) ArrowOut else NoArrow
         seed += 1
         addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
-        for (i <- e.ins) {
-          edges ::= ReoChannel(i, seed, NoArrow, inArrow, "" /*mkEdgeName(i,true)*/, Set()) // extras are in the main node
+//        val names:Option[List[TVar]] = e.prim.extra.find(e=>e.isInstanceOf[List[TVar]]).asInstanceOf[Option[List[TVar]]]
+        val names1:Option[List[String]] = e.prim.extra.find(e=>e.isInstanceOf[List[String]]).asInstanceOf[Option[List[String]]]
+        var ins:List[(Port,String)] = List()
+        var outs:List[(Port,String)] = List()
+//        if (names.isDefined && names.get.nonEmpty && extra.contains("task")) {
+        if (names1.isDefined && names1.get.nonEmpty && extra.contains("task")) {
+//          ins = e.ins.zip(names.get.filter(v=> v.isIn).map(_.name))
+//          outs = e.outs.zip(names.get.filter(v=> v.isOut).map(_.name))
+            ins = e.ins.zip(names1.get.filter(v=> v.endsWith("?")))
+            outs = e.outs.zip(names1.get.filter(v=> v.endsWith("!")))
+        } else {
+          ins = e.ins.map(i=> (i,""))
+          outs = e.outs.map(o=>(o,""))
+        }
+        for ((i,n) <- ins) {
+          edges ::= ReoChannel(i, seed, NoArrow, inArrow, n /*mkEdgeName(i,true)*/, Set()) // extras are in the main node
           addNode(i, None, Source, Set(),Set(i))
         }
-        for (o <- e.outs) {
-          edges ::= ReoChannel(seed, o, NoArrow, ArrowOut, ""/*mkEdgeName(o,false)*/, Set()) // extras are in the main node
+        for ((o,n) <- outs) {
+          edges ::= ReoChannel(seed, o, NoArrow, ArrowOut, n/*mkEdgeName(o,false)*/, Set()) // extras are in the main node
           addNode(o, None, Sink, Set(),Set(o))
         }
       } else
