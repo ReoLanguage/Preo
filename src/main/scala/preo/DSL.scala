@@ -103,16 +103,16 @@ object DSL {
   // tasks channels
   val nwput = (v:Option[Int],n:Option[String]) =>
     Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:NW "+n.get+"!" else "")) & Prim("nbtimer",1,1,Set("to:"+0))
+      Set("component","T",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:NW "+n.get+"!" else "")) & Prim("nbtimer",1,1,Set("to:"+0))
   val wput = (v:Option[Int],n:Option[String]) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:W "+n.get+"!" else ""))
+    Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component","T",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:W "+n.get+"!" else ""))
   val toput = (to:Int,v:Option[Int],n:Option[String]) =>
     Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","TO",if (v.isDefined) "writes:"+v.get else "")) & Prim("nbtimer",1,1,Set("to:"+to,if(n.isDefined) s"portName:$to "+n.get+"!" else ""))
+      Set("component","T","TO",if (v.isDefined) "writes:"+v.get else "")) & Prim("nbtimer",1,1,Set("to:"+to,if(n.isDefined) s"portName:$to "+n.get+"!" else ""))
 //  val nwget = (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
-  val nwget = (n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","to:"+0,if(n.isDefined) "portName:NW "+n.get+"?" else ""))
-  val wget = (n:Option[String]) => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component","W",if(n.isDefined) "portName:W "+n.get+"?" else ""))
-  val toget = (to:Int,n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","TO","to:"+to,if(n.isDefined) s"portName:$to "+n.get+"?" else ""))
+  val nwget = (n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","to:"+0,if(n.isDefined) "portName:NW "+n.get+"?" else ""))
+  val wget = (n:Option[String]) => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component","T","W",if(n.isDefined) "portName:W "+n.get+"?" else ""))
+  val toget = (to:Int,n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","TO","to:"+to,if(n.isDefined) s"portName:$to "+n.get+"?" else ""))
 //  val toget = (to:Int) => {(Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+to)) * id) & drain}
 
   // included for the demo at FACS'15
