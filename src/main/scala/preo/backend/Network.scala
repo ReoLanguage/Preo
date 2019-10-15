@@ -1,7 +1,7 @@
 package preo.backend
 
 import preo.ast._
-import preo.frontend.{Show, TVar}
+import preo.frontend.{Show, TVar, TreoLite}
 import preo.common.TypeCheckException
 
 import scala.collection.mutable
@@ -125,6 +125,8 @@ object Network {
       val g = Network(gc.prims++loop,gc.ins.dropRight(i),gc.outs.dropRight(i))
       g
     //      gc ++ Graph(mkGrSyncs(outs,ins),outs,ins)
+    case CTreo(treo) => toGraph(TreoLite.treo2preo(treo,"dupl"), hideSome)
+      
     case p@CPrim(_, CoreInterface(pi), CoreInterface(pj), _) =>
       val (i,j) = ((seed until seed+pi).toList,(seed+pi until seed+pi+pj).toList)
       seed += (pi+pj)
