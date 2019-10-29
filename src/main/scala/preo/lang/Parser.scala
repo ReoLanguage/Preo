@@ -158,6 +158,14 @@ trait Parser extends RegexParsers {
         val conn = ps.map(p=>p._1)
         TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None),Annotation("task",None)))),args)
     }|
+    "timer|timeout".r~opt("<"~>intVal<~">")~"("~opt(trArgs)~")" ^^ {
+      case name~Some(v)~_~args~_ => TConnAST(Right(SubConnector(name,Prim(name,1,1,Set("to:"+v.n)),List())),args.getOrElse(Nil))
+      case name~None~_~args~_ => TConnAST(Right(SubConnector(name,Prim(name,1,1,Set("to:"+0)),List())),args.getOrElse(Nil))
+    }|
+    "await".r~opt("<"~>intVal<~">")~"("~opt(trArgs)~")" ^^ {
+      case name~Some(v)~_~args~_ => TConnAST(Right(SubConnector(name,Prim(name,2,0,Set("to:"+v.n)),List())),args.getOrElse(Nil))
+      case name~None~_~args~_ => TConnAST(Right(SubConnector(name,Prim(name,2,0,Set("to:"+0)),List())),args.getOrElse(Nil))
+    }|
     identifier~"("~opt(trArgs)~")" ^^ {
       case name~_~args~_ => TConnAST(Left(name),args.getOrElse(Nil))
     }
