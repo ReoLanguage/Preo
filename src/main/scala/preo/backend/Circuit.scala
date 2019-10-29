@@ -278,7 +278,7 @@ object Circuit {
 
 
   private val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port",
-    "eventFull","dataEventFull","fifoFull","blackboardFull")
+    "eventFull","dataEventFull","fifoFull","blackboardFull","await","timeout")
   private def isAHub(n:String): Boolean = {
 //    val hubs = Set("semaphore","fifo","resource","dataEvent","blackboard","event","port")
 //    DSL.hubs.contains(n)

@@ -263,13 +263,17 @@ trait Parser extends RegexParsers {
 //    bexpr~"?"~connP~"+"~connP        ^^ { case e~_~c1~_~c2 => (e ? c1) + c2 }    |
     litP~opt("!")                    ^^ { case l~o => if (o.isDefined) lam(n,l^n) else l}
 
+
   def litP: Parser[Connector] =
     "loop"~"("~iexpr~")"~"("~connP~")" ^^ { case _~_~ie~_~_~con~_ => Trace(ie,con) }   |
     "sym"~"("~iexpr~","~iexpr~")"    ^^ { case _~_~ie1~_~ie2~_ => sym(ie1,ie2) } |
     "wr"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(0)),Port(IVal(1)),Set("component"))} |
     "rd"~"("~nameP~")"               ^^ { case _~_~name~_ => Prim(name,Port(IVal(1)),Port(IVal(0)),Set("component"))} |
     "("~>connP<~")" |
-    "timer"~"("~intVal~")"           ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to:"+ival.n))} |
+    "timer|timeout".r~"("~intVal~")" ^^ {case name~_~ival~_ => Prim(name,1,1,Set("to:"+ival.n))} |
+    "await"~opt("("~>intVal<~")")    ^^ {
+      case name~Some(ival) => Prim(name,2,0,Set("to:"+ival.n))
+      case name~None => Prim(name,2,0,Set("to:"+0))} |
     "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")" ^^ {case _~name~_~ps~_ =>SubConnector(name.getOrElse("Task"),ps,List(Annotation("hide",None)))}|
     primitiveName
 
