@@ -146,6 +146,8 @@ object PortAutomata {
       * @return new PortAutomata and updated counter for state names
       */
     def buildAutomata(e: Prim, seed: Int): (PortAutomata, Int) = e match {
+      // if prim has ports with same name (selfloop) then return an emtpy automaton
+      case Prim(CPrim(_, _, _, _), ins, outs,_) if (ins++outs).groupBy(p=>p).exists(g=>g._2.size>1) => (emptyAutomata,seed)
       case Prim(CPrim("sync", _, _, _), List(a), List(b),_) =>
         (PortAutomata(Set(a, b), seed, Set(seed -> (seed, Set(a, b), Set(e), List(Move(Loc(a),Loc(b)))))), seed + 1)
       case Prim(CPrim("id", _, _, _), List(a), List(b),_) =>
