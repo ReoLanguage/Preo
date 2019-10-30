@@ -100,23 +100,50 @@ object DSL {
   // hubs
   val event = Prim("event",1,1)
   val eventFull = Prim("eventFull",1,1)
-  // tasks channels
-  val nwput = (v:Option[Int],n:Option[String]) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","T",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:NW "+n.get+"!" else "")) & Prim("nbtimer",1,1,Set("to:"+0))
-  val wput = (v:Option[Int],n:Option[String]) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component","T",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:W "+n.get+"!" else ""))
-  val toput = (to:Int,v:Option[Int],n:Option[String]) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","T","TO",if (v.isDefined) "writes:"+v.get else "")) & Prim("nbtimer",1,1,Set("to:"+to,if(n.isDefined) s"portName:$to "+n.get+"!" else ""))
-//  val nwget = (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
-  val nwget = (n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","to:"+0,if(n.isDefined) "portName:NW "+n.get+"?" else ""))
-  val wget = (n:Option[String]) => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component","T","W",if(n.isDefined) "portName:W "+n.get+"?" else ""))
-  val toget = (to:Int,n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","TO","to:"+to,if(n.isDefined) s"portName:$to "+n.get+"?" else ""))
-//  val toget = (to:Int) => {(Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+to)) * id) & drain}
 
   // included for the demo at FACS'15
   val x:I="x"; val y:I="y"; val z:I="z"; val n:I="n"; val b:B="b"; val c:B="c"
+
+  /* Helpers for building virtuoso tasks */
+
+  val writer = (v:Option[Int],n:Option[String],t:String) =>
+    Prim("writer",Port(IVal(0)),Port(IVal(1)), Set("component","T",t,if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) s"portName:${t} "+n.get+"!" else ""))
+  val reader = (n:Option[String],t:String) =>
+    Prim("reader",Port(IVal(1)),Port(IVal(0)), Set("component","T",t,if(n.isDefined) s"portName:${t} "+n.get+"!" else ""))
+
+  val putNW = (v:Option[Int],n:Option[String]) =>
+    SubConnector("putNW",(id * writer(v,n,"NW") ) & ( dupl * dupl) & (id * drain * putNB(0)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id),Nil)
+  val putTO = (to:Int,v:Option[Int],n:Option[String]) =>
+    SubConnector("putTO",(id * writer(v,n,"TO") ) & ( dupl * dupl) & (id * drain * putNB(to)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id),Nil)
+  val putW = (v:Option[Int],n:Option[String]) =>
+    SubConnector("putW",(id * writer(v,n,"W")) & ( dupl * dupl) & (id * drain * id),Nil)
+
+  val putNB = (to:Int) => Prim("putNB",Port(IVal(1)),Port(IVal(2)), Set("to:"+to,"T")) // 1->2 (in->ok*err)
+
+  val getW = (n:Option[String]) =>
+    SubConnector("getW",(dupl * dupl) & (reader(n,"W") * drain * id),Nil)
+  val getNW = (n:Option[String]) =>
+    SubConnector("getNW",(getNB(n,0,"NW") & id),Nil)
+  val getTO = (to:Int,n:Option[String]) =>
+    SubConnector("getTO",(getNB(n,to,"TO") & id),Nil)
+
+  val getNB = (n:Option[String],to:Int,t:String) =>
+  Prim("getNB",Port(IVal(2)),Port(IVal(1)),Set("component","T",t,if(n.isDefined) s"portName:${t} "+n.get+"!" else "","to:"+to))
+
+  // tasks channels
+  //  val nwput = (v:Option[Int],n:Option[String]) =>
+  //    Prim("writer",Port(IVal(0)),Port(IVal(1)),
+  //      Set("component","T",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:NW "+n.get+"!" else "")) & Prim("nbtimer",1,1,Set("to:"+0))
+  //  val wput = (v:Option[Int],n:Option[String]) =>
+  //    Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component","T",if (v.isDefined) "writes:"+v.get else "",if(n.isDefined) "portName:W "+n.get+"!" else ""))
+  //  val toput = (to:Int,v:Option[Int],n:Option[String]) =>
+  //    Prim("writer",Port(IVal(0)),Port(IVal(1)),
+  //      Set("component","T","TO",if (v.isDefined) "writes:"+v.get else "")) & Prim("nbtimer",1,1,Set("to:"+to,if(n.isDefined) s"portName:$to "+n.get+"!" else ""))
+  //  //  val nwget = (Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
+  //  val nwget = (n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","to:"+0,if(n.isDefined) "portName:NW "+n.get+"?" else ""))
+  //  val wget = (n:Option[String]) => Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component","T","W",if(n.isDefined) "portName:W "+n.get+"?" else ""))
+  //  val toget = (to:Int,n:Option[String]) => Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","TO","to:"+to,if(n.isDefined) s"portName:$to "+n.get+"?" else ""))
+  //  //  val toget = (to:Int) => {(Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component")) * id) & (Prim("nbtimer",1,1,Set("to:"+to)) * id) & drain}
 
   // methods to (instantiate and) simplify a connector //
   /**
