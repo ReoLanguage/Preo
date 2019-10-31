@@ -163,10 +163,10 @@ object Task {
       Set("component","T",iname(n,to,t),"to:"+to)) //& (id * reader(n,t))
 
   private def iname(n:Option[String],to:Int,t:String) =
-    if(n.isDefined) s"portName:${if (t == "NW") t else to} "+n.get+"?" else ""
+    if(n.isDefined) s"portName:${if (t == "TO") to else t} "+n.get+"?" else ""
 
   private def oname(n:Option[String],to:Int,t:String) =
-    if(n.isDefined) s"portName:${if (t == "NW") t else to} "+n.get+"!" else ""
+    if(n.isDefined) s"portName:${if (t == "TO") to  else t} "+n.get+"!" else ""
   /*
   * - Connectors for ports when they are unique or -
   *
