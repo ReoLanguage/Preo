@@ -1,8 +1,8 @@
 package preo.backend
 
 import preo.ast._
-import preo.frontend.{Show, TVar, TreoLite}
 import preo.common.TypeCheckException
+import preo.frontend.{Show, TreoLite}
 
 import scala.collection.mutable
 
@@ -29,7 +29,7 @@ object Network {
 
   class Mirrors {
     private val mirrors = mutable.Map[Int,Set[Int]]()
-    def +=(pair:(Int,Int)) =
+    def +=(pair:(Int,Int)): Unit =
       mirrors(pair._2) = mirrors.getOrElse(pair._2,Set()) + pair._1
 
     def apply(src:Int): Set[Int] = {
@@ -136,7 +136,7 @@ object Network {
     case CSubConnector(name, sub, anns)
         if hideSome && Annotation.hidden(anns) =>
       val (t,_) = preo.DSL.unsafeTypeOf(sub.toConnector)
-      val dummy = toGraph(sub,false) // generating everything, but using only the port names
+      val dummy = toGraph(sub,hideSome = false) // generating everything, but using only the port names
       val (i,j) = (dummy.ins,dummy.outs)
       val allPorts = dummy.prims.flatMap(prim => prim.ins:::prim.outs).toSet
 //      val portNames = dummy.prims.flatMap(prim => prim.prim.extra.filter(e=> e.isInstanceOf[List[TVar]]))//.asInstanceOf[TVar]
@@ -198,10 +198,8 @@ object Network {
     val (inmap,outmap) = collectInsOuts(g3)
     val maps = joinMap(inmap,outmap)
 
-    //println("ReoGraph after toNode: "+g3)
     val edg4 = traverse(Set(),Set(),g3.prims,maps, ms)
     val g4 = Network(edg4,g3.ins,g3.outs)
-    //println("ReoGraph after traversal: "+g4+s"\nmirrors: $ms")
 
     g4
   }
@@ -213,7 +211,11 @@ object Network {
     * @param g Network to be extended
     * @return new network
     */
-  def addRedundancy(g:Network,ms:Mirrors): Network = {
+  def addRedundancy(g:Network,ms:Mirrors,newseed:Option[Int]=None): Network = {
+    newseed match {
+      case Some(value) => seed = value
+      case None =>
+    }
     //println("Mirrors after traversal: "+ms)
     val g2  = fixLoops(g,ms)
     //println("ReoGraph after loops: "+g2+s"\nmirrors: $ms")
@@ -232,15 +234,21 @@ object Network {
     mbEdge match {
       case Some(edge: Prim) =>
         //println(s"## traversing $edge")
-        val neighbours = getCompatNeighb(edge,done,maps)
-        if (neighbours.isEmpty)
+        val neighbour = getCompatNeighb(edge,done,maps)
+        if (neighbour.isEmpty)
           edge :: traverse(fringe2,done+edge,rest2,maps,ms)
         else {
           //println(s"## joining with ${neighbours.mkString("/")}")
-          val newEdge = joinAll(edge,neighbours,ms)
+//          val newEdge = joinAll(edge,neighbours,ms)
           //println(s"## joined  ${newEdge}")
-          traverse(fringe2+newEdge--neighbours,(done+edge)++neighbours,rest2.filterNot(neighbours),
-                   maps,ms)
+//          traverse(fringe2+newEdge--neighbours,(done+edge)++neighbours,rest2.filterNot(neighbours),
+//                   maps,ms)
+          val neighb = neighbour.get
+          //println(s"## joining with $neighb")
+          val newEdge = joinPrimtitives(edge,neighb,ms)
+          //println(s"## joined  $newEdge")
+          traverse((fringe2+newEdge)-neighb,done+edge+neighb,rest2.filterNot(_ == neighb),
+            maps,ms)
         }
       case _ => Nil
     }
@@ -255,50 +263,61 @@ object Network {
       }
     }
   }
-  private def getCompatNeighb(edge: Prim, done: Set[Prim], m: IOMapF): Set[Prim] = {
+  private def getCompatNeighb(edge: Prim, done: Set[Prim], m: IOMapF): Option[Prim] = {
     val around: Set[Prim] = (edge.ins.toSet++edge.outs.toSet).flatMap(m) - edge -- done
     //println(s"## around: ${around.mkString(",")}")
     //println(s"## compat: ${around.filter(edgeCompat(edge,_)).mkString(",")}")
-    around.filter(edgeCompat(edge,_))
+    around.find(edgeCompat(edge,_))
   }
   private def edgeCompat(e1: Prim, e2: Prim): Boolean = {
-     //print(s"## compat? $e1 vs. $e2 ")
+     //print(s"## compat? $e1 vs. $e2 -- ")
     (e1,e2) match {
       // two compatible nodes
       case (Prim(CPrim("node", _, _, ex1), i1, o1, _)
       , Prim(CPrim("node", _, _, ex2), i2, o2, _)) =>
-        val xordupl = !(((ex1 contains "xor") && ((ex2 contains "dupl"))) ||
+        val xordupl = !(((ex1 contains "xor") && (ex2 contains "dupl")) ||
           ((ex2 contains "xor") && (ex1 contains "dupl")))
-        val duplvdupl = !(((ex1 contains "vdupl") && ((ex2 contains "dupl"))) ||
+        val duplvdupl = !(((ex1 contains "vdupl") && (ex2 contains "dupl")) ||
           ((ex2 contains "vdupl") && (ex1 contains "dupl")))
-        val mergervmerger = !(((ex1 contains "vmrg") && ((ex2 contains "mrg"))) ||
+        val mergervmerger = !(((ex1 contains "vmrg") && (ex2 contains "mrg")) ||
           ((ex2 contains "vmrg") && (ex1 contains "mrg")))
-        val xorvdupl = !(((ex1 contains "vdupl") && ((ex2 contains "xor"))) ||
+        val xorvdupl = !(((ex1 contains "vdupl") && (ex2 contains "xor")) ||
           ((ex2 contains "vdupl") && (ex1 contains "xor")))
         lazy val onelink =
           if ((i1.toSet intersect o2.toSet).nonEmpty)
             i1.size <= 1 || o2.size <= 1
           else i2.size <= 1 || o1.size <= 1
         // println(s"$xordupl /\\ $onelink")
+        //println(s"one link (ok)? $onelink")
         xordupl && onelink && xorvdupl && duplvdupl && mergervmerger
+      // one is a simple node (1 in, 1 out)
+      case (Prim(CPrim("node",CoreInterface(1),CoreInterface(1),_),_,_,_),_) =>
+        true
+      case (_,Prim(CPrim("node",CoreInterface(1),CoreInterface(1),_),_,_,_)) =>
+        true
       // one is a port/sync/id
       case (Prim(CPrim(name1, _, _, _), _, _, _)
            ,Prim(CPrim(name2, _, _, _), _, _, _)) =>
-        // println(Set("port","id","sync").intersect(Set(name1,name2)).nonEmpty)
+        //println(Set("port","id","sync").intersect(Set(name1,name2)).nonEmpty)
         Set("port","id","sync").intersect(Set(name1,name2)).nonEmpty
-      case _ => {/*println("NO");*/ false}
+      case _ =>
+        println("NO")
+        false
     }}
-  private def joinAll(e:Prim, es: Set[Prim], ms: Mirrors): Prim = {
-    es.fold[Prim](e)((e1, e2) => {
-      val res = joinPrimtitives(e1, e2, ms)
-      // println(s"joining $e1+$e2 = $res")
-      res
-    })
-  }
+
+//  private def joinAll(e:Prim, es: Set[Prim], ms: Mirrors): Prim = {
+//    es.fold[Prim](e)((e1, e2) => {
+//      val res = joinPrimtitives(e1, e2, ms)
+//      println(s"joining $e1+$e2 = $res")
+//      res
+//    })
+//  }
+
+  @scala.annotation.tailrec
   private def joinPrimtitives(e1:Prim, e2:Prim, ms: Mirrors): Prim = (e1,e2) match {
     // two compatible nodes
-    case (Prim(CPrim("node",CoreInterface(is1),CoreInterface(js1),ex1),ins1,outs1,ps1)
-         ,Prim(CPrim("node",CoreInterface(is2),CoreInterface(js2),ex2),ins2,outs2,ps2)) =>
+    case (Prim(CPrim("node",CoreInterface(_),CoreInterface(_),ex1),ins1,outs1,ps1)
+         ,Prim(CPrim("node",CoreInterface(_),CoreInterface(_),ex2),ins2,outs2,ps2)) =>
       val newpars = if (ps2.length>ps1.length) ps2 else ps1
       val ins  = ins1.toSet ++ ins2.toSet -- outs1.toSet -- outs2.toSet
       val outs = outs1.toSet ++ outs2.toSet -- ins1.toSet -- ins2.toSet
@@ -314,10 +333,10 @@ object Network {
         Prim(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
                   ,ins.toList,outs.toList,newpars)
       else throw new RuntimeException(s"Failed to combine nodes $e1 and $e2 - more than one shared end.")
-    // 2nd is a port/sync/id
+    // 2nd is a port/sync/id/(simple-)node
     case (Prim(CPrim(name1,ip1,op1,ex1),is1,os1,ps1)
          ,Prim(CPrim(name2,CoreInterface(1),CoreInterface(1),ex2),List(i2),List(o2),_))
-        if Set("sync","id","port").contains(name2) =>
+        if Set("sync","id","port","node").contains(name2) =>
       if (is1 contains o2) {
         ms += o2 -> i2
         Prim(CPrim(name1,ip1,op1,ex1++ex2),replace(is1,o2->i2),os1,ps1)
@@ -326,9 +345,9 @@ object Network {
         ms += i2 -> o2
         Prim(CPrim(name1,ip1,op1,ex1++ex2),is1,replace(os1,i2->o2),ps1)
       }
-    // 1st is a port/sync/id --> swap arguments
+    // 1st is a port/sync/id/(simple-)node --> swap arguments
     case (Prim(CPrim(name,CoreInterface(1),CoreInterface(1),_),List(_),List(_),_),_)
-         if Set("sync","id","port").contains(name) =>
+         if Set("sync","id","port","node").contains(name) =>
       joinPrimtitives(e2,e1,ms)
     //
     case _ =>
@@ -651,8 +670,6 @@ object Network {
 
   /**
     * Add extra Sync channels when having mergers or dupls in the borders
-    * @param graph
-    * @return
     */
   private def addBorderSyncs(graph: Network, mirrors: Mirrors): Network = {
     val (inmap,outmap) = collectInsOuts(graph)
