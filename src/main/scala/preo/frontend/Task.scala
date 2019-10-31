@@ -118,34 +118,35 @@ object Task {
   /* - Helpers for building virtuoso tasks - */
 
   /** single writer port */
-  private val writer = (n:Option[String],v:Option[IVal],t:String) =>
+  private val writer = (n:Option[String],v:Option[IVal],to:Int,t:String,keep:String) =>
     Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","T",t,if (v.isDefined) "writes:"+v.get.n else "",if(n.isDefined) s"portName:${t} "+n.get+"!" else ""))
+      Set("component",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t)))
+
 
   /** single reader port */
-  private val reader = (n:Option[String],t:String) =>
-    Prim("reader",Port(IVal(1)),Port(IVal(0)), Set("component","T",t,if(n.isDefined) s"portName:${t} "+n.get+"?" else ""))
+  private val reader = (n:Option[String],to:Int,t:String) =>
+    Prim("reader",Port(IVal(1)),Port(IVal(0)), Set("component","T",iname(n,to,t)))
 
   /*
    * - Connectors for ports when they need to be sequenced inside a task -
-
+   *
    *   put request in a sequece have type 1 -> 2 (go -> next, out)
    *   get request in a sequece have type 2 -> 1 (go,read -> next)
    */
 
   /** NW put request */
   private val nwput = (n:Option[String],v:Option[IVal]) =>
-    (id * writer(n,v,"NW") ) & ( dupl * dupl) & (id * drain * putNB(0)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+    (id * writer(n,v,0,"NW","") ) & ( dupl * dupl) & (id * drain * putNB(0)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
 
   /** TO put request */
   private val toput = (n:Option[String],to:Int,v:Option[IVal]) =>
-    (id * writer(n,v,"TO") ) & ( dupl * dupl) & (id * drain * putNB(to)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+    (id * writer(n,v,to,"TO","") ) & ( dupl * dupl) & (id * drain * putNB(to)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
 
   /** W put request */
-  private val wput = (n:Option[String],v:Option[IVal]) => (id * writer(n,v,"W")) & ( dupl * dupl) & (id * drain * id)
+  private val wput = (n:Option[String],v:Option[IVal]) => (id * writer(n,v,0,"W","T")) & ( dupl * dupl) & (id * drain * id)
 
   /* W get request */
-  private val wget = (n:Option[String]) => (dupl * dupl) & (reader(n,"W") * drain * id)
+  private val wget = (n:Option[String]) => (dupl * dupl) & (reader(n,0,"W") * drain * id)
 
   /* NW get request */
   private val nwget = (n:Option[String]) => getNB(n,0,"NW")
@@ -158,9 +159,14 @@ object Task {
 
   /** helper to build non-blocking get request (NW/TO) */
   private val getNB = (n:Option[String],to:Int,t:String) =>
-    Prim("getNB",Port(IVal(2)),Port(IVal(1)),Set("component","T",t,if(n.isDefined) s"portName:${t} "+n.get+"?" else "","to:"+to))
+    Prim("getNB",Port(IVal(2)),Port(IVal(1)),
+      Set("component","T",iname(n,to,t),"to:"+to)) //& (id * reader(n,t))
 
+  private def iname(n:Option[String],to:Int,t:String) =
+    if(n.isDefined) s"portName:${if (t == "NW") t else to} "+n.get+"?" else ""
 
+  private def oname(n:Option[String],to:Int,t:String) =
+    if(n.isDefined) s"portName:${if (t == "NW") t else to} "+n.get+"!" else ""
   /*
   * - Connectors for ports when they are unique or -
   *
@@ -171,30 +177,26 @@ object Task {
 
   /** single NW put request */
   private val singleNWput = (n:Option[String],v:Option[IVal]) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","T",if (v.isDefined) "writes:"+v.get.n else "",if(n.isDefined) "portName:NW "+n.get+"!" else "")) & Prim("nbtimer",1,1,Set("to:"+0))
+    writer(n,v,0,"NW","") & Prim("nbtimer",1,1,Set("to:"+0))
 
   /** single W put request */
-  private val singleWput = (n:Option[String],v:Option[IVal]) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),Set("component","T",if (v.isDefined) "writes:"+v.get.n else "",if(n.isDefined) "portName:W "+n.get+"!" else ""))
+  private val singleWput = (n:Option[String],v:Option[IVal]) => writer(n,v,0,"W","")
 
   /** single TO put request */
   private val singleTOput = (n:Option[String],v:Option[IVal],to:Int) =>
-    Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","T","TO",if (v.isDefined) "writes:"+v.get.n else "")) & Prim("nbtimer",1,1,Set("to:"+to,if(n.isDefined) s"portName:$to "+n.get+"!" else ""))
+    writer(n,v,to,"TO","") & Prim("nbtimer",1,1,Set("T","to:"+to,oname(n,to,"TO")))
 
   /** single NW get request */
   private val singleNWget = (n:Option[String]) =>
-    Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","to:"+0,if(n.isDefined) "portName:NW "+n.get+"?" else ""))
+    Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","to:"+0,iname(n,0,"NW")))
 
   /** single W get request */
-  private val singleWget = (n:Option[String]) =>
-    Prim("reader",Port(IVal(1)),Port(IVal(0)),Set("component","T","W",if(n.isDefined) "portName:W "+n.get+"?" else ""))
+  private val singleWget = (n:Option[String]) => reader(n,0,"W")
+
 
   /** single TO get request */
   private val singleTOget = (n:Option[String],to:Int) =>
-    Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","TO","to:"+to,if(n.isDefined) s"portName:$to "+n.get+"?" else ""))
-
+    Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set("component","T","to:"+to,iname(n,to,"TO")))
 
   /**
     * Convert a TaskPort into a Connector that will be connected in a sequence with other ports
