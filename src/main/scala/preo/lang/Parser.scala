@@ -66,10 +66,6 @@ trait Parser extends RegexParsers {
     case "lossy"      => lossy
     case "merger"     => merger
     case "vmerger"    => vmerger
-    case "putTO"      => putTO(0,None,None)
-    case "putNW"      => putNW(Some(0),None)
-    case "getTO"      => putTO(0,None,None)
-    case "getNW"      => putNW(Some(0),None)
 //    case "timer"      => timer
     case "swap"       => swap
     case "xor"        => xor
@@ -156,7 +152,7 @@ trait Parser extends RegexParsers {
       case a~inout => TVar(a,inout=="?")}
   def trConns: Parser[List[TConnAST]] = rep(trExpr)
   def trExpr: Parser[TConnAST] =
-    "task"~"<"~identifierCap~">"~"("~taskTreoParams1~")" ^^ {
+    "task"~"<"~identifierCap~">"~"("~taskTreoParams~")" ^^ {
       case _~_~name~_~_~ps~_ =>
         val args = ps.map(p=> p._2)
         val conn = ps.map(p=> p._1)
@@ -180,29 +176,14 @@ trait Parser extends RegexParsers {
       case name~more => name :: more
     }
 
-  def taskTreoParams:Parser[List[(SubConnector,String)]] =
+  def taskTreoParams:Parser[List[(TaskPort,String)]] =
     taskTreoParam ~ rep("," ~> taskTreoParam) ^^ { case p~ps => p::ps}
-
-  def taskTreoParams1:Parser[List[(TaskPort,String)]] =
-    taskTreoParam1 ~ rep("," ~> taskTreoParam1) ^^ { case p~ps => p::ps}
 
   val syncmode:Parser[Either[String,IVal]] =
     "NW|W".r ^^ {case m => Left(m)} |
     intVal ^^ {case v => Right(v)}
 
-  def taskTreoParam:Parser[(SubConnector,String)] =
-    syncmode ~ identifier ~ "?" ^^ {
-      case Left(m)~name~_   => (if (m =="W") getW(Some(name)) else getNW(Some(name)),name)
-      case Right(to)~name~_ => (getTO(to.n,Some(name)),name)
-    } |
-    syncmode ~ identifier ~ "!" ~ opt("="~>intVal) ^^ {
-      case Left(m)~name~_~Some(intval)    => (if (m =="W") putW(Some(intval.n),Some(name)) else putNW(Some(intval.n),Some(name)),name)
-      case Left(m)~name~_~None            => (if (m =="W") putW(None,Some(name)) else putNW(None,Some(name)),name)
-      case Right(to)~name~_~Some(intval)  => (putTO(to.n,Some(intval.n),Some(name)),name)
-      case Right(to)~name~_~None          => (putTO(to.n,None,Some(name)),name)
-    }
-
-  def taskTreoParam1:Parser[(TaskPort,String)] =
+  def taskTreoParam:Parser[(TaskPort,String)] =
     syncmode ~ identifier ~ "?" ^^ {
       case Left(m)~name~_   => (if (m =="W") GetW(Some(name)) else GetNW(Some(name)),name)
       case Right(to)~name~_ => (GetTO(Some(name),to.n),name)
@@ -301,49 +282,19 @@ trait Parser extends RegexParsers {
     "await"~opt("("~>intVal<~")")    ^^ {
       case name~Some(ival) => Prim(name,2,0,Set("to:"+ival.n))
       case name~None => Prim(name,2,0,Set("to:"+0))} |
-    "task"~opt("<"~>identifierCap<~">")~"("~ taskParams1 ~")" ^^ {
+    "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")" ^^ {
       case _~name~_~ps~_ =>
         var task = Task(ps)
         SubConnector(name.getOrElse("Task"),task,List(Annotation("hide",None)))}|
     primitiveName
 
-  def taskParams: Parser[List[SubConnector]] =
+
+  def taskParams: Parser[List[TaskPort]] =
     taskParam ~ rep(","~> taskParam) ^^ {
       case p~ps => p::ps//ps.foldLeft(p)(_*_)
     }
 
-  def taskParams1: Parser[List[TaskPort]] =
-    taskParam1 ~ rep(","~> taskParam1) ^^ {
-      case p~ps => p::ps//ps.foldLeft(p)(_*_)
-    }
-
-//  def makeSequencerTask(cons:List[(String,String)]):Connector = {
-//    val sequencer:Connector = Repository.eventSequencer(cons.size)
-//    sequencer & (cons.map(c=>mkConFromOut(c)))
-//  }
-
-//  def mkConFromOut(c: (String, String)):Connector = c match {
-//    case ("NW","!") => Prim("nbtimer",1,1,Set("to:"+0))
-//    case ("NW","?") => (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
-//    case ("W","?") => (id * dupl) & (drain * id)
-//    case ("W","!") => id
-//    case (n,"!") if n.matches("""[0-9]+""") => Prim("nbtimer",1,1,Set("to:"+n.toInt))
-//    case (n,">") if n.matches("""[0-9]+""") => (Prim("nbtimer",1,1,Set("to:"+n.toInt)) * id) & drain
-//  }
-
-  def taskParam: Parser[SubConnector] =
-    syncmode ~ "?" ^^ {
-      case Left(m)~_   => if (m =="W") getW(None) else getNW(None)
-      case Right(to)~_ => getTO(to.n,None)
-    } |
-    syncmode ~ "!" ~ opt("="~>intVal) ^^ {
-      case Left(m)~_~Some(intval)   => if (m =="W") putW(Some(intval.n),None) else putNW(Some(intval.n),None)
-      case Left(m)~_~None           => if (m =="W") putW(None,None) else putNW(None,None)
-      case Right(to)~_~Some(intval) => putTO(to.n,Some(intval.n),None)
-      case Right(to)~_~None         => putTO(to.n,None,None)
-    }
-
-  def taskParam1: Parser[TaskPort] =
+  def taskParam: Parser[TaskPort] =
     syncmode ~ "?" ^^ {
       case Left(m)~_   => if (m =="W") GetW(None) else GetNW(None)
       case Right(to)~_ => GetTO(None,to.n)
@@ -352,12 +303,6 @@ trait Parser extends RegexParsers {
       case Left(m)~_~intval   => if (m =="W") PutW(None,intval) else PutNW(None,intval)
       case Right(to)~_~intval => PutTO(None,intval,to.n)
     }
-
-  //    "NW" ~ "\\?|\\!".r   ^^ { case _~inout => if (inout =="!") nwput else nwget} |
-//    "W" ~ "\\?|\\!".r    ^^ { case _~inout => if (inout =="!") wput else wget} |
-//    intVal ~ "\\?|\\!".r ^^ { case to~inout => if (inout =="!") toput(to.n) else toget(to.n)}
-
-
 
 
   ////////////////

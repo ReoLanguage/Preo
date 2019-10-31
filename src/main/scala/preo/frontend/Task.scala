@@ -18,6 +18,9 @@ object Task {
 
   /**
     * Given a list of task's ports connectors, organize them so that they execute in sequence
+    * Its a wrapper for 'mkSequentialPorts' and 'toSingleConnector'
+    *
+    * Depending if its a single port or more uses different methods
     *
     * @param ports list of task's ports
     * @return a reo connector that represents a task
@@ -28,8 +31,13 @@ object Task {
   }
 
 
+  /**
+    * Given a list of task's ports connectors, organize them so that they execute in sequence
+    *
+    * @param ports
+    * @return
+    */
   private def mkSequentialPorts(ports:List[TaskPort]):Connector = {
-
     // number of inputs to have from the beginning
     var ins = ports.count(p => p.isInput)
     // number of final output ports
@@ -85,66 +93,6 @@ object Task {
     Tr(1,task)
   }
 
-//  def apply(ports:List[SubConnector]):Connector = {
-//
-//    // number of inputs to have from the beginning
-//    var ins = ports.count(p => p.name.startsWith("get"))
-//    // number of final output ports
-//    var outs = ports.count(p => p.name.startsWith("put"))
-//
-//    // current inputs we need to pass through steps (each step is separated by a ;)
-//    var currentIns = ins
-//    // current outputs
-//    var currentOuts = 0
-//
-//    // accumulator for final task, initially has an eventFull and as many ids in parallel as ins (and 0 outputs)
-//    // the event full determines which task port can go first
-//    var task:Connector = mkStep(eventFull,ins,0)
-//
-//    // iterator over ports of the task
-//    var iterator = ports.iterator
-//
-//    // while there are ports
-//    while (iterator.hasNext) {
-//
-//      // get the next port
-//      val con = iterator.next()
-//
-//      // if it is a put request (put request are of type (1 -> 2): (go -> next,write)
-//      if (con.name.startsWith("put")) {
-//        if (iterator.hasNext || isSingleWport(ports)) // if this is not the last port
-//        // mk a step keeping the same number of inputs in parallel and current outs,
-//        // mk conn & (event * id) to allow time to pass since con executes and the next can go, i.e. they don't synchronise
-//          task = task & mkStep(con & (event * id),currentIns,currentOuts)
-//        else
-//        // if it is the last port,
-//        // no need to add (event * id) since next of this conn will connect to the initial eventFull
-//          task = task & mkStep(con,currentIns,currentOuts)
-//        // a put increments in 1 the number of outputs
-//        currentOuts+=1
-//      } else { // if it is a get request (get request are of type (2 -> 1): (read,go -> next))
-//        if (iterator.hasNext || isSingleWport(ports))
-//        // mk a consuming one input and keeping the same outputs,
-//        // if it is not the last add and event after next, to avoid synchronicity with next port
-//          task = task & mkStep(con & event,currentIns-1,currentOuts)
-//        else
-//        // mk a consuming one input and keeping the same outputs,
-//          task = task & mkStep(con,currentIns-1,currentOuts)
-//        // a get decrements in 1 the number of inputs
-//        currentIns-=1
-//      }
-//
-//    }
-//
-//    // swap next from top to bottom as many times as outs are
-//    for(i <- 1 to outs) {
-//      task = task & mkStep(swap,i-1,outs-i)
-//    }
-//
-//    // do a loop from last next to the eventFull input
-//    Tr(1,task)
-//  }
-
   /**
     *
     * Helper to make a step of a task connector, each step is separated by sequential composition ;
@@ -164,21 +112,8 @@ object Task {
     case _ => conn
   }
 
-  /** Helper to make n ids in parallel. assumes n>0 */
+  /** Helper to make n ids in parallel - assumes n>0 */
   private def ids(n:Int):Connector = (1 until n).map(_=>id).foldRight[Connector](id)(_*_)
-
-  /** Helper to know if a task has just one port that is synchronous (if so it needs a an event before looping) */
-//  private def isSingleWport(ports:List[SubConnector]):Boolean = ports match {
-//    case List(p) if p.name.endsWith("W")=> true
-//    case _ => false
-//  }
-
-  /** Helper to know if a task has just one port that is synchronous (if so it needs a an event before looping) */
-//  private def isSingleWport1(ports:List[TaskPort]):Boolean = ports match {
-//    case List(PutW(n,v)) => true
-//    case List(GetW(n)) => true
-//    case _ => false
-//  }
 
   /* - Helpers for building virtuoso tasks - */
 
