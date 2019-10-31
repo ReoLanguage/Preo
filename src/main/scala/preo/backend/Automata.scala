@@ -50,7 +50,6 @@ object Automata {
                         (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
     val gr = Network(cc,hideClosed = false,mirrors)
-//    println("about to create automata from\n"+gr)
     buildAutomata[A](gr)(builder)
   }
 
@@ -58,7 +57,6 @@ object Automata {
                                       (implicit builder: AutomataBuilder[A]): A = {
     seed = 0
     val gr = Network.toNetwWithRedundancy(cc,hideClosed = false, mirrors)
-    //    println("about to create automata from\n"+gr)
     buildAutomata[A](gr)(builder)
   }
 
@@ -88,8 +86,8 @@ object Automata {
                                         (implicit builder:AutomataBuilder[A]): A = {
     val (ins,outs) = collectInsOuts(g)
     def getNeighbours(e:Prim): List[Prim] =
-      (for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
-      (for (o <- e.outs) yield ins.getOrElse(o,Set())).flatten
+      ((for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
+      (for (o <- e.outs) yield ins.getOrElse(o,Set())).flatten).distinct //to remove duplicates
 
 
     if (g.prims.nonEmpty) {
