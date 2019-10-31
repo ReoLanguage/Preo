@@ -155,8 +155,10 @@ trait Parser extends RegexParsers {
     "task"~"<"~identifierCap~">"~"("~taskTreoParams~")" ^^ {
       case _~_~name~_~_~ps~_ =>
         val args = ps.map(p=> p._2)
-        val conn = ps.map(p=>p._1)
-        TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None),Annotation("task",None)))),args)
+        val conn = ps.map(p=> p._1)
+        var task = Task(conn)
+        //TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None),Annotation("task",None)))),args)
+        TConnAST(Right(SubConnector(name,task,List(Annotation("hide",None),Annotation("task",None)))),args)
     }|
     "timer|timeout".r~opt("<"~>intVal<~">")~"("~opt(trArgs)~")" ^^ {
       case name~Some(v)~_~args~_ => TConnAST(Right(SubConnector(name,Prim(name,1,1,Set("to:"+v.n)),List())),args.getOrElse(Nil))
@@ -174,23 +176,21 @@ trait Parser extends RegexParsers {
       case name~more => name :: more
     }
 
-  def taskTreoParams:Parser[List[(Connector,String)]] =
+  def taskTreoParams:Parser[List[(TaskPort,String)]] =
     taskTreoParam ~ rep("," ~> taskTreoParam) ^^ { case p~ps => p::ps}
 
   val syncmode:Parser[Either[String,IVal]] =
     "NW|W".r ^^ {case m => Left(m)} |
     intVal ^^ {case v => Right(v)}
 
-  def taskTreoParam:Parser[(Connector,String)] =
+  def taskTreoParam:Parser[(TaskPort,String)] =
     syncmode ~ identifier ~ "?" ^^ {
-      case Left(m)~name~_   => (if (m =="W") wget(Some(name)) else nwget(Some(name)),name)
-      case Right(to)~name~_ => (toget(to.n,Some(name)),name)
-    } |
+      case Left(m)~name~_   => (if (m =="W") GetW(Some(name)) else GetNW(Some(name)),name)
+      case Right(to)~name~_ => (GetTO(Some(name),to.n),name)
+     } |
     syncmode ~ identifier ~ "!" ~ opt("="~>intVal) ^^ {
-      case Left(m)~name~_~Some(intval)    => (if (m =="W") wput(Some(intval.n),Some(name)) else nwput(Some(intval.n),Some(name)),name)
-      case Left(m)~name~_~None            => (if (m =="W") wput(None,Some(name)) else nwput(None,Some(name)),name)
-      case Right(to)~name~_~Some(intval)  => (toput(to.n,Some(intval.n),Some(name)),name)
-      case Right(to)~name~_~None          => (toput(to.n,None,Some(name)),name)
+      case Left(m) ~ name ~ _ ~ intval => (if (m == "W") PutW(Some(name),intval) else PutNW(Some(name),intval), name)
+      case Right(to) ~ name ~ _ ~ intval => (PutTO(Some(name),intval,to.n), name)
     }
 
 
@@ -282,42 +282,27 @@ trait Parser extends RegexParsers {
     "await"~opt("("~>intVal<~")")    ^^ {
       case name~Some(ival) => Prim(name,2,0,Set("to:"+ival.n))
       case name~None => Prim(name,2,0,Set("to:"+0))} |
-    "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")" ^^ {case _~name~_~ps~_ =>SubConnector(name.getOrElse("Task"),ps,List(Annotation("hide",None)))}|
+    "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")" ^^ {
+      case _~name~_~ps~_ =>
+        var task = Task(ps)
+        SubConnector(name.getOrElse("Task"),task,List(Annotation("hide",None)))}|
     primitiveName
 
-  def taskParams: Parser[Connector] =
-    taskParam ~ rep(","~> taskParams) ^^ {case p~ps => ps.foldLeft(p)(_*_)}
 
-//  def makeSequencerTask(cons:List[(String,String)]):Connector = {
-//    val sequencer:Connector = Repository.eventSequencer(cons.size)
-//    sequencer & (cons.map(c=>mkConFromOut(c)))
-//  }
+  def taskParams: Parser[List[TaskPort]] =
+    taskParam ~ rep(","~> taskParam) ^^ {
+      case p~ps => p::ps//ps.foldLeft(p)(_*_)
+    }
 
-//  def mkConFromOut(c: (String, String)):Connector = c match {
-//    case ("NW","!") => Prim("nbtimer",1,1,Set("to:"+0))
-//    case ("NW","?") => (Prim("nbtimer",1,1,Set("to:"+0)) * id) & drain
-//    case ("W","?") => (id * dupl) & (drain * id)
-//    case ("W","!") => id
-//    case (n,"!") if n.matches("""[0-9]+""") => Prim("nbtimer",1,1,Set("to:"+n.toInt))
-//    case (n,">") if n.matches("""[0-9]+""") => (Prim("nbtimer",1,1,Set("to:"+n.toInt)) * id) & drain
-//  }
-
-  def taskParam: Parser[Connector] =
+  def taskParam: Parser[TaskPort] =
     syncmode ~ "?" ^^ {
-      case Left(m)~_   => if (m =="W") wget(None) else nwget(None)
-      case Right(to)~_ => toget(to.n,None)
+      case Left(m)~_   => if (m =="W") GetW(None) else GetNW(None)
+      case Right(to)~_ => GetTO(None,to.n)
     } |
     syncmode ~ "!" ~ opt("="~>intVal) ^^ {
-      case Left(m)~_~Some(intval)   => if (m =="W") wput(Some(intval.n),None) else nwput(Some(intval.n),None)
-      case Left(m)~_~None           => if (m =="W") wput(None,None) else nwput(None,None)
-      case Right(to)~_~Some(intval) => toput(to.n,Some(intval.n),None)
-      case Right(to)~_~None         => toput(to.n,None,None)
+      case Left(m)~_~intval   => if (m =="W") PutW(None,intval) else PutNW(None,intval)
+      case Right(to)~_~intval => PutTO(None,intval,to.n)
     }
-  //    "NW" ~ "\\?|\\!".r   ^^ { case _~inout => if (inout =="!") nwput else nwget} |
-//    "W" ~ "\\?|\\!".r    ^^ { case _~inout => if (inout =="!") wput else wget} |
-//    intVal ~ "\\?|\\!".r ^^ { case to~inout => if (inout =="!") toput(to.n) else toget(to.n)}
-
-
 
 
   ////////////////
