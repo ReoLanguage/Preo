@@ -152,11 +152,11 @@ trait Parser extends RegexParsers {
       case a~inout => TVar(a,inout=="?")}
   def trConns: Parser[List[TConnAST]] = rep(trExpr)
   def trExpr: Parser[TConnAST] =
-    "task"~"<"~identifierCap~">"~"("~taskTreoParams~")" ^^ {
-      case _~_~name~_~_~ps~_ =>
+    "task"~"<"~identifierCap~">"~"("~taskTreoParams~")"~opt("every"~>intVal)  ^^ {
+      case _~_~name~_~_~ps~_~period =>
         val args = ps.map(p=> p._2)
         val conn = ps.map(p=> p._1)
-        var task = Task(conn)
+        var task = if (period.isDefined) Task(conn,Some(period.get.n)) else Task(conn)
         //TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None),Annotation("task",None)))),args)
         TConnAST(Right(SubConnector(name,task,List(Annotation("hide",None),Annotation("task",None)))),args)
     }|
@@ -282,9 +282,9 @@ trait Parser extends RegexParsers {
     "await"~opt("("~>intVal<~")")    ^^ {
       case name~Some(ival) => Prim(name,2,0,Set("to:"+ival.n))
       case name~None => Prim(name,2,0,Set("to:"+0))} |
-    "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")" ^^ {
-      case _~name~_~ps~_ =>
-        var task = Task(ps)
+    "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")"~opt("every"~>intVal) ^^ {
+      case _~name~_~ps~_~period =>
+        var task = if (period.isDefined) Task(ps,Some(period.get.n)) else Task(ps)
         SubConnector(name.getOrElse("Task"),task,List(Annotation("hide",None)))}|
     primitiveName
 
