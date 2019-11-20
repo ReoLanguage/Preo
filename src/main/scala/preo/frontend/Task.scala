@@ -139,7 +139,7 @@ object Task {
   /** single writer port */
   private val writer = (n:Option[String],v:Option[IVal],to:Int,t:String,keep:String) =>
     Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t)))
+      Set("component","T",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t)))
 
   /** single reader port */
   private val reader = (n:Option[String],to:Int,t:String) =>
