@@ -438,7 +438,7 @@ object Solver {
   private def mkRange(x:String,from:Option[Int],to:Option[Int]): (Map[Var,Interval],BExpr) =
     (Map(Var(x) -> Range(from,to)),BVal(true))
   private def mergeMap(m1:Map[Var,Interval],m2:Map[Var,Interval]) : Map[Var,Interval] =
-    m1.toList./:(m2)(insertPair)
+    m1.toList.foldLeft(m2)(insertPair)
   private def insertPair(m:Map[Var,Interval],vi:(Var,Interval)): Map[Var,Interval] = {
     var changed = false
     var newmap = Map[Var,Interval]()

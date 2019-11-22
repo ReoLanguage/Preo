@@ -360,7 +360,8 @@ object Circuit {
         seed += 1
         addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
 //        val names:Option[List[TVar]] = e.prim.extra.find(e=>e.isInstanceOf[List[TVar]]).asInstanceOf[Option[List[TVar]]]
-        val names1:Option[List[String]] = e.prim.extra.find(e=>e.isInstanceOf[List[String]]).asInstanceOf[Option[List[String]]]
+        val names1:Option[List[String]] =
+          e.prim.extra.find(e=>e.isInstanceOf[List[_]]).asInstanceOf[Option[List[String]]]
         var ins:List[(Port,String)] = List()
         var outs:List[(Port,String)] = List()
 //        if (names.isDefined && names.get.nonEmpty && extra.contains("task")) {
