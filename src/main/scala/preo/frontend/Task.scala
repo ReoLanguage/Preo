@@ -139,7 +139,7 @@ object Task {
   /** single writer port */
   private val writer = (n:Option[String],v:Option[IVal],to:Int,t:String,keep:String) =>
     Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component","T",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t)))
+      Set("component",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t)))
 
   /** single reader port */
   private val reader = (n:Option[String],to:Int,t:String) =>
@@ -155,11 +155,11 @@ object Task {
 
   /** NW put request */
   private val nwput = (n:Option[String],v:Option[IVal]) =>
-    (id * writer(n,v,0,"NW","") ) & ( dupl * dupl) & (id * drain * putNB(0)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+    (id * writer(None,v,0,"NW","") ) & ( dupl * dupl) & (id * drain * putNB(n,0,"NW")) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
 
   /** TO put request */
   private val toput = (n:Option[String],to:Int,v:Option[IVal]) =>
-    (id * writer(n,v,to,"TO","") ) & ( dupl * dupl) & (id * drain * putNB(to)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+    (id * writer(None,v,to,"TO","") ) & ( dupl * dupl) & (id * drain * putNB(n,to,"TO")) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
 
   /** W put request */
   private val wput = (n:Option[String],v:Option[IVal]) => (id * writer(n,v,0,"W","T")) & ( dupl * dupl) & (id * drain * id)
@@ -174,7 +174,7 @@ object Task {
   private val toget = (n:Option[String],to:Int) => getNB(n,to,"TO")
 
   /** helper to build non-blocking put request (NW/TO) */
-  private val putNB = (to:Int) => Prim("putNB",Port(IVal(1)),Port(IVal(2)), Set("to:"+to)) // 1->2 (in->ok*err)
+  private val putNB = (n:Option[String],to:Int,t:String) => Prim("putNB",Port(IVal(1)),Port(IVal(2)), Set("T","to:"+to,oname(n,to,t))) // 1->2 (in->ok*err)
 
   /** helper to build non-blocking get request (NW/TO) */
   private val getNB = (n:Option[String],to:Int,t:String) =>
