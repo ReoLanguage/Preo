@@ -196,10 +196,10 @@ object Task {
 
   /** single NW put request */
   private val singleNWput = (n:Option[String],v:Option[IVal],p:Option[Int]) =>
-    writer(n,v,0,"NW","") & Prim("nbtimer",1,1,Set("to:"+0,addPeriod(p)))
+    writer(n,v,0,"NW","T") & Prim("nbtimer",1,1,Set("to:"+0,addPeriod(p)))
 
   /** single W put request */
-  private val singleWput = (n:Option[String],v:Option[IVal]) => writer(n,v,0,"W","")
+  private val singleWput = (n:Option[String],v:Option[IVal]) => writer(n,v,0,"W","T")
 
   /** single TO put request */
   private val singleTOput = (n:Option[String],v:Option[IVal],to:Int,p:Option[Int]) =>
