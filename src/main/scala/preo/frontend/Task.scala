@@ -78,7 +78,7 @@ object Task {
       // mk a step keeping the same number of inputs in parallel and current outs,
       task = task & mkStep(toSeqConnector(con),currentIns,currentOuts)
       // a put increments in 1 the number of outputs
-      currentOuts +=1
+      currentOuts+=1
     } else { // if it is a get request (get request are of type (2 -> 1): (read,go -> next))
       // mk a step consuming one input and keeping the same outputs,
       task = task & mkStep(toSeqConnector(con),currentIns-1,currentOuts)
@@ -94,24 +94,24 @@ object Task {
       if (con.isOutput) {
         if (iterator.hasNext) // if this is not the last port
           // mk a step keeping the same number of inputs in parallel and current outs
-          // if it is a (periodic) wait it adds a (periodic) event before go so that the previous port and this one do not synchronize at the same time
-          task = task & mkStep( (if(con.isWait) mbPEvent(periodicity) else id) & toSeqConnector(con),currentIns,currentOuts)
+          // if it is a  wait it adds a event before go so that the previous port and this one do not synchronize at the same time
+          task = task & mkStep( (if(con.isWait) event else id) & toSeqConnector(con),currentIns,currentOuts)
         else // if it is the last port
-          // if it is a (periodic) wait it adds a (periodic) event before go so that the previous port and this one do not synchronize at the same time
-          // if it is periodic it adds a periodic event after next so that next does not have a guard on the same transition the action fires
-          task = task & mkStep( (if(con.isWait) mbPEvent(periodicity) else id) & toSeqConnector(con) & ((if(periodicity.isDefined) mbPEvent(periodicity) else id) * id),currentIns,currentOuts)
+          // if it is a  wait it adds a event before go so that the previous port and this one do not synchronize at the same time
+          // if it is periodic it adds an event after next so that next does not have a guard on the same transition the action fires
+          task = task & mkStep( (if(con.isWait) event else id) & toSeqConnector(con) & ((if(periodicity.isDefined) event else id) * id),currentIns,currentOuts)
         // a put increments in 1 the number of outputs
         currentOuts+=1
       } else { // if it is a get request (get request are of type (2 -> 1): (read,go -> next))
         if (iterator.hasNext) // if this is not the last port
           // mk a step consuming one input and keeping the same outputs
-          // if it is a (periodic) wait it adds a (periodic) event before read (* id to keep go) so that the previous port and this one do not synchronize at the same time
-          task = task & mkStep(((if(con.isWait) mbPEvent(periodicity) else id) * id) & toSeqConnector(con),currentIns-1,currentOuts)
+          // if it is a wait it adds an event before go so that the previous port and this one do not synchronize at the same time
+          task = task & mkStep((id * (if(con.isWait) event else id)) & toSeqConnector(con),currentIns-1,currentOuts)
         else // if it is the last port
         // mk a step consuming one input and keeping the same outputs
-        // if it is a (periodic) wait it adds a (periodic) event before read (* id to keep go) so that the previous port and this one do not synchronize at the same time
-        // if it is periodic it adds a periodic event after next so that next does not have a guard on the same transition the action fires
-          task = task & mkStep(((if(con.isWait) mbPEvent(periodicity) else id) * id) & toSeqConnector(con) & (if(periodicity.isDefined) mbPEvent(periodicity) else id),currentIns-1,currentOuts)
+        // if it is a wait it adds an event before go so that the previous port and this one do not synchronize at the same time
+        // if it is periodic it adds an event after next so that next does not have a guard on the same transition the action fires
+          task = task & mkStep((id * (if(con.isWait) event else id)) & toSeqConnector(con) & (if(periodicity.isDefined) event else id),currentIns-1,currentOuts)
         // a get decrements in 1 the number of inputs
         currentIns-=1
       }
