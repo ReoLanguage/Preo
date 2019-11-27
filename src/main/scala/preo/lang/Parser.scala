@@ -156,9 +156,12 @@ trait Parser extends RegexParsers {
       case _~_~name~_~_~ps~_~period =>
         val args = ps.map(p=> p._2)
         val conn = ps.map(p=> p._1)
-        var task = if (period.isDefined) Task(conn,Some(period.get.n)) else Task(conn)
-        //TConnAST(Right(SubConnector(name,conn.tail.foldLeft(conn.head)(_*_),List(Annotation("hide",None),Annotation("task",None)))),args)
-        TConnAST(Right(SubConnector(name,task,List(Annotation("hide",None),Annotation("task",None)))),args)
+//        var task = if (period.isDefined) Task(conn,Some(period.get.n)) else Task(conn)
+        val ins:Int = conn.count(c=>c.isInput)
+        val outs:Int = conn.size - ins
+        val params:Set[Any] = Set("T","component",conn,"listPorts:"+args.mkString(","),if (period.isDefined) "periodicity:"+period.get.n else "")
+        TConnAST(Right(SubConnector(name,Prim("task",ins,outs,params),List(Annotation("hide",None),Annotation("task",None)))),args)
+//        TConnAST(Right(SubConnector(name,task,List(Annotation("hide",None),Annotation("task",None)))),args)
     }|
     "timer|timeout".r~opt("<"~>intVal<~">")~"("~opt(trArgs)~")" ^^ {
       case name~Some(v)~_~args~_ => TConnAST(Right(SubConnector(name,Prim(name,1,1,Set("to:"+v.n)),List())),args.getOrElse(Nil))
@@ -284,8 +287,12 @@ trait Parser extends RegexParsers {
       case name~None => Prim(name,2,0,Set("to:"+0))} |
     "task"~opt("<"~>identifierCap<~">")~"("~ taskParams ~")"~opt("every"~>intVal) ^^ {
       case _~name~_~ps~_~period =>
-        var task = if (period.isDefined) Task(ps,Some(period.get.n)) else Task(ps)
-        SubConnector(name.getOrElse("Task"),task,List(Annotation("hide",None)))}|
+//        var task = if (period.isDefined) Task(ps,Some(period.get.n)) else Task(ps)
+        val ins:Int = ps.count(c=>c.isInput)
+        val outs:Int = ps.size - ins
+        val params:Set[Any] = Set("T","component",ps,if (period.isDefined) "periodicity:"+period.get.n else "")
+        SubConnector(name.getOrElse("Task"),Prim("task",ins,outs,params),List(Annotation("hide",None),Annotation("task",None)))}|
+        //SubConnector(name.getOrElse("Task"),task,List(Annotation("hide",None)))}|
     primitiveName
 
 

@@ -3,9 +3,10 @@ package preo.backend
 //import hub.DSL
 import preo.ast.CoreConnector
 import preo.backend.Network.{Mirrors, Port}
-import preo.frontend.TVar
+import preo.frontend.{TVar, TaskPort}
 
 import scala.collection.mutable
+import scala.collection.parallel.Task
 
 /**
   * Created by jose on 07/07/2017.
@@ -359,17 +360,12 @@ object Circuit {
         val inArrow = if (isComp) ArrowOut else NoArrow
         seed += 1
         addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
-//        val names:Option[List[TVar]] = e.prim.extra.find(e=>e.isInstanceOf[List[TVar]]).asInstanceOf[Option[List[TVar]]]
-        val names1:Option[List[String]] =
-          e.prim.extra.find(e=>e.isInstanceOf[List[_]]).asInstanceOf[Option[List[String]]]
+        val pNames: Option[List[TaskPort]] = e.prim.extra.find(p=> p.isInstanceOf[List[TaskPort]]).asInstanceOf[Option[List[TaskPort]]]
         var ins:List[(Port,String)] = List()
         var outs:List[(Port,String)] = List()
-//        if (names.isDefined && names.get.nonEmpty && extra.contains("task")) {
-        if (names1.isDefined && names1.get.nonEmpty && extra.contains("task")) {
-//          ins = e.ins.zip(names.get.filter(v=> v.isIn).map(_.name))
-//          outs = e.outs.zip(names.get.filter(v=> v.isOut).map(_.name))
-            ins = e.ins.zip(names1.get.filter(v=> v.endsWith("?")))
-            outs = e.outs.zip(names1.get.filter(v=> v.endsWith("!")))
+        if (pNames.isDefined && pNames.get.nonEmpty && extra.contains("task")) {
+            ins = e.ins.zip(pNames.get.filter(v=> v.isInput).map(_.toString))
+            outs = e.outs.zip(pNames.get.filter(v=> v.isOutput).map(_.toString))
         } else {
           ins = e.ins.map(i=> (i,""))
           outs = e.outs.map(o=>(o,""))

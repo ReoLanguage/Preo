@@ -2,7 +2,7 @@ package preo.backend
 
 import preo.ast._
 import preo.common.TypeCheckException
-import preo.frontend.{Show, TreoLite}
+import preo.frontend.{Show, TVar, TaskPort, TreoLite}
 
 import scala.collection.mutable
 
@@ -139,11 +139,10 @@ object Network {
       val dummy = toGraph(sub,hideSome = false) // generating everything, but using only the port names
       val (i,j) = (dummy.ins,dummy.outs)
       val allPorts = dummy.prims.flatMap(prim => prim.ins:::prim.outs).toSet
-//      val portNames = dummy.prims.flatMap(prim => prim.prim.extra.filter(e=> e.isInstanceOf[List[TVar]]))//.asInstanceOf[TVar]
-      var portNames1:List[String] = dummy.prims.flatMap(prim=> prim.prim.extra.filter(e=> e.isInstanceOf[String])).asInstanceOf[List[String]]
-      portNames1 = portNames1.filter(e=>e.startsWith("portName:")).map(e=>e.drop(9))
+      var portNames:List[TaskPort] = dummy.prims.flatMap(prim=> prim.prim.extra.filter(e=> e.isInstanceOf[List[TaskPort]])).asInstanceOf[List[List[TaskPort]]].flatten
+
       val p = CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),
-                   if(anns.exists(e=>e.name=="task")) Set("box","task",("ports",allPorts),/*portNames.asInstanceOf[List[List[TVar]]].flatten,*/portNames1)
+                   if(anns.exists(e=>e.name=="task")) Set("box","task",("ports",allPorts), portNames/*portNames.asInstanceOf[List[List[TVar]]].flatten,*/)
                    else Set("box",("ports",allPorts)))
       Network(List(Prim(p,i,j,Nil)),i,j)
 

@@ -28,12 +28,12 @@ object Task {
     * @return a reo connector that represents a task
     */
   def apply(ports: List[TaskPort], periodicity: Option[Int] = None): Connector = {
-    if (periodicityOk(ports,periodicity))
+//    if (periodicityOk(ports,periodicity))
       ports match {
         case p :: Nil => toSingleConnector(p, periodicity)
         case _ => mkSequentialPorts(ports, periodicity)
       }
-    else throw new GenerationException("Unsupported periodicity for ports: "+ ports.map(_.toString))
+//    else throw new GenerationException("Unsupported periodicity for ports: "+ ports.map(_.toString))
   }
   /**
     * Check if the lists of ports is correct for a given periodicity (if any)
@@ -66,38 +66,52 @@ object Task {
 
     // accumulator for final task, initially has an eventFull and as many ids in parallel as ins (and 0 outputs)
     // the event full determines which task port can go first
-    // if periodicity is defined it adds periodic synchroniser
-    var task:Connector = mkStep(if(periodicity.isDefined) eventFull & periodic(periodicity.get) else eventFull,ins,0)
+    // if periodicity is defined it adds periodic synchronizer at the beggining which will force periodicity to reset when the period pass
+    var task:Connector = mkStep(if(periodicity.isDefined) periodic(periodicity.get) & eventFull  else eventFull,ins,0)
 
     // iterator over ports of the task
     var iterator = ports.iterator
 
-    // while there are ports
+    // mk the first port since it doesn't need special connectors before trying to do that port action
+    val con = iterator.next()
+    if (con.isOutput) { // if it is a put request (put request are of type (1 -> 2): (go -> next,write)
+      // mk a step keeping the same number of inputs in parallel and current outs,
+      task = task & mkStep(toSeqConnector(con),currentIns,currentOuts)
+      // a put increments in 1 the number of outputs
+      currentOuts+=1
+    } else { // if it is a get request (get request are of type (2 -> 1): (read,go -> next))
+      // mk a step consuming one input and keeping the same outputs,
+      task = task & mkStep(toSeqConnector(con),currentIns-1,currentOuts)
+      // a get decrements in 1 the number of inputs
+      currentIns-=1
+    }
+
+    // while there are more ports
     while (iterator.hasNext) {
       // get the next port
       val con = iterator.next()
       // if it is a put request (put request are of type (1 -> 2): (go -> next,write)
       if (con.isOutput) {
         if (iterator.hasNext) // if this is not the last port
-          // mk a step keeping the same number of inputs in parallel and current outs,
-          // mk conn & (event * id) to allow time to pass since con executes and the next can go, i.e. they don't synchronise
-          // if periodicity is defined it adds id instead of event since it should immediately do the next operation
-          task = task & mkStep(toSeqConnector(con) & ((if(periodicity.isDefined) id else event) * id),currentIns,currentOuts)
-        else
-          // if it is the last port,
-          // no need to add (event * id) since next of this conn will connect to the initial eventFull
-          task = task & mkStep(toSeqConnector(con),currentIns,currentOuts)
+          // mk a step keeping the same number of inputs in parallel and current outs
+          // if it is a  wait it adds a event before go so that the previous port and this one do not synchronize at the same time
+          task = task & mkStep( (if(con.isWait) event else id) & toSeqConnector(con),currentIns,currentOuts)
+        else // if it is the last port
+          // if it is a  wait it adds a event before go so that the previous port and this one do not synchronize at the same time
+          // if it is periodic it adds an event after next so that next does not have a guard on the same transition the action fires
+          task = task & mkStep( (if(con.isWait) event else id) & toSeqConnector(con) & ((if(periodicity.isDefined) event else id) * id),currentIns,currentOuts)
         // a put increments in 1 the number of outputs
         currentOuts+=1
       } else { // if it is a get request (get request are of type (2 -> 1): (read,go -> next))
-        if (iterator.hasNext)
-          // mk a consuming one input and keeping the same outputs,
-          // if it is not the last add and event after next, to avoid synchronicity with next port
-          // if periodicity is defined it adds id instead of event since it should immediately do the next operation
-          task = task & mkStep(toSeqConnector(con) & (if(periodicity.isDefined) id else event),currentIns-1,currentOuts)
-        else
-          // mk a consuming one input and keeping the same outputs,
-          task = task & mkStep(toSeqConnector(con),currentIns-1,currentOuts)
+        if (iterator.hasNext) // if this is not the last port
+          // mk a step consuming one input and keeping the same outputs
+          // if it is a wait it adds an event before go so that the previous port and this one do not synchronize at the same time
+          task = task & mkStep((id * (if(con.isWait) event else id)) & toSeqConnector(con),currentIns-1,currentOuts)
+        else // if it is the last port
+        // mk a step consuming one input and keeping the same outputs
+        // if it is a wait it adds an event before go so that the previous port and this one do not synchronize at the same time
+        // if it is periodic it adds an event after next so that next does not have a guard on the same transition the action fires
+          task = task & mkStep((id * (if(con.isWait) event else id)) & toSeqConnector(con) & (if(periodicity.isDefined) event else id),currentIns-1,currentOuts)
         // a get decrements in 1 the number of inputs
         currentIns-=1
       }
@@ -137,13 +151,13 @@ object Task {
   /* - Helpers for building virtuoso tasks - */
 
   /** single writer port */
-  private val writer = (n:Option[String],v:Option[IVal],to:Int,t:String,keep:String) =>
+  private val writer = (n:Option[String],v:Option[IVal],to:Int,t:String,keep:String,p:Option[Int]) =>
     Prim("writer",Port(IVal(0)),Port(IVal(1)),
-      Set("component",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t)))
+      Set("component",keep,if (v.isDefined) "writes:"+v.get.n else "",oname(n,to,t),addPeriod(p)))
 
   /** single reader port */
-  private val reader = (n:Option[String],to:Int,t:String) =>
-    Prim("reader",Port(IVal(1)),Port(IVal(0)), Set("component","T",iname(n,to,t)))
+  private val reader = (n:Option[String],to:Int,t:String,p:Option[Int]) =>
+    Prim("reader",Port(IVal(1)),Port(IVal(0)), Set("component","T",iname(n,to,t),addPeriod(p)))
 
 
   /*
@@ -154,32 +168,32 @@ object Task {
    */
 
   /** NW put request */
-  private val nwput = (n:Option[String],v:Option[IVal]) =>
-    (id * writer(None,v,0,"NW","") ) & ( dupl * dupl) & (id * drain * putNB(n,0,"NW")) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+  private val nwput = (n:Option[String],v:Option[IVal],p:Option[Int]) =>
+    (id * writer(None,v,0,"NW","",None) ) & ( dupl * dupl) & (id * drain * putNB(n,0,"NW",p)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
 
   /** TO put request */
-  private val toput = (n:Option[String],to:Int,v:Option[IVal]) =>
-    (id * writer(None,v,to,"TO","") ) & ( dupl * dupl) & (id * drain * putNB(n,to,"TO")) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+  private val toput = (n:Option[String],to:Int,v:Option[IVal],p:Option[Int]) =>
+    (id * writer(None,v,to,"TO","",None) ) & ( dupl * dupl) & (id * drain * putNB(n,to,"TO",p)) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
 
   /** W put request */
-  private val wput = (n:Option[String],v:Option[IVal]) => (id * writer(n,v,0,"W","T")) & ( dupl * dupl) & (id * drain * id)
+  private val wput = (n:Option[String],v:Option[IVal],p:Option[Int]) => (id * writer(n,v,0,"W","T",p)) & ( dupl * dupl) & (id * drain * id)
 
   /* W get request */
-  private val wget = (n:Option[String]) => (dupl * dupl) & (reader(n,0,"W") * drain * id)
+  private val wget = (n:Option[String],p:Option[Int]) => (dupl * dupl) & (reader(n,0,"W",p) * drain * id)
 
   /* NW get request */
-  private val nwget = (n:Option[String]) => getNB(n,0,"NW")
+  private val nwget = (n:Option[String],p:Option[Int]) => getNB(n,0,"NW",p)
 
   /* TO get request */
-  private val toget = (n:Option[String],to:Int) => getNB(n,to,"TO")
+  private val toget = (n:Option[String],to:Int,p:Option[Int]) => getNB(n,to,"TO",p)
 
   /** helper to build non-blocking put request (NW/TO) */
-  private val putNB = (n:Option[String],to:Int,t:String) => Prim("putNB",Port(IVal(1)),Port(IVal(2)), Set("T","to:"+to,oname(n,to,t))) // 1->2 (in->ok*err)
+  private val putNB = (n:Option[String],to:Int,t:String,p:Option[Int]) => Prim("nbput",Port(IVal(1)),Port(IVal(2)), Set("T","to:"+to,oname(n,to,t),addPeriod(p))) // 1->2 (in->ok*err)
 
   /** helper to build non-blocking get request (NW/TO) */
-  private val getNB = (n:Option[String],to:Int,t:String) =>
-    Prim("getNB",Port(IVal(2)),Port(IVal(1)),
-      Set("component","T",iname(n,to,t),"to:"+to)) //& (id * reader(n,t))
+  private val getNB = (n:Option[String],to:Int,t:String,p:Option[Int]) =>
+    Prim("nbget",Port(IVal(2)),Port(IVal(1)),
+      Set("component","T",iname(n,to,t),"to:"+to,addPeriod(p))) //& (id * reader(n,t))
 
   private def iname(n:Option[String],to:Int,t:String) =
     if(n.isDefined) s"portName:${if (t == "TO") to else t} "+n.get+"?" else ""
@@ -196,14 +210,14 @@ object Task {
 
   /** single NW put request */
   private val singleNWput = (n:Option[String],v:Option[IVal],p:Option[Int]) =>
-    writer(n,v,0,"NW","T") & Prim("nbtimer",1,1,Set("to:"+0,addPeriod(p)))
+    writer(n,v,0,"NW","T",p) & Prim("nbtimer",1,1,Set("to:"+0,addPeriod(p)))
 
   /** single W put request */
-  private val singleWput = (n:Option[String],v:Option[IVal]) => writer(n,v,0,"W","T")
+  private val singleWput = (n:Option[String],v:Option[IVal],p:Option[Int]) => writer(n,v,0,"W","T",p)
 
   /** single TO put request */
   private val singleTOput = (n:Option[String],v:Option[IVal],to:Int,p:Option[Int]) =>
-    writer(n,v,to,"TO","") & Prim("nbtimer",1,1,Set("T","to:"+to,addPeriod(p),oname(n,to,"TO")))
+    writer(n,v,to,"TO","",None) & Prim("nbtimer",1,1,Set("T","to:"+to,addPeriod(p),oname(n,to,"TO")))
 
   /** single NW get request */
   private def singleNWget(n:Option[String],p:Option[Int]):Connector =
@@ -211,18 +225,62 @@ object Task {
 
 
   /** single W get request */
-  private val singleWget = (n:Option[String]) => reader(n,0,"W")
+  private val singleWget = (n:Option[String],p:Option[Int]) => reader(n,0,"W",p)
 
   /** single TO get request */
   private val singleTOget = (n:Option[String],to:Int,p:Option[Int]) =>
     Prim("nbreader",Port(IVal(1)),Port(IVal(0)),Set(addPeriod(p),"component","T","to:"+to,iname(n,to,"TO")))
 
+  // NEW DEFINITIONS SINGLE PORT
+  private def onlyGetTO(n:Option[String],to:Int,p:Option[Int]): Connector =
+    Prim("nbget",Port(IVal(1)),Port(IVal(0)),Set(addPeriod(p),"component","T","to:"+to,iname(n,to,"TO")))
+  private def onlyGetNW(n:Option[String],p:Option[Int]): Connector =
+    Prim("nbget",Port(IVal(1)),Port(IVal(0)),Set(addPeriod(p),"component","T","to:"+0,iname(n,0,"TO")))
+  private def onlyGetW(n:Option[String],p:Option[Int]): Connector =
+    reader(n,0,"W",p)
+  private def onlyPutTO(n:Option[String],v:Option[IVal],to:Int,p:Option[Int]):Connector =
+    Prim("nbput",0,1,Set("T","to:"+to,addPeriod(p),oname(n,to,"TO")))
+  private def onlyPutNW(n:Option[String],v:Option[IVal],p:Option[Int]):Connector =
+    Prim("nbput",0,1,Set("T","to:"+0,addPeriod(p),oname(n,0,"TO")))
+  private def onlyPutW(n:Option[String],v:Option[IVal],p:Option[Int]): Connector =
+    writer(n,v,0,"W","T",p)
+
+
+  // NEW DEFINITIONS WHEN SEQUENCE OF PORTS
+//  private def seqPutNW(n:Option[String],v:Option[IVal]):Connector =
+//    (id * writer(None,v,0,"NW","",None) ) & ( dupl * dupl) & (id * drain * putNB(n,0,"NW")) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+
+  /** TO put request */
+//  private val toput = (n:Option[String],to:Int,v:Option[IVal]) =>
+//    (id * writer(None,v,to,"TO","",None) ) & ( dupl * dupl) & (id * drain * putNB(n,to,"TO")) & (event * id * dupl) & (dupl * merger * id) & (id * drain * id)
+//
+//  /** W put request */
+//  private val wput = (n:Option[String],v:Option[IVal]) => (id * writer(n,v,0,"W","T",None)) & ( dupl * dupl) & (id * drain * id)
+//
+//  /* W get request */
+//  private val wget = (n:Option[String]) => (dupl * dupl) & (reader(n,0,"W",None) * drain * id)
+//
+//  /* NW get request */
+//  private val nwget = (n:Option[String]) => getNB(n,0,"NW")
+//
+//  /* TO get request */
+//  private val toget = (n:Option[String],to:Int) => getNB(n,to,"TO")
+//
+//  /** helper to build non-blocking put request (NW/TO) */
+//  private val putNB = (n:Option[String],to:Int,t:String) => Prim("putNB",Port(IVal(1)),Port(IVal(2)), Set("T","to:"+to,oname(n,to,t))) // 1->2 (in->ok*err)
+//
+//  /** helper to build non-blocking get request (NW/TO) */
+//  private val getNB = (n:Option[String],to:Int,t:String) =>
+//    Prim("getNB",Port(IVal(2)),Port(IVal(1)),
+//      Set("component","T",iname(n,to,t),"to:"+to)) //& (id * reader(n,t))
 
   // periodicity
   private def periodic(p:Int):Connector = Prim("psync",Port(IVal(1)),Port(IVal(1)),Set("T","period:"+p))
 
   private def addPeriod(p:Option[Int]):String = if(p.isDefined) s"period:${p.get}" else ""
 
+  // maybe event with period
+  private def mbPEvent(p:Option[Int]):Connector = if (p.isDefined) Prim("pevent",Port(IVal(1)),Port(IVal(1)),Set("period:"+p.get)) else event
 
   /**
     * Convert a TaskPort into a Connector that will be connected in a sequence with other ports
@@ -230,13 +288,13 @@ object Task {
     * @param p a task's port
     * @return  a connector
     */
-  private def toSeqConnector(p:TaskPort):Connector = p match {
-    case GetW(name)  => wget(name)
-    case GetNW(name) => nwget(name)
-    case GetTO(name,to) => toget(name,to)
-    case PutW(name,value) => wput(name,value)
-    case PutNW(name,value) => nwput(name,value)
-    case PutTO(name,value,to) => toput(name,to,value)
+  private def toSeqConnector(p:TaskPort,periodicity:Option[Int]=None):Connector = p match {
+    case GetW(name)  => wget(name,periodicity)
+    case GetNW(name) => nwget(name,periodicity)
+    case GetTO(name,to) => toget(name,to,periodicity)
+    case PutW(name,value) => wput(name,value,periodicity)
+    case PutNW(name,value) => nwput(name,value,periodicity)
+    case PutTO(name,value,to) => toput(name,to,value,periodicity)
   }
 
   /**
@@ -245,12 +303,12 @@ object Task {
     * @return a connector
     */
   private def toSingleConnector(p:TaskPort,periodicity:Option[Int]=None):Connector = p match {
-    case GetW(name)  => singleWget(name)
-    case GetNW(name) => singleNWget(name,periodicity)
-    case GetTO(name,to) => singleTOget(name,to,periodicity)
-    case PutW(name,value) => singleWput(name,value)
-    case PutNW(name,value) => singleNWput(name,value,periodicity)
-    case PutTO(name,value,to) => singleTOput(name,value,to,periodicity)
+    case GetW(name)  => onlyGetW(name,periodicity)
+    case GetNW(name) => onlyGetNW(name,periodicity)
+    case GetTO(name,to) => onlyGetTO(name,to,periodicity)
+    case PutW(name,value) => onlyPutW(name,value,periodicity)
+    case PutNW(name,value) => onlyPutNW(name,value,periodicity)
+    case PutTO(name,value,to) => onlyPutTO(name,value,to,periodicity)
   }
 
 }
@@ -258,6 +316,7 @@ object Task {
 
 
 sealed trait TaskPort {
+  val name:Option[String]
 
   def isInput:Boolean = this match {
     case GetW(_) | GetNW(_) | GetTO(_,_)  => true
@@ -283,12 +342,12 @@ sealed trait TaskPort {
   }
 
   override def toString: String = this match {
-    case GetW(name)  => s"W $name?"
-    case GetNW(name) => s"NW $name?"
-    case GetTO(name,to) => s"$to $name?"
-    case PutW(name,value) => s"W $name!${if(value.isDefined) s"=${value.get.n}" else ""}"
-    case PutNW(name,value) => s"NW $name!${if(value.isDefined) s"=${value.get.n}" else ""}"
-    case PutTO(name,value,to) => s"$to $name!${if(value.isDefined) s"=${value.get.n}" else ""}"
+    case GetW(name)  => s"W ${name.getOrElse("")}?"
+    case GetNW(name) => s"NW ${name.getOrElse("")}?"
+    case GetTO(name,to) => s"$to ${name.getOrElse("")}?"
+    case PutW(name,value) => s"W ${name.getOrElse("")}!" //${if(value.isDefined) s"=${value.get.n}" else ""}"
+    case PutNW(name,value) => s"NW ${name.getOrElse("")}!"//${if(value.isDefined) s"=${value.get.n}" else ""}"
+    case PutTO(name,value,to) => s"$to ${name.getOrElse("")}!" //${if(value.isDefined) s"=${value.get.n}" else ""}"
   }
 }
 
