@@ -316,6 +316,7 @@ object Task {
 
 
 sealed trait TaskPort {
+  val name:Option[String]
 
   def isInput:Boolean = this match {
     case GetW(_) | GetNW(_) | GetTO(_,_)  => true
@@ -341,12 +342,12 @@ sealed trait TaskPort {
   }
 
   override def toString: String = this match {
-    case GetW(name)  => s"W $name?"
-    case GetNW(name) => s"NW $name?"
-    case GetTO(name,to) => s"$to $name?"
-    case PutW(name,value) => s"W $name!${if(value.isDefined) s"=${value.get.n}" else ""}"
-    case PutNW(name,value) => s"NW $name!${if(value.isDefined) s"=${value.get.n}" else ""}"
-    case PutTO(name,value,to) => s"$to $name!${if(value.isDefined) s"=${value.get.n}" else ""}"
+    case GetW(name)  => s"W ${name.getOrElse("")}?"
+    case GetNW(name) => s"NW ${name.getOrElse("")}?"
+    case GetTO(name,to) => s"$to ${name.getOrElse("")}?"
+    case PutW(name,value) => s"W ${name.getOrElse("")}!${if(value.isDefined) s"=${value.get.n}" else ""}"
+    case PutNW(name,value) => s"NW ${name.getOrElse("")}!${if(value.isDefined) s"=${value.get.n}" else ""}"
+    case PutTO(name,value,to) => s"$to ${name.getOrElse("")}!${if(value.isDefined) s"=${value.get.n}" else ""}"
   }
 }
 

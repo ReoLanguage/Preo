@@ -291,7 +291,7 @@ trait Parser extends RegexParsers {
         val ins:Int = ps.count(c=>c.isInput)
         val outs:Int = ps.size - ins
         val params:Set[Any] = Set("T","component",ps,if (period.isDefined) "periodicity:"+period.get.n else "")
-        SubConnector(name.getOrElse("Task"),Prim("task",ins,outs,params),List(Annotation("hide",None)))}|
+        SubConnector(name.getOrElse("Task"),Prim("task",ins,outs,params),List(Annotation("hide",None),Annotation("task",None)))}|
         //SubConnector(name.getOrElse("Task"),task,List(Annotation("hide",None)))}|
     primitiveName
 
