@@ -363,7 +363,6 @@ object Circuit {
         val pNames: Option[List[TaskPort]] = e.prim.extra.find(p=> p.isInstanceOf[List[TaskPort]]).asInstanceOf[Option[List[TaskPort]]]
         var ins:List[(Port,String)] = List()
         var outs:List[(Port,String)] = List()
-        println(pNames)
         if (pNames.isDefined && pNames.get.nonEmpty && extra.contains("task")) {
             ins = e.ins.zip(pNames.get.filter(v=> v.isInput).map(_.toString))
             outs = e.outs.zip(pNames.get.filter(v=> v.isOutput).map(_.toString))
@@ -371,7 +370,6 @@ object Circuit {
           ins = e.ins.map(i=> (i,""))
           outs = e.outs.map(o=>(o,""))
         }
-        println("outs"+outs)
         for ((i,n) <- ins) {
           edges ::= ReoChannel(i, seed, NoArrow, inArrow, n /*mkEdgeName(i,true)*/, Set()) // extras are in the main node
           addNode(i, None, Source, Set(),Set(i))
