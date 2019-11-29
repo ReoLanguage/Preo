@@ -145,23 +145,56 @@ object TreoLite {
       else throw new TypeCheckException(
         s"${c.getName} has ${c.args.size} arguments, but expected ${c.args.size}.")
 
-    def inferFromConn(conn: Connector): List[TVar] =
-        preo.DSL.unsafeTypeOf(expandTreoAST(conn, scope, inferPrim)._1) match {
-          case m@(Type(args, Port(IVal(i)), Port(IVal(j)), BVal(true), _), BVal(true))
-            if args.vars.isEmpty =>
-          /* to track all port names from treo to the Connector ------> */
-//            conn match {
-//              case SubConnector(n,c1,ann) if ann.exists(e=> e.name == "task") =>
-//              println("SubConnector type"+m._1)
-//              mkPortNames(conn,c.args)
-//              case _ => updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
-//            }
-          /* -----> to track all port names from treo to the Connector */
-            updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
-          case _ =>
-            throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
-              s"But non concrete primitive found: ${Show(conn)}")
-        }
+    def getFromTask(conn: Connector): Option[List[TaskPort]] = {
+      def toTaskPort(l: List[_]): List[TaskPort] = l match {
+        case (a: TaskPort) :: rest => a :: (toTaskPort(rest))
+        case _::rest => toTaskPort(rest)
+        case _ => Nil
+      }
+
+      conn match {
+        case SubConnector(_, Prim(_, _, _, extra), _) =>
+          for (e <- extra) e match {
+            case hd :: tl => hd match {
+              // needed, otherwise type would be removed by erasure
+              case hd: TaskPort =>
+                return Some(hd :: toTaskPort(tl))
+              case _ =>
+            }
+            case _ =>
+          }
+          None
+        case _ => None
+      }
+    }
+
+    def inferFromConn(conn: Connector): List[TVar] = {
+      def toTVar(p:TaskPort) = TVar(p.name.getOrElse(""),p.isInput)
+
+      getFromTask(conn) match {
+        // conn is a task - it has the port information inside "extra"
+        case Some(ports) =>
+          ports.map(toTVar)
+        // conn is some primitive: assume leftmost are input, rightmost are output.
+        case _ =>
+          preo.DSL.unsafeTypeOf(expandTreoAST(conn, scope, inferPrim)._1) match {
+            case m@(Type(args, Port(IVal(i)), Port(IVal(j)), BVal(true), _), BVal(true))
+              if args.vars.isEmpty =>
+              /* to track all port names from treo to the Connector ------> */
+              //            conn match {
+              //              case SubConnector(n,c1,ann) if ann.exists(e=> e.name == "task") =>
+              //              println("SubConnector type"+m._1)
+              //              mkPortNames(conn,c.args)
+              //              case _ => updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
+              //            }
+              /* -----> to track all port names from treo to the Connector */
+              updNames(c.args.zipWithIndex.map(pair => TVar(pair._1, pair._2 < i)))
+            case _ =>
+              throw new TypeCheckException(s"Only concrete primitives can be in a Treo block. " +
+                s"But non concrete primitive found: ${Show(conn)}")
+          }
+      }
+    }
 
     c.name match {
       case Left(name) => scope.get(name) match {

@@ -85,6 +85,12 @@ object Automata {
   private def buildAutomata[A<:Automata](g: Network)
                                         (implicit builder:AutomataBuilder[A]): A = {
     val (ins,outs) = collectInsOuts(g)
+    // println("building automata:")
+    // for (p<-g.prims) {
+    //   println(s"- ${p.prim.name} ${p.ins.mkString("[",",","]")} ${p.outs.mkString("[",",","]")}\n")
+    // }
+    // println("--- done ---")
+
     def getNeighbours(e:Prim): List[Prim] =
       ((for (i <- e.ins)  yield outs.getOrElse(i,Set())).flatten ++
       (for (o <- e.outs) yield ins.getOrElse(o,Set())).flatten).distinct //to remove duplicates
