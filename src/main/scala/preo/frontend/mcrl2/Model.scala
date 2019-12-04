@@ -34,17 +34,15 @@ abstract class Model(procs:List[Process],init:ProcessExpr) {
       mleft ++ mright ++ mleft.flatMap(ml => mright.map(mr => ml ++ mr))
     }
     case Comm(syncActions,expr) =>
-      val m = getMultiActions(expr, procs_map)
-      val syncActionsSets = syncActions.map(sa => sa._1.toSet)
-      var res:List[Set[Action]] = List()
-      for (f <- m) {
-        for (s <- syncActionsSets) {
-          if (s.subsetOf(f))
-            res ::= (f -- s)
-          else
-            res ::= (f)
-        }
-      }
+      var res = getMultiActions(expr, procs_map)
+      def rename(toSync:Set[Action],newName:Action,ma:Set[Action]): Set[Action] =
+        if (toSync subsetOf ma)
+          (ma -- toSync) + newName // newName was missing
+        else ma
+
+      for ((sync,ren) <- syncActions) 
+        res = res.map(rename(sync.toSet,ren,_)) // previous double-for was buggy
+      //println(s"[MOD] getting MA from COMM\n - acts: $syncActions\n - expr: $expr\n - inter: ${m.mkString}\n - GOT: $res")
       res
 //    case Comm(syncActions, resultingAction, expr) => {
 //      val m = getMultiActions(expr, procs_map)
@@ -233,13 +231,14 @@ object Model {
       case CSubConnector(name, c1, a) if name == "" => c1
       case c => c
     }
-    val (ins, names_in, procs, names_out, outs) = conToChannels[M](ccon)(primBuilder)
+    val (ins, names_in, procs, names_out, outs, outInits) = conToChannels[M](ccon)(primBuilder)
 
-    val inits = (names_in ++ names_out).toSet
+    val inits: List[ProcessExpr] = 
+      if (outInits.isEmpty) procs.map(_.getName) else outInits.toList //(names_in ++ names_out).toSet
     val init: ProcessExpr =
       if(inits.isEmpty) ProcessName("delta")
       else
-        inits.tail.foldRight(inits.head.asInstanceOf[ProcessExpr])((a, b) => preo.frontend.mcrl2.Par(a, b))
+        inits.tail.foldRight[ProcessExpr](inits.head)(preo.frontend.mcrl2.Par)
 
     init_count = 1
     channel_count = 1
@@ -254,12 +253,14 @@ object Model {
     * @return the output mentioned above
     */
   def conToChannels[M<:Model](ccon: CoreConnector)(implicit primBuilder: PrimBuilder[M]):
-  (List[Action], List[ProcessName], List[Process], List[ProcessName], List[Action]) = ccon match {
+  (List[Action], List[ProcessName], List[Process], List[ProcessName], List[Action], Set[ProcessExpr]) = ccon match {
     case CSeq(c1, c2) =>
-      val (in1, namesIn1, procs1, namesOut1, out1) = conToChannels(c1)
-      val (in2, namesIn2, procs2, namesOut2, out2) = conToChannels(c2)
+      val (in1, namesIn1, procs1, namesOut1, out1,_) = conToChannels(c1)
+      val (in2, namesIn2, procs2, namesOut2, out2,_) = conToChannels(c2)
 
       val inits = makeInits(namesOut1, out1, namesIn2, in2)
+      val outInits: Set[ProcessExpr] = inits.values.map(_.getName).toSet
+      //println(s"[MOD] new inits ${inits.mkString(" ## ")}")
       val replaced1 = namesIn1.map(name => {
         getRealName(inits, name)
       })
@@ -268,12 +269,12 @@ object Model {
       })
       init_count += 1
 
-      (in1, replaced1, procs1 ++ procs2 ++ inits.values.toSet.toList, replaced2, out2) //inits1.values == inits2.values
+      (in1, replaced1, procs1 ++ procs2 ++ inits.values.toSet.toList, replaced2, out2, outInits) //inits1.values == inits2.values
 
     case CPar(c1, c2) =>
-      val (in1, namesIn1, procs1, namesOut1, out1) = conToChannels(c1)
-      val (in2, namesIn2, procs2, namesOut2, out2) = conToChannels(c2)
-      (in1 ++ in2, namesIn1 ++ namesIn2, procs1 ++ procs2, namesOut1 ++ namesOut2, out1 ++ out2)
+      val (in1, namesIn1, procs1, namesOut1, out1, oInits1) = conToChannels(c1)
+      val (in2, namesIn2, procs2, namesOut2, out2, oInits2) = conToChannels(c2)
+      (in1 ++ in2, namesIn1 ++ namesIn2, procs1 ++ procs2, namesOut1 ++ namesOut2, out1 ++ out2, oInits1 ++ oInits2)
 
     case CSymmetry(CoreInterface(i), CoreInterface(j)) =>
 //      val channels = makeSyncs(i + j)
@@ -287,12 +288,14 @@ object Model {
       val namesIn: List[ProcessName] = channels.flatMap(f => f.in.map(_ => f.getName))
       val namesOut: List[ProcessName] = channels.flatMap(f => f.out.map(_ => f.getName))
 
-      (ins, namesIn, channels, namesOut.drop(i) ++ namesOut.take(i), outs.drop(i) ++ outs.take(i))
+      (ins, namesIn, channels, namesOut.drop(i) ++ namesOut.take(i), outs.drop(i) ++ outs.take(i), Set())
 
     case CTrace(CoreInterface(i), c) =>
-      val (in, namesIn, procs, namesOut, out) = conToChannels(c)
+      val (in, namesIn, procs, namesOut, out, _) = conToChannels(c)
 
       val inits = makeInits(namesOut.takeRight(i), out.takeRight(i), namesIn.takeRight(i), in.takeRight(i))
+      val outInits: Set[ProcessExpr] = inits.values.map(_.getName).toSet
+
       val replaced1 = namesIn.dropRight(i).map(name => {
         getRealName(inits, name)
       })
@@ -301,7 +304,7 @@ object Model {
       })
       init_count += 1
 
-      (in.dropRight(i), replaced1, procs ++ inits.values.toSet.toList, replaced2, out.dropRight(i))
+      (in.dropRight(i), replaced1, procs ++ inits.values.toSet.toList, replaced2, out.dropRight(i), outInits)
 
     case CId(CoreInterface(i)) =>
       val channels = (for (j <- 1 to i) yield {
@@ -315,13 +318,13 @@ object Model {
       val namesIn: List[ProcessName]  = channels.flatMap(f => f.in.map(_ => f.getName))
       val namesOut: List[ProcessName] = channels.flatMap(f => f.out.map(_ => f.getName))
 
-      (ins, namesIn, channels, namesOut, outs)
+      (ins, namesIn, channels, namesOut, outs, Set())
 
     case CSubConnector(name, c, anns) =>
       val toHide = Annotation.hidden(anns)
       val c2 = if (toHide)  hideAllSubConn(c) else c
 
-      val (in, namesIn, procs, namesOut, out) = conToChannels(c2)
+      val (in, namesIn, procs, namesOut, out, oInit) = conToChannels(c2)
 
       var count = 1
       for (proc <- procs; a <- proc.getActions if a.state != Sync) {
@@ -349,14 +352,14 @@ object Model {
             i.toHide = true // TODO: CHECK if it makes sense (seems ok now)
           case x      =>
         }
-      (in, namesIn, procs, namesOut, out)
+      (in, namesIn, procs, namesOut, out, oInit)
 
     case x@CPrim(_, _, _, _) =>
       val channel = primBuilder.buildPrimChannel(x,channel_count) // primToChannel(x)
       channel_count+=1
-      (channel.in, channel.in.map(_ => channel.getName), List(channel), channel.out.map(_ => channel.getName), channel.out)
+      (channel.in, channel.in.map(_ => channel.getName), List(channel), channel.out.map(_ => channel.getName), channel.out, Set())
 
-    case _ => (Nil, Nil, Nil, Nil, Nil)
+    case _ => (Nil, Nil, Nil, Nil, Nil, Set())
   }
 
   /**
