@@ -105,10 +105,13 @@ trait Parser extends RegexParsers {
   /** Top rule - already performs some semantic analysis (TreoLite.expand)
     * to replace primitives denoting Treo definitions by ther Preo counterparts. */
   def preo: Parser[Connector] =
-    prog ^^ {p => TreoLite.treoASTToTreo(p,inferPrim)}
+    prog(connP) ^^ {p => TreoLite.treoASTToTreo(p,inferPrim)}
 
-  def prog: Parser[Connector] =
-    opt(annotate)~connP~opt("{"~>whereP<~"}")  ^^ {
+  def treo: Parser[Connector] =
+    prog(trConnsEmpty) ^^ {p => TreoLite.treoASTToTreo(p,inferPrim)}
+
+  def prog(p:Parser[Connector]): Parser[Connector] =
+    opt(annotate)~p~opt("{"~>whereP<~"}")  ^^ {
       case Some(annotation) ~ co ~ Some(p) => SubConnector("", p(co), annotation)
       case Some(annotation) ~co ~ None     => SubConnector("", co, annotation)
       case None~ co ~ Some(p) =>  p(co)
@@ -116,7 +119,7 @@ trait Parser extends RegexParsers {
     }
 
   def whereP: Parser[Connector=>Connector] =
-    opt(annotate)~identifier~"="~prog~opt(","~>whereP) ^^ {
+    opt(annotate)~identifier~"="~prog(connP)~opt(","~>whereP) ^^ {
       case anns~s~_~co2~where => (co:Connector) =>
         Substitution.replacePrim(s, where.getOrElse((x:Connector)=>x)(co),
                                  SubConnector(s,co2, anns.getOrElse(Nil)))
@@ -142,6 +145,10 @@ trait Parser extends RegexParsers {
     identifier~"("~opt(trTypedArgs)~")"~"="~trConns ^^ {
       case s~_~args~_~_~cons =>
         Prim(s,1,1,Set(TreoLiteAST(args.getOrElse(Nil),cons)))
+    }
+  def trConnsEmpty: Parser[Prim] =
+    trConns ^^ {
+      cons => Prim("main",1,1,Set(TreoLiteAST(Nil,cons)))
     }
   def trTypedArgs: Parser[List[TVar]] =
     trTypedArg ~ rep(","~>trTypedArg) ^^ {
@@ -201,7 +208,8 @@ trait Parser extends RegexParsers {
   // Connector //
   ///////////////
 
-  def connP: Parser[Connector] = lamP
+  def connP: Parser[Connector] =
+    "{"~>trConnsEmpty<~"}" | lamP
 
   def lamP: Parser[Connector] =
     "\\"~>identifier~lamCont ^^ { case s ~ cont => cont(s,IntType)}  |
