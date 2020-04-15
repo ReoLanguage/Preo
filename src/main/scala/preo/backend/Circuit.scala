@@ -296,7 +296,7 @@ object Circuit {
 
   // todo: fix drains
   private def toVirtuoso(g:Network): Circuit = {
-    //println(g)
+//    println(g)
     var seed:Int = (0::(g.ins ++ g.outs ++ g.prims.flatMap(x => x.ins ++ x.outs))).max
 
     val nodes  = scala.collection.mutable.Set[ReoNode]()
@@ -332,8 +332,7 @@ object Circuit {
       * @param extra of the node to be added or updated
       */
     def addNode(id:Int,name:Option[String],nType:NodeType,extra:Set[Any],ports:Set[Port]): Unit = {
-      //      print(s"adding node $id $name $nType $extra")
-      if (!nodes.exists(_ similar ReoNode(id,name,Mixed,Set(),ports))) {
+//        print(s"adding node $id $name $nType $extra")
         nodes.find(_ similar ReoNode(id,name,nType.dual,Set(),ports)) match {
           case Some(rn) =>
             nodes -= rn
@@ -341,8 +340,7 @@ object Circuit {
           case None =>
             nodes += ReoNode(id, name, nType, extra,ports)
         }
-      }
-      //      println(s" - nodes ${nodes.mkString(",")}")
+//        println(s" - nodes ${nodes.mkString(",")}")
     }
 
 
@@ -419,8 +417,9 @@ object Circuit {
         }
       }
     }
-
-    val g1 = changeDrains(remapGraph(Circuit(edges,nodes.toList),remap,nodeEdges))
+    val g0 = remapGraph(Circuit(edges,nodes.toList),remap,nodeEdges)
+//    println("After remaping graph:\n"+g0)
+    val g1 = changeDrains(g0)
 //    println("After changing drains:\n"+g1)
     val g2 = expandCollidingChannels(g1,seed)
 //    println("After expanding colliding channels:\n"+g2)
