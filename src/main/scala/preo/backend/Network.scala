@@ -132,14 +132,21 @@ object Network {
       seed += (pi+pj)
       Network(List(Prim(p,i,j,Nil)),i,j)
 
-      // HIDING subonnector
+      // HIDING subconnector
     case CSubConnector(name, sub, anns)
         if hideSome && Annotation.hidden(anns) =>
       val (t,_) = preo.DSL.unsafeTypeOf(sub.toConnector)
       val dummy = toGraph(sub,hideSome = false) // generating everything, but using only the port names
       val (i,j) = (dummy.ins,dummy.outs)
       val allPorts = dummy.prims.flatMap(prim => prim.ins:::prim.outs).toSet
-      var portNames:List[TaskPort] = dummy.prims.flatMap(prim=> prim.prim.extra.filter(e=> e.isInstanceOf[List[TaskPort]])).asInstanceOf[List[List[TaskPort]]].flatten
+      def getTaskPorts(a:Any): List[TaskPort] = a match {
+        case l:List[_] if l.forall(_.isInstanceOf[TaskPort]) =>
+          l.map(_.asInstanceOf[TaskPort])
+        case _ => Nil
+      }
+      val portNames: List[TaskPort] =
+        dummy.prims.flatMap(prim => //prim.prim.extra.filter(e => e.isInstanceOf[List[TaskPort]])).asInstanceOf[List[List[TaskPort]]].flatten
+          prim.prim.extra.flatMap(getTaskPorts))
 
       val p = CPrim(s"$name",preo.frontend.Eval.reduce(t.i),preo.frontend.Eval.reduce(t.j),
                    if(anns.exists(e=>e.name=="task")) Set("box","task",("ports",allPorts), portNames/*portNames.asInstanceOf[List[List[TVar]]].flatten,*/)

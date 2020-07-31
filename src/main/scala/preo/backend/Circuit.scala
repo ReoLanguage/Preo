@@ -358,12 +358,22 @@ object Circuit {
         val inArrow = if (isComp) ArrowOut else NoArrow
         seed += 1
         addNode(seed, Some(e.prim.name), typ, extra,(e.ins++e.outs).toSet) // Main node: preserve box/component
-        val pNames: Option[List[TaskPort]] = e.prim.extra.find(p=> p.isInstanceOf[List[TaskPort]]).asInstanceOf[Option[List[TaskPort]]]
+        def asTaskPort(a:Any): List[TaskPort] = a match {
+          case l:List[_] if l.forall(_.isInstanceOf[TaskPort]) =>
+            l.map(_.asInstanceOf[TaskPort])
+          case _ => Nil
+        }
+        val pNames: Set[TaskPort] = // Option[List[TaskPort]] =
+//          e.prim.extra.find(p=> p.isInstanceOf[List[TaskPort]]).asInstanceOf[Option[List[TaskPort]]]
+          e.prim.extra.map(asTaskPort).flatten // merge all lists of taskports!
         var ins:List[(Port,String)] = List()
         var outs:List[(Port,String)] = List()
-        if (pNames.isDefined && pNames.get.nonEmpty && extra.contains("task")) {
-            ins = e.ins.zip(pNames.get.filter(v=> v.isInput).map(_.toString))
-            outs = e.outs.zip(pNames.get.filter(v=> v.isOutput).map(_.toString))
+//        if (pNames.isDefined && pNames.get.nonEmpty && extra.contains("task")) {
+//            ins = e.ins.zip(pNames.get.filter(v=> v.isInput).map(_.toString))
+//            outs = e.outs.zip(pNames.get.filter(v=> v.isOutput).map(_.toString))
+        if (pNames.nonEmpty && extra.contains("task")) {
+          ins = e.ins.zip(pNames.filter(v=> v.isInput).map(_.toString))
+          outs = e.outs.zip(pNames.filter(v=> v.isOutput).map(_.toString))
         } else {
           ins = e.ins.map(i=> (i,""))
           outs = e.outs.map(o=>(o,""))
