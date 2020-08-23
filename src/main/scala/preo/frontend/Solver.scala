@@ -18,7 +18,7 @@ object Solver {
   private var seed = 0
   private var boolVars: scala.collection.mutable.Map[String,BoolVar] = null
   private var intVars: scala.collection.mutable.Map[String,IntVar] = null
-  private var solver: CSolver = null
+  // private var solver: CSolver = null
 
   private def MAX_INT:Int =  1000//VariableFactory.MAX_INT_BOUND
   private def MIN_INT:Int = 0//VariableFactory.MIN_INT_BOUND
