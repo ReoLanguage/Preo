@@ -143,7 +143,7 @@ object Circuit {
       edges += ReoChannel(i,o,a1,a2,str,extra)
     }
 
-    def addRemap(pair: (Int, Int),srcs:List[Int]): Unit = {
+    def addRemap(pair: (Int, Int),srcs:Set[Int]): Unit = {
       //print(s"adding remap ${pair._1}->${pair._2}\n")
       toRemap.get(pair._1) match {
         case Some(newPort) => // orig already existed
@@ -180,9 +180,11 @@ object Circuit {
           case lst =>
             seed += 1
             addNode(seed,None,Mixed,e.prim.extra,(e.ins++e.outs).toSet)
+            val inSet = e.ins.toSet
             for (p <- lst) {
-              addRemap(p -> seed, e.ins)
-              mirrors += seed -> p
+              addRemap(p -> seed, inSet)
+//              if (inSet(p))
+                mirrors += seed -> p
             }
             toRemap += seed->seed // adding self loop in the end on purpose
 

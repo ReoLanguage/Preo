@@ -2,7 +2,7 @@ package preo.backend
 
 import preo.ast._
 import preo.common.TypeCheckException
-import preo.frontend.{Show, TVar, TaskPort, TreoLite}
+import preo.frontend.{Show, TaskPort, TreoLite}
 
 import scala.collection.mutable
 
@@ -14,7 +14,7 @@ import scala.collection.mutable
   * Can be simplified, and reused by other tools, e.g., visualiser ([[Circuit]]) or automata semantics ([[PortAutomata]]).
   */
 case class Network(prims:List[Network.Prim], ins:List[Network.Port], outs:List[Network.Port]) {
-  def ++(other:Network) = Network(prims++other.prims,ins++other.ins,outs++other.outs)
+  def ++(other:Network): Network = Network(prims++other.prims,ins++other.ins,outs++other.outs)
 }
 
 
@@ -42,6 +42,13 @@ object Network {
         more ++= next
       }
       res
+    }
+
+    def inverse(): Unit = {
+      val copy = mirrors.toList
+      mirrors.clear()
+      for (kv <- copy; out <- kv._2)
+        this += kv._1 -> out
     }
 
     override def toString: String =
@@ -330,11 +337,15 @@ object Network {
       // println(s"$ins $outs $ins1 $outs1 $ins2 $outs2")
       //// shared port will reflect any of the inputs of the first node
       val shared = (ins1.toSet++outs2.toSet++ins2.toSet++outs1.toSet) -- (ins++outs) // should be 1
-      for (s <- shared; p <- ins1.toSet if outs1 contains s)
+      for (s <- shared; p <- ins1.toSet if outs1 contains s) {
+        //println(s"[1] $p -> $s")
+        ms += p -> s
+      }
+      for (s <- shared; p <- ins2.toSet if outs2 contains s) {
+        //println(s"[2] $s -> $p")
         ms += s -> p
-      for (s <- shared; p <- ins2.toSet if outs2 contains s)
-        ms += s -> p
-//      for (old <- (ins1.toSet intersect outs2.toSet) ++ (ins2.toSet intersect( outs1.toSet))) {}
+      }
+      //      for (old <- (ins1.toSet intersect outs2.toSet) ++ (ins2.toSet intersect( outs1.toSet))) {}
       if (ins1.size+outs1.size+ins2.size+outs2.size - ins.size - outs.size <= 2)
         Prim(CPrim("node",CoreInterface(ins.size),CoreInterface(outs.size),ex1++ex2)
                   ,ins.toList,outs.toList,newpars)
@@ -344,10 +355,12 @@ object Network {
          ,Prim(CPrim(name2,CoreInterface(1),CoreInterface(1),ex2),List(i2),List(o2),_))
         if Set("sync","id","port","node").contains(name2) =>
       if (is1 contains o2) {
+        //println(s"[3] $o2 -> $i2")
         ms += o2 -> i2
         Prim(CPrim(name1,ip1,op1,ex1++ex2),replace(is1,o2->i2),os1,ps1)
       }
       else {
+        //println(s"[4] $i2 -> $o2")
         ms += i2 -> o2
         Prim(CPrim(name1,ip1,op1,ex1++ex2),is1,replace(os1,i2->o2),ps1)
       }
@@ -529,7 +542,7 @@ object Network {
           }
         if (nb.prim.name=="node")
           nbNodes += nb -> (nbNodes.getOrElse(nb,Set[Port]())+port)
-        print("c ")
+        //print("c ")
         // case 1: self-loop
         if (!updated && nb==next) {
           val nextExpanded = makeSelfLoop(next, mirrors)
