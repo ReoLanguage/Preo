@@ -6,7 +6,6 @@ import preo.backend.Network.{Mirrors, Port}
 import preo.frontend.{TVar, TaskPort}
 
 import scala.collection.mutable
-import scala.collection.parallel.Task
 
 /**
   * Created by jose on 07/07/2017.

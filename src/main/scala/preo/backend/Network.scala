@@ -638,8 +638,8 @@ object Network {
       seed += 1
     }
     val newFrom = Prim(from.prim,ins,outs,from.parents)
-    inmap2  =  inmap2.mapValues(set => if (set contains from) set-from+newFrom else set)
-    outmap2 = outmap2.mapValues(set => if (set contains from) set-from+newFrom else set)
+    inmap2  =  inmap2.view.mapValues(set => if (set contains from) set-from+newFrom else set).toMap
+    outmap2 = outmap2.view.mapValues(set => if (set contains from) set-from+newFrom else set).toMap
     (newFrom :: syncs, (inmap2,outmap2))
   }
 

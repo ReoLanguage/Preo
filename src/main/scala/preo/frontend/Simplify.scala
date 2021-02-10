@@ -4,7 +4,7 @@ import preo.DSL
 import preo.ast._
 import preo.common.Utils
 
-import scala.collection.convert.Wrappers.{JCollectionWrapper, JIterableWrapper}
+//import scala.collection.convert.Wrappers.{JCollectionWrapper, JIterableWrapper}
 //import scala.collection.immutable.Bag
 import preo.common.{Multiset => Bag}
 
@@ -254,14 +254,14 @@ object Simplify {
     for ((v,c) <- optLits.lits.map) {
       // TODO: improve by checking if variable only appears once before moving
       if ((c/gcdc) == -1 && v.size == 1) {
-        val res = EQ(lits2IExpr(OptLits(Lits(optLits.lits.map.mapValues(_ / gcdc) - v), optLits.rest)), Var(v.head))
+        val res = EQ(lits2IExpr(OptLits(Lits(optLits.lits.map.view.mapValues(_ / gcdc).toMap - v), optLits.rest)), Var(v.head))
 //        println(s"#### checking if ${v.head} is a temp variable.")
         if (Utils.isGenVar(v.head))
           return res
         else todo = Some(res)
       }
       if ((c/gcdc) == 1 && v.size == 1) {
-        val res = EQ( Var(v.head), lits2IExpr(OptLits(Lits((optLits.lits.map - v).mapValues(-_/gcdc)),optLits.rest.map(neg(_)))))
+        val res = EQ( Var(v.head), lits2IExpr(OptLits(Lits((optLits.lits.map - v).view.mapValues(-_/gcdc).toMap),optLits.rest.map(neg(_)))))
 //        println(s"#### checking if ${v.head} is a temp variable.")
         if (Utils.isGenVar(v.head))
           return res
@@ -306,7 +306,7 @@ object Simplify {
   }
   
   private def neg(ls:OptLits): OptLits = {
-    val newlits = Lits(ls.lits.map.mapValues(-_))
+    val newlits = Lits(ls.lits.map.view.mapValues(-_).toMap)
     val newrest:Set[IExpr] = for (e <- ls.rest) yield neg(e)
     OptLits(newlits,newrest)
   }

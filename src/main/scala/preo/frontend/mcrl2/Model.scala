@@ -40,7 +40,7 @@ abstract class Model(procs:List[Process],init:ProcessExpr) {
           (ma -- toSync) + newName // newName was missing
         else ma
 
-      for ((sync,ren) <- syncActions) 
+      for ((sync,ren) <- syncActions)
         res = res.map(rename(sync.toSet,ren,_)) // previous double-for was buggy
       //println(s"[MOD] getting MA from COMM\n - acts: $syncActions\n - expr: $expr\n - inter: ${m.mkString}\n - GOT: $res")
       res
@@ -255,8 +255,8 @@ object Model {
   def conToChannels[M<:Model](ccon: CoreConnector)(implicit primBuilder: PrimBuilder[M]):
   (List[Action], List[ProcessName], List[Process], List[ProcessName], List[Action], Set[ProcessExpr]) = ccon match {
     case CSeq(c1, c2) =>
-      val (in1, namesIn1, procs1, namesOut1, out1,_) = conToChannels(c1)
-      val (in2, namesIn2, procs2, namesOut2, out2,_) = conToChannels(c2)
+      val (in1, namesIn1, procs1, namesOut1, out1,_) = conToChannels(c1)(primBuilder)
+      val (in2, namesIn2, procs2, namesOut2, out2,_) = conToChannels(c2)(primBuilder)
 
       val inits = makeInits(namesOut1, out1, namesIn2, in2)
       val outInits: Set[ProcessExpr] = inits.values.map(_.getName).toSet
@@ -272,8 +272,8 @@ object Model {
       (in1, replaced1, procs1 ++ procs2 ++ inits.values.toSet.toList, replaced2, out2, outInits) //inits1.values == inits2.values
 
     case CPar(c1, c2) =>
-      val (in1, namesIn1, procs1, namesOut1, out1, oInits1) = conToChannels(c1)
-      val (in2, namesIn2, procs2, namesOut2, out2, oInits2) = conToChannels(c2)
+      val (in1, namesIn1, procs1, namesOut1, out1, oInits1) = conToChannels(c1)(primBuilder)
+      val (in2, namesIn2, procs2, namesOut2, out2, oInits2) = conToChannels(c2)(primBuilder)
       (in1 ++ in2, namesIn1 ++ namesIn2, procs1 ++ procs2, namesOut1 ++ namesOut2, out1 ++ out2, oInits1 ++ oInits2)
 
     case CSymmetry(CoreInterface(i), CoreInterface(j)) =>
@@ -291,7 +291,7 @@ object Model {
       (ins, namesIn, channels, namesOut.drop(i) ++ namesOut.take(i), outs.drop(i) ++ outs.take(i), Set())
 
     case CTrace(CoreInterface(i), c) =>
-      val (in, namesIn, procs, namesOut, out, _) = conToChannels(c)
+      val (in, namesIn, procs, namesOut, out, _) = conToChannels(c)(primBuilder)
 
       val inits = makeInits(namesOut.takeRight(i), out.takeRight(i), namesIn.takeRight(i), in.takeRight(i))
       val outInits: Set[ProcessExpr] = inits.values.map(_.getName).toSet
@@ -324,7 +324,7 @@ object Model {
       val toHide = Annotation.hidden(anns)
       val c2 = if (toHide)  hideAllSubConn(c) else c
 
-      val (in, namesIn, procs, namesOut, out, oInit) = conToChannels(c2)
+      val (in, namesIn, procs, namesOut, out, oInit) = conToChannels(c2)(primBuilder)
 
       var count = 1
       for (proc <- procs; a <- proc.getActions if a.state != Sync) {
