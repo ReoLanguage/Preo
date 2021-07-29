@@ -422,17 +422,17 @@ object Solver {
     case GE(IVal(n), Var(x)) => varIntIntervals(GE(Var(x),IVal(n)))
     //
     case GT(Mul(IVal(n1),Var(x)),IVal(n)) =>
-      if (n1>0) varIntIntervals(GT(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
-      else      varIntIntervals(LT(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+      if (n1>0) varIntIntervals(GT(Var(x),IVal(Math.floor((n.toFloat)/(n1.toFloat)).toInt)))
+      else      varIntIntervals(LT(Var(x),IVal(Math.floor((n.toFloat)/(n1.toFloat)).toInt)))
     case LT(Mul(IVal(n1),Var(x)),IVal(n)) =>
-      if (n1>0) varIntIntervals(LT(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
-      else      varIntIntervals(GT(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+      if (n1>0) varIntIntervals(LT(Var(x),IVal(Math.ceil((n.toFloat)/(n1.toFloat)).toInt)))
+      else      varIntIntervals(GT(Var(x),IVal(Math.ceil((n.toFloat)/(n1.toFloat)).toInt)))
     case LE(Mul(IVal(n1),Var(x)),IVal(n)) =>
-      if (n1>0) varIntIntervals(LE(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
-      else      varIntIntervals(GE(Var(x),IVal(Math.floor((n:Float)/(n1:Float)).toInt)))
+      if (n1>0) varIntIntervals(LE(Var(x),IVal(Math.floor((n.toFloat)/(n1.toFloat)).toInt)))
+      else      varIntIntervals(GE(Var(x),IVal(Math.floor((n.toFloat)/(n1.toFloat)).toInt)))
     case GE(Mul(IVal(n1),Var(x)),IVal(n)) =>
-      if (n1>0) varIntIntervals(GE(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
-      else      varIntIntervals(LE(Var(x),IVal(Math.ceil((n:Float)/(n1:Float)).toInt)))
+      if (n1>0) varIntIntervals(GE(Var(x),IVal(Math.ceil((n.toFloat)/(n1.toFloat)).toInt)))
+      else      varIntIntervals(LE(Var(x),IVal(Math.ceil((n.toFloat)/(n1.toFloat)).toInt)))
     case _ => (Map(),bEXpr)
   }
   private def mkRange(x:String,from:Option[Int],to:Option[Int]): (Map[Var,Interval],BExpr) =
